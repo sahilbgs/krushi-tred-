@@ -29,11 +29,9 @@ export const SalesBilling = ({ onBillCreated }) => {
     stockId: '',
     seedId: '',
     varietyName: '',
-    batchNo: '',
     bagWeightKg: 50,
     bags: 1,
     looseKg: 0,
-    rateType: 'kg', // 'kg' or 'bag'
     rate: 140
   });
 
@@ -61,11 +59,9 @@ export const SalesBilling = ({ onBillCreated }) => {
         stockId: selectedStock.id,
         seedId: selectedStock.seedId,
         varietyName: selectedStock.varietyName,
-        batchNo: selectedStock.batchNo,
         bagWeightKg: selectedStock.bagWeightKg,
         bags: 1,
         looseKg: 0,
-        rateType: 'kg',
         rate: defaultRate
       });
     } else {
@@ -79,7 +75,7 @@ export const SalesBilling = ({ onBillCreated }) => {
     setErrorMessage('');
 
     if (!currentItem.stockId) {
-      setErrorMessage("કૃપા કરીને બિયારણ અને બેચ પસંદ કરો.");
+      setErrorMessage("કૃપા કરીને બિયારણ પસંદ કરો.");
       return;
     }
 
@@ -120,7 +116,6 @@ export const SalesBilling = ({ onBillCreated }) => {
       stockId: '',
       seedId: '',
       varietyName: '',
-      batchNo: '',
       bagWeightKg: 50,
       bags: 1,
       looseKg: 0,
@@ -297,7 +292,7 @@ export const SalesBilling = ({ onBillCreated }) => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">બિયારણ જાત & ઉપલબ્ધ બેચ પસંદ કરો *</label>
+              <label className="form-label">બિયારણ જાત પસંદ કરો *</label>
               <select 
                 className="form-control"
                 value={currentItem.stockId}
@@ -305,7 +300,7 @@ export const SalesBilling = ({ onBillCreated }) => {
                 <option value="">-- બિયારણ પસંદ કરો --</option>
                 {stock.map(s => (
                   <option key={s.id} value={s.id}>
-                    {s.varietyName} | બેચ: {s.batchNo} (હાજર: {s.availableBags} બોરી + {s.availableLooseKg} kg)
+                    {s.varietyName} (હાજર: {s.availableBags} બોરી + {s.availableLooseKg} kg)
                   </option>
                 ))}
               </select>
@@ -390,7 +385,6 @@ export const SalesBilling = ({ onBillCreated }) => {
                   <tr>
                     <th>ક્રમ</th>
                     <th>બિયારણ જાત</th>
-                    <th>બેચ નં</th>
                     <th>બોરી</th>
                     <th>છૂટક KG</th>
                     <th>કુલ કિલો</th>
@@ -404,7 +398,6 @@ export const SalesBilling = ({ onBillCreated }) => {
                     <tr key={idx}>
                       <td>{idx + 1}</td>
                       <td style={{ fontWeight: '600' }}>{it.varietyName}</td>
-                      <td><span className="badge badge-primary">{it.batchNo}</span></td>
                       <td style={{ fontWeight: '600' }}>{it.bags}</td>
                       <td>{it.looseKg} kg</td>
                       <td style={{ fontWeight: '700', color: '#064e3b' }}>{it.totalWeightKg} kg</td>

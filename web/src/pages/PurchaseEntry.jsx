@@ -15,12 +15,11 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
   const [currentItem, setCurrentItem] = useState({
     seedId: '',
     varietyName: '',
-    batchNo: '',
     bagWeightKg: 50,
     bags: 10,
     netWeightKg: 500,
-    rateType: 'bag',
-    purchaseRate: 6000
+    rateType: 'kg',
+    purchaseRate: 120
   });
 
   const [items, setItems] = useState([]);
@@ -38,7 +37,6 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       setCurrentItem({
         seedId: seed.id,
         varietyName: seed.varietyName,
-        batchNo: `LOT-${new Date().getFullYear()}/${Math.floor(10 + Math.random() * 90)}`,
         bagWeightKg: seed.bagWeightKg,
         bags: defaultBags,
         netWeightKg: defaultBags * seed.bagWeightKg,
@@ -66,10 +64,6 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       setErrMsg("કૃપા કરીને બિયારણ જાત પસંદ કરો.");
       return;
     }
-    if (!currentItem.batchNo) {
-      setErrMsg("કૃપા કરીને બેચ / લોટ નંબર દાખલ કરો.");
-      return;
-    }
     if (currentItem.bags <= 0) {
       setErrMsg("બોરીની સંખ્યા ૧ કે તેથી વધુ હોવી જોઈએ.");
       return;
@@ -84,7 +78,6 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     setCurrentItem({
       seedId: '',
       varietyName: '',
-      batchNo: '',
       bagWeightKg: 50,
       bags: 10,
       netWeightKg: 500,
@@ -236,7 +229,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
           {/* Seeds Inward Row */}
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title">૨. બિયારણ, બેચ & સ્ટોક ઇન્વર્ડ</h3>
+              <h3 className="card-title">૨. બિયારણ વિગત & સ્ટોક ઇન્વર્ડ</h3>
             </div>
 
             <div className="form-group">
@@ -256,28 +249,16 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
 
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">બેચ / લોટ નંબર *</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  value={currentItem.batchNo}
-                  onChange={(e) => setCurrentItem(prev => ({ ...prev, batchNo: e.target.value }))}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">બોરીની સંખ્યા (Bags)</label>
+                <label className="form-label">બોરીની સંખ્યા (Bags) *</label>
                 <input 
                   type="number" 
                   min="1"
                   className="form-control" 
-                  value={currentItem.bags}
-                  onChange={(e) => handleBagsChange(e.target.value)}
+                  value={currentItem.bags} 
+                  onChange={(e) => handleBagsChange(e.target.value)} 
                 />
               </div>
-            </div>
 
-            <div className="form-row">
               <div className="form-group">
                 <label className="form-label">કુલ નેટ વજન (KG)</label>
                 <input 
@@ -331,7 +312,6 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
                   <tr>
                     <th>ક્રમ</th>
                     <th>બિયારણ જાત</th>
-                    <th>બેચ નં</th>
                     <th>બોરી (Bags)</th>
                     <th>કુલ વજન (KG)</th>
                     <th>ખરીદી ભાવ (₹/kg)</th>
@@ -344,7 +324,6 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
                     <tr key={idx}>
                       <td>{idx + 1}</td>
                       <td style={{ fontWeight: '600' }}>{it.varietyName}</td>
-                      <td><span className="badge badge-primary">{it.batchNo}</span></td>
                       <td style={{ fontWeight: '700' }}>{it.bags} બોરી</td>
                       <td style={{ fontWeight: '700' }}>{it.netWeightKg} kg</td>
                       <td>₹{it.purchaseRate} /kg</td>

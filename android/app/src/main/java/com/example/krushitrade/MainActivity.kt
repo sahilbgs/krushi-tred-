@@ -53,7 +53,6 @@ fun MainApp(repository: FirebaseRepository) {
                 id = "stk_1",
                 seedId = "seed_1",
                 varietyName = "GJG-22 (મગફળી)",
-                batchNo = "LOT-2026/01",
                 bagWeightKg = 50.0,
                 availableBags = 120,
                 availableLooseKg = 25.0,
@@ -64,7 +63,6 @@ fun MainApp(repository: FirebaseRepository) {
                 id = "stk_2",
                 seedId = "seed_2",
                 varietyName = "GJG-23 (અર્ધવેલડી)",
-                batchNo = "LOT-2026/02",
                 bagWeightKg = 50.0,
                 availableBags = 80,
                 availableLooseKg = 40.0,
@@ -75,7 +73,6 @@ fun MainApp(repository: FirebaseRepository) {
                 id = "stk_3",
                 seedId = "seed_3",
                 varietyName = "GJ-39 (જીરૂ બિયારણ)",
-                batchNo = "LOT-2026/J4",
                 bagWeightKg = 30.0,
                 availableBags = 24,
                 availableLooseKg = 10.0,
@@ -103,7 +100,7 @@ fun MainApp(repository: FirebaseRepository) {
                 farmerVillage = "વડાલ",
                 farmerMobile = "9825123456",
                 items = listOf(
-                    SaleItem(varietyName = "GJG-22 (મગફળી)", batchNo = "LOT-2026/01", bags = 2, looseKg = 10.0, totalWeightKg = 110.0, rate = 140.0, itemTotal = 15400.0)
+                    SaleItem(varietyName = "GJG-22 (મગફળી)", bags = 2, looseKg = 10.0, totalWeightKg = 110.0, rate = 140.0, itemTotal = 15400.0)
                 ),
                 subTotal = 15400.0,
                 discount = 400.0,
@@ -148,7 +145,7 @@ fun MainApp(repository: FirebaseRepository) {
                         initialSales.add(0, newSale)
                         // Deduct stock locally
                         newSale.items.forEach { item ->
-                            val idx = initialStock.indexOfFirst { it.varietyName == item.varietyName && it.batchNo == item.batchNo }
+                            val idx = initialStock.indexOfFirst { it.seedId == item.seedId || it.varietyName == item.varietyName }
                             if (idx >= 0) {
                                 val cur = initialStock[idx]
                                 val newTotalKg = (cur.totalWeightKg - item.totalWeightKg).coerceAtLeast(0.0)
@@ -181,7 +178,7 @@ fun MainApp(repository: FirebaseRepository) {
                     ),
                     onSavePurchase = { newPur ->
                         newPur.items.forEach { item ->
-                            val existingIdx = initialStock.indexOfFirst { it.varietyName == item.varietyName && it.batchNo == item.batchNo }
+                            val existingIdx = initialStock.indexOfFirst { it.seedId == item.seedId || it.varietyName == item.varietyName }
                             if (existingIdx >= 0) {
                                 val cur = initialStock[existingIdx]
                                 initialStock[existingIdx] = cur.copy(
@@ -194,7 +191,6 @@ fun MainApp(repository: FirebaseRepository) {
                                         id = "stk_${System.currentTimeMillis()}",
                                         seedId = item.seedId,
                                         varietyName = item.varietyName,
-                                        batchNo = item.batchNo,
                                         bagWeightKg = item.bagWeightKg,
                                         availableBags = item.bags,
                                         totalWeightKg = item.netWeightKg,

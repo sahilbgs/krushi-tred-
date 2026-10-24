@@ -36,7 +36,6 @@ fun PurchaseEntryScreen(
     var seedExpanded by remember { mutableStateOf(false) }
 
     var invoiceNo by remember { mutableStateOf("") }
-    var batchNo by remember { mutableStateOf("LOT-2026/05") }
     var bagsInput by remember { mutableStateOf("20") }
     var purchaseRateInput by remember { mutableStateOf("120") }
     var paidInput by remember { mutableStateOf("") }
@@ -161,14 +160,6 @@ fun PurchaseEntryScreen(
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
-                        value = batchNo,
-                        onValueChange = { batchNo = it },
-                        label = { Text("બેચ / લોટ નં *") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-
-                    OutlinedTextField(
                         value = bagsInput,
                         onValueChange = { bagsInput = it },
                         label = { Text("બોરી (Bags)") },
@@ -176,11 +167,7 @@ fun PurchaseEntryScreen(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     )
-                }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
                         value = "$totalWeightKg kg",
                         onValueChange = {},
@@ -189,16 +176,18 @@ fun PurchaseEntryScreen(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     )
-
-                    OutlinedTextField(
-                        value = purchaseRateInput,
-                        onValueChange = { purchaseRateInput = it },
-                        label = { Text("ખરીદી ભાવ (₹/kg) *") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = purchaseRateInput,
+                    onValueChange = { purchaseRateInput = it },
+                    label = { Text("ખરીદી ભાવ (₹ પ્રતિ કિલો) *") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                )
             }
         }
 
@@ -258,11 +247,10 @@ fun PurchaseEntryScreen(
                         PurchaseItem(
                             seedId = selectedSeed!!.id,
                             varietyName = selectedSeed!!.varietyName,
-                            batchNo = batchNo,
                             bagWeightKg = bagWeight,
                             bags = bags,
                             netWeightKg = totalWeightKg,
-                            rateType = "bag",
+                            rateType = "kg",
                             purchaseRate = rate,
                             itemTotal = totalAmount
                         )

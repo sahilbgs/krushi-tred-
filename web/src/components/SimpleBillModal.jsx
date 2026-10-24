@@ -103,7 +103,6 @@ export const SimpleBillModal = ({ sale, onClose }) => {
               <tr style={{ backgroundColor: '#f1f5f9', borderTop: '1px solid #cbd5e1', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>
                 <th style={{ padding: '0.5rem' }}>ક્રમ</th>
                 <th style={{ padding: '0.5rem' }}>બિયારણ વિગત</th>
-                <th style={{ padding: '0.5rem' }}>બેચ નં</th>
                 <th style={{ padding: '0.5rem', textAlign: 'center' }}>બોરી</th>
                 <th style={{ padding: '0.5rem', textAlign: 'center' }}>કુલ KG</th>
                 <th style={{ padding: '0.5rem', textAlign: 'right' }}>ભાવ (₹ / kg)</th>
@@ -118,7 +117,6 @@ export const SimpleBillModal = ({ sale, onClose }) => {
                     {it.varietyName}
                     {it.looseKg > 0 && <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>(+ {it.looseKg} kg છૂટક)</span>}
                   </td>
-                  <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>{it.batchNo || '—'}</td>
                   <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>{it.bags}</td>
                   <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: '700' }}>{it.totalWeightKg} kg</td>
                   <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right' }}>₹{it.rate} /kg</td>

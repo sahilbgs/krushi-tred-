@@ -240,7 +240,6 @@ export const Dashboard = ({ setActiveTab, onOpenBill }) => {
               <thead>
                 <tr>
                   <th>બિયારણ જાત</th>
-                  <th>બેચ નં</th>
                   <th>હાજર બોરી</th>
                   <th>છૂટક KG</th>
                   <th>કુલ કિલો</th>
@@ -250,7 +249,6 @@ export const Dashboard = ({ setActiveTab, onOpenBill }) => {
                 {stock.map(item => (
                   <tr key={item.id}>
                     <td style={{ fontWeight: '600' }}>{item.varietyName}</td>
-                    <td><span className="badge badge-primary">{item.batchNo}</span></td>
                     <td style={{ fontWeight: '700', color: item.availableBags <= 15 ? '#dc2626' : '#059669' }}>
                       {item.availableBags} બોરી
                     </td>

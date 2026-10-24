@@ -14,8 +14,7 @@ export const StockLedger = () => {
   const [adjustReason, setAdjustReason] = useState('ગોડાઉન ઓડિટ ગણતરી');
 
   const filteredStock = stock.filter(item => 
-    item.varietyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.batchNo.toLowerCase().includes(searchTerm.toLowerCase())
+    item.varietyName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalBags = stock.reduce((sum, s) => sum + (parseInt(s.availableBags) || 0), 0);
@@ -46,7 +45,7 @@ export const StockLedger = () => {
             સ્ટોક લેજર – બોરી & કિલો મેનેજમેન્ટ (Stock Ledger)
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.88rem' }}>
-            દરેક બિયારણ અને બેચ વાઇઝ હાજર બોરી અને છૂટક કિલો સ્ટોક
+            દરેક બિયારણ જાત વાઇઝ હાજર બોરી અને છૂટક કિલો સ્ટોક
           </p>
         </div>
 
@@ -55,7 +54,7 @@ export const StockLedger = () => {
           <Search size={18} color="#94a3b8" />
           <input 
             type="text" 
-            placeholder="બિયારણ અથવા બેચ શોધો..."
+            placeholder="બિયારણ શોધો..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{ border: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', fontFamily: 'inherit' }}
@@ -103,7 +102,6 @@ export const StockLedger = () => {
             <thead>
               <tr>
                 <th>બિયારણ જાત</th>
-                <th>બેચ / લોટ નં</th>
                 <th>૧ બોરીનું વજન</th>
                 <th>હાજર આખી બોરી</th>
                 <th>છૂટક કિલો (Loose)</th>
@@ -118,9 +116,6 @@ export const StockLedger = () => {
                 <tr key={item.id}>
                   <td style={{ fontWeight: '600', color: '#0f172a' }}>
                     {item.varietyName}
-                  </td>
-                  <td>
-                    <span className="badge badge-primary">{item.batchNo}</span>
                   </td>
                   <td>{item.bagWeightKg} kg</td>
                   <td style={{ fontWeight: '700', fontSize: '1.05rem', color: item.availableBags <= 15 ? '#dc2626' : '#059669' }}>
@@ -178,7 +173,6 @@ export const StockLedger = () => {
             <form onSubmit={handleSaveAdjustment}>
               <div className="modal-body">
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.88rem' }}>
-                  <div>બેચ: <strong>{selectedStockForAdjust.batchNo}</strong></div>
                   <div>હાલનો સ્ટોક: <strong>{selectedStockForAdjust.availableBags} બોરી + {selectedStockForAdjust.availableLooseKg} kg ({selectedStockForAdjust.totalWeightKg} kg)</strong></div>
                 </div>
 

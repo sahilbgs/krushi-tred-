@@ -54,7 +54,6 @@ data class StockItem(
     val id: String = "",
     val seedId: String = "",
     val varietyName: String = "",
-    val batchNo: String = "",
     val bagWeightKg: Double = 50.0,
     val availableBags: Int = 0,
     val availableLooseKg: Double = 0.0,
@@ -65,7 +64,6 @@ data class StockItem(
 data class SaleItem(
     val seedId: String = "",
     val varietyName: String = "",
-    val batchNo: String = "",
     val bagWeightKg: Double = 50.0,
     val bags: Int = 0,
     val looseKg: Double = 0.0,
@@ -96,11 +94,10 @@ data class SaleInvoice(
 data class PurchaseItem(
     val seedId: String = "",
     val varietyName: String = "",
-    val batchNo: String = "",
     val bagWeightKg: Double = 50.0,
     val bags: Int = 0,
     val netWeightKg: Double = 0.0,
-    val rateType: String = "bag",
+    val rateType: String = "kg",
     val purchaseRate: Double = 0.0,
     val itemTotal: Double = 0.0
 )

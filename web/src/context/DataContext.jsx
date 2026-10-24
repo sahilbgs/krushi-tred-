@@ -61,7 +61,6 @@ const initialStock = [
     id: "stock_1",
     seedId: "seed_1",
     varietyName: "GJG-22 (ગુજરાત જૂનાગઢ મગફળી)",
-    batchNo: "LOT-2026/01",
     bagWeightKg: 50,
     availableBags: 120,
     availableLooseKg: 25,
@@ -72,7 +71,6 @@ const initialStock = [
     id: "stock_2",
     seedId: "seed_2",
     varietyName: "GJG-23 (અર્ધવેલડી મગફળી)",
-    batchNo: "LOT-2026/02",
     bagWeightKg: 50,
     availableBags: 80,
     availableLooseKg: 40,
@@ -83,7 +81,6 @@ const initialStock = [
     id: "stock_3",
     seedId: "seed_3",
     varietyName: "GJ-39 (જીરૂ રિસર્ચ બિયારણ)",
-    batchNo: "LOT-2026/J4",
     bagWeightKg: 30,
     availableBags: 24,
     availableLooseKg: 10,
@@ -94,7 +91,6 @@ const initialStock = [
     id: "stock_4",
     seedId: "seed_4",
     varietyName: "GW-496 (ટુકડી ઘઉં બિયારણ)",
-    batchNo: "LOT-2026/W9",
     bagWeightKg: 40,
     availableBags: 150,
     availableLooseKg: 0,
@@ -195,7 +191,6 @@ const initialSales = [
       {
         seedId: "seed_1",
         varietyName: "GJG-22 (ગુજરાત જૂનાગઢ મગફળી)",
-        batchNo: "LOT-2026/01",
         bagWeightKg: 50,
         bags: 2,
         looseKg: 10,
@@ -324,7 +319,7 @@ export const DataProvider = ({ children }) => {
     let updatedStock = [...stock];
     purchaseData.items.forEach(item => {
       const existingIdx = updatedStock.findIndex(
-        s => s.seedId === item.seedId && s.batchNo.toLowerCase() === item.batchNo.toLowerCase()
+        s => s.seedId === item.seedId
       );
 
       const addedBags = parseInt(item.bags || 0);
@@ -348,7 +343,6 @@ export const DataProvider = ({ children }) => {
           id: "stock_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
           seedId: item.seedId,
           varietyName: item.varietyName,
-          batchNo: item.batchNo,
           bagWeightKg: parseFloat(item.bagWeightKg || 50),
           availableBags: addedBags,
           availableLooseKg: 0,
@@ -390,7 +384,7 @@ export const DataProvider = ({ children }) => {
     let updatedStock = [...stock];
     saleData.items.forEach(item => {
       const idx = updatedStock.findIndex(
-        s => s.seedId === item.seedId && s.batchNo === item.batchNo
+        s => s.seedId === item.seedId
       );
 
       if (idx >= 0) {

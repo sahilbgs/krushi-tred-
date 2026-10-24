@@ -23,8 +23,7 @@ fun StockLedgerScreen(stock: List<StockItem>) {
     var searchQuery by remember { mutableStateOf("") }
 
     val filtered = stock.filter {
-        it.varietyName.contains(searchQuery, ignoreCase = true) ||
-        it.batchNo.contains(searchQuery, ignoreCase = true)
+        it.varietyName.contains(searchQuery, ignoreCase = true)
     }
 
     Column(
@@ -49,7 +48,7 @@ fun StockLedgerScreen(stock: List<StockItem>) {
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("બિયારણ અથવા બેચ શોધો...") },
+            placeholder = { Text("બિયારણની જાત શોધો...") },
             modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
             shape = RoundedCornerShape(10.dp)
         )
@@ -63,25 +62,7 @@ fun StockLedgerScreen(stock: List<StockItem>) {
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(item.varietyName, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF0F172A))
-                            Surface(
-                                color = GreenLight,
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text(
-                                    item.batchNo,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = GreenDark,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
+                        Text(item.varietyName, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF0F172A))
 
                         Spacer(modifier = Modifier.height(8.dp))
 

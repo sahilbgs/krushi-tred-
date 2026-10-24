@@ -52,7 +52,7 @@ class FirebaseRepository {
             db.runTransaction { transaction ->
                 // દરેક આઈટમ માટે સ્ટોક ઘટાડો
                 for (item in finalSale.items) {
-                    val stockRef = db.collection("stockLedger").document(item.seedId + "_" + item.batchNo)
+                    val stockRef = db.collection("stockLedger").document(item.seedId)
                     val snapshot = transaction.get(stockRef)
 
                     if (snapshot.exists()) {
@@ -101,7 +101,7 @@ class FirebaseRepository {
 
             db.runTransaction { transaction ->
                 for (item in finalPur.items) {
-                    val stockDocId = item.seedId + "_" + item.batchNo
+                    val stockDocId = item.seedId
                     val stockRef = db.collection("stockLedger").document(stockDocId)
                     val snapshot = transaction.get(stockRef)
 
@@ -123,7 +123,6 @@ class FirebaseRepository {
                             id = stockDocId,
                             seedId = item.seedId,
                             varietyName = item.varietyName,
-                            batchNo = item.batchNo,
                             bagWeightKg = item.bagWeightKg,
                             availableBags = item.bags,
                             availableLooseKg = 0.0,

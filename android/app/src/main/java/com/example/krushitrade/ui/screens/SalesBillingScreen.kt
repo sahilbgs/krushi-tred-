@@ -151,7 +151,7 @@ fun SalesBillingScreen(
                     onExpandedChange = { stockExpanded = !stockExpanded }
                 ) {
                     OutlinedTextField(
-                        value = selectedStock?.let { "${it.varietyName} [${it.batchNo}]" } ?: "બિયારણ પસંદ કરો",
+                        value = selectedStock?.let { it.varietyName } ?: "બિયારણ પસંદ કરો",
                         onValueChange = {},
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = stockExpanded) },
@@ -301,7 +301,6 @@ fun SalesBillingScreen(
                         SaleItem(
                             seedId = selectedStock!!.seedId,
                             varietyName = selectedStock!!.varietyName,
-                            batchNo = selectedStock!!.batchNo,
                             bagWeightKg = selectedStock!!.bagWeightKg,
                             bags = bags,
                             looseKg = looseKg,

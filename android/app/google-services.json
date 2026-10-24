@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1004019640828",
+    "project_id": "hp-pump",
+    "storage_bucket": "hp-pump.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1004019640828:android:7e15f17fdde9fa83286a79",
+        "android_client_info": {
+          "package_name": "com.example.krushitrade"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBO81nw5ryFUv8SNj33RXpoWZgRl5kkliQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1004019640828:android:7e15f17fdde9fa83286a79",
+        "android_client_info": {
+          "package_name": "com.example.petrol_pump_hisab"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBO81nw5ryFUv8SNj33RXpoWZgRl5kkliQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

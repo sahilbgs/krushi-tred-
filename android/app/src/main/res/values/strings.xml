@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">કૃષિ ટ્રેડ</string>
+    <string name="app_subtitle">Seeds Purchase, Sales &amp; Stock</string>
+    <string name="login_title">કૃષિ ટ્રેડ લૉગિન</string>
+    <string name="dashboard">ડેશબોર્ડ</string>
+    <string name="sales">નવું બિલ</string>
+    <string name="purchases">ખરીદી</string>
+    <string name="stock">સ્ટોક</string>
+    <string name="farmers">ખેડૂત</string>
+</resources>

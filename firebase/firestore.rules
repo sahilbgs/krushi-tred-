@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // સહાયક ફંક્શન્સ (Helper Functions)
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserData().role == 'admin' || 
+        getUserData().role == 'main_admin'
+      );
+    }
+    
+    function isSubUser() {
+      return isAuthenticated() && getUserData().role == 'sub_user';
+    }
+    
+    function hasPermission(perm) {
+      return isAdmin() || (
+        isSubUser() && 
+        getUserData().permissions[perm] == true
+      );
+    }
+
+    // ૧. Users Collection (વપરાશકર્તા માહિતી)
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      // ફક્ત Main Admin જ નવા sub-users બનાવી કે બદલી શકે
+      allow write: if isAdmin() || request.auth.uid == userId;
+    }
+    
+    // ૨. Business Profile (દુકાન ની વિગત)
+    match /business/{businessId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // ૩. Farmer Master (ખેડૂત / ગ્રાહક માસ્ટર)
+    match /farmers/{farmerId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('farmerMaster');
+      allow delete: if isAdmin();
+    }
+    
+    // ૪. Supplier Master (બિયારણ સપ્લાયર્સ)
+    match /suppliers/{supplierId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('supplierMaster');
+      allow delete: if isAdmin();
+    }
+    
+    // ૫. Seed Products Master (બિયારણ જાતો & બોરી વજન)
+    match /seedProducts/{seedId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('seedMaster');
+      allow delete: if isAdmin();
+    }
+    
+    // ૬. Purchases (ખરીદી ની એન્ટ્રી અને ઇન્વર્ડ)
+    match /purchases/{purchaseId} {
+      allow read: if isAuthenticated();
+      allow create: if hasPermission('purchaseEntry');
+      allow update: if hasPermission('purchaseEntry') && (!('isCancelled' in request.resource.data) || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    // ૭. Sales & Invoices (વેચાણ અને સાદું બિલ)
+    match /sales/{saleId} {
+      allow read: if isAuthenticated();
+      allow create: if hasPermission('salesBilling');
+      allow update: if hasPermission('salesBilling') && (!('isCancelled' in request.resource.data) || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    // ૮. Stock Ledger & Batches (બોરી અને કિલો સ્ટોક)
+    match /stockLedger/{stockId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('stockManagement');
+      allow delete: if isAdmin();
+    }
+    
+    // ૯. Payments (જમા / ઉધાર ચૂકવણી)
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('payments');
+      allow delete: if isAdmin();
+    }
+    
+    // ૧૦. Audit Logs (ઓડિટ લોગ - સુરક્ષા માટે માત્ર create અને admin read)
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // કોઈ પણ લોગ ડિલીટ કે એડિટ ના કરી શકે
+    }
+  }
+}

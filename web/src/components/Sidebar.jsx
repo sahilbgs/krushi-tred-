@@ -5,6 +5,7 @@ import {
   Receipt, 
   ShoppingCart, 
   Boxes, 
+  BookOpen,
   Users, 
   Truck, 
   Sprout, 
@@ -30,6 +31,13 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       icon: Receipt,
       allowed: hasPermission('salesBilling'),
       permKey: 'salesBilling'
+    },
+    {
+      id: 'khatabook',
+      label: 'ખેડૂત ખાતાવહી',
+      icon: BookOpen,
+      allowed: true,
+      permKey: 'khataBook'
     },
     {
       id: 'purchases',

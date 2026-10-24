@@ -100,19 +100,20 @@ export const AuthProvider = ({ children }) => {
         const subUser = {
           uid: "subuser_staff_002",
           email,
-          displayName: "રમેશભાઈ પટેલ (સ્ટાફ યુઝર)",
+          displayName: "રમેશભાઈ પટેલ (કાઉન્ટર સ્ટાફ)",
           role: "sub_user",
           permissions: {
             farmerMaster: true,
-            supplierMaster: false,
+            supplierMaster: true, // can add market party
             seedMaster: true,
-            purchaseEntry: false,
-            salesBilling: true,
+            purchaseEntry: true, // can make purchase entries
+            salesBilling: true, // can make sales bills
             stockManagement: true,
             payments: true,
+            khataBook: true,
             reports: false,
             userManagement: false,
-            viewRates: false
+            viewRates: true
           }
         };
         setUser({ uid: subUser.uid, email });
@@ -137,15 +138,16 @@ export const AuthProvider = ({ children }) => {
         role: "sub_user",
         permissions: {
           farmerMaster: true,
-          supplierMaster: false,
+          supplierMaster: true, // can add market party
           seedMaster: true,
-          purchaseEntry: false,
-          salesBilling: true,
+          purchaseEntry: true, // can make purchase entries
+          salesBilling: true, // can make sales bills
           stockManagement: true,
           payments: true,
+          khataBook: true,
           reports: false,
           userManagement: false,
-          viewRates: false
+          viewRates: true
         }
       };
       setUser({ uid: staffUser.uid, email: staffUser.email });

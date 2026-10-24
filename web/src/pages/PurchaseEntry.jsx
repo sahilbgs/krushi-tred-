@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { ShoppingCart, Plus, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Plus, Trash2, CheckCircle2, AlertCircle, Truck, UserPlus, X } from 'lucide-react';
 
 export const PurchaseEntry = ({ onPurchaseCompleted }) => {
-  const { suppliers, seeds, recordPurchase } = useData();
+  const { suppliers, seeds, recordPurchase, addSupplier } = useData();
   const { userProfile } = useAuth();
 
   const [supplierId, setSupplierId] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [truckNo, setTruckNo] = useState('');
+
+  // Quick Market Party Modal Form
+  const [showAddPartyModal, setShowAddPartyModal] = useState(false);
+  const [newPartyForm, setNewPartyForm] = useState({
+    companyName: '',
+    contactPerson: '',
+    mobile: '',
+    city: '',
+    openingBalance: 0
+  });
 
   // Current item row
   const [currentItem, setCurrentItem] = useState({
@@ -23,6 +34,8 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
   });
 
   const [items, setItems] = useState([]);
+  const [majuriAmount, setMajuriAmount] = useState('');
+  const [extraCharges, setExtraCharges] = useState('');
   const [paidAmount, setPaidAmount] = useState('');
   const [paymentMode, setPaymentMode] = useState('bank');
   const [remarks, setRemarks] = useState('');
@@ -90,9 +103,28 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     setItems(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const totalPurchaseAmount = items.reduce((sum, it) => sum + it.itemTotal, 0);
+  const itemsSubTotal = items.reduce((sum, it) => sum + it.itemTotal, 0);
+  const majuri = parseFloat(majuriAmount) || 0;
+  const extra = parseFloat(extraCharges) || 0;
+  const totalPurchaseAmount = itemsSubTotal + majuri + extra;
   const numericPaid = paidAmount === '' ? totalPurchaseAmount : parseFloat(paidAmount) || 0;
   const dueAmount = Math.max(0, totalPurchaseAmount - numericPaid);
+
+  // Quick Market Party Add
+  const handleSaveQuickParty = (e) => {
+    e.preventDefault();
+    if (!newPartyForm.companyName) return;
+    const created = addSupplier(newPartyForm);
+    setSupplierId(created.id);
+    setShowAddPartyModal(false);
+    setNewPartyForm({
+      companyName: '',
+      contactPerson: '',
+      mobile: '',
+      city: '',
+      openingBalance: 0
+    });
+  };
 
   const handleSubmitPurchase = (e) => {
     e.preventDefault();
@@ -100,11 +132,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     setSuccessMsg('');
 
     if (!supplierId) {
-      setErrMsg("કૃપા કરીને સપ્લાયર પસંદ કરો.");
-      return;
-    }
-    if (!invoiceNo) {
-      setErrMsg("ખરીદી બિલ / ચલણ નંબર દાખલ કરો.");
+      setErrMsg("કૃપા કરીને સપ્લાયર / માર્કેટ પાર્ટી પસંદ કરો.");
       return;
     }
     if (items.length === 0) {
@@ -113,19 +141,24 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     }
 
     const supplier = suppliers.find(s => s.id === supplierId);
+    const generatedInvoiceNo = invoiceNo || `PUR-${Date.now().toString().slice(-6)}`;
 
     const purchasePayload = {
-      invoiceNo,
+      invoiceNo: generatedInvoiceNo,
       purchaseDate,
+      truckNo,
       supplierId: supplier.id,
       supplierName: supplier.companyName,
       items,
+      itemsSubTotal,
+      majuriAmount: majuri,
+      extraCharges: extra,
       totalAmount: totalPurchaseAmount,
       paidAmount: numericPaid,
       dueAmount,
       paymentMode,
       remarks,
-      createdBy: userProfile?.displayName || 'Admin'
+      createdBy: userProfile?.displayName || 'સ્ટાફ'
     };
 
     recordPurchase(purchasePayload);
@@ -134,6 +167,9 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     // Clear
     setItems([]);
     setInvoiceNo('');
+    setTruckNo('');
+    setMajuriAmount('');
+    setExtraCharges('');
     setPaidAmount('');
     setSupplierId('');
   };
@@ -170,18 +206,26 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
           
           {/* Supplier & Invoice metadata */}
           <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">૧. સપ્લાયર & બિલ માહિતી</h3>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 className="card-title">૧. માર્કેટ પાર્ટી / સપ્લાયર & વાહન માહિતી</h3>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                onClick={() => setShowAddPartyModal(true)}>
+                <UserPlus size={15} />
+                + નવી પાર્ટી ઉમેરો
+              </button>
             </div>
 
             <div className="form-group">
-              <label className="form-label">સપ્લાયર કંપની પસંદ કરો *</label>
+              <label className="form-label">સપ્લાયર / માર્કેટ પાર્ટી પસંદ કરો *</label>
               <select 
                 className="form-control"
                 value={supplierId}
                 onChange={(e) => setSupplierId(e.target.value)}
                 required>
-                <option value="">-- સપ્લાયર કંપની પસંદ કરો --</option>
+                <option value="">-- માર્કેટ પાર્ટી પસંદ કરો ({suppliers.length}) --</option>
                 {suppliers.map(s => (
                   <option key={s.id} value={s.id}>
                     {s.companyName} ({s.city}) - {s.contactPerson}
@@ -192,14 +236,13 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
 
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">સપ્લાયર ઇન્વોઇસ / ચલણ નં *</label>
+                <label className="form-label">સપ્લાયર ઇન્વોઇસ / ચલણ નં</label>
                 <input 
                   type="text" 
                   className="form-control" 
-                  placeholder="દા.ત. INV-589"
+                  placeholder="દા.ત. INV-589 (ખાલી હોય તો ઓટો બનશે)"
                   value={invoiceNo}
                   onChange={(e) => setInvoiceNo(e.target.value)}
-                  required 
                 />
               </div>
 
@@ -214,15 +257,31 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">નોંધ / ટ્રાન્સપોર્ટ બિલ્ટી નં</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="ટ્રક નંબર અથવા અન્ય વિગત"
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <Truck size={15} color="#059669" />
+                  ટ્રક / વાહન નંબર (Truck / Vehicle No.)
+                </label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="દા.ત. GJ-11-AB-1234"
+                  value={truckNo}
+                  onChange={(e) => setTruckNo(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">ટ્રાન્સપોર્ટ બિલ્ટી / નોંધ</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="બિલ્ટી નંબર અથવા અન્ય વિગત"
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
@@ -347,8 +406,38 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
         {/* Settlement and Save */}
         {items.length > 0 && (
           <div className="card">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', alignItems: 'center' }}>
+            <div className="card-header">
+              <h3 className="card-title">૩. મજૂરી, વાહન ભાડું & ચુકવણી</h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
               <div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">અનલોડિંગ મજૂરી ખર્ચ (Majuri ₹)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      className="form-control" 
+                      placeholder="0"
+                      value={majuriAmount} 
+                      onChange={(e) => setMajuriAmount(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">ટ્રક ભાડું / અન્ય ચાર્જિસ (Freight ₹)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      className="form-control" 
+                      placeholder="0"
+                      value={extraCharges} 
+                      onChange={(e) => setExtraCharges(e.target.value)} 
+                    />
+                  </div>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">ચૂકવણી મોડ</label>
                   <select 
@@ -357,7 +446,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
                     onChange={(e) => setPaymentMode(e.target.value)}>
                     <option value="bank">બેંક ટ્રાન્સફર (NEFT/RTGS/Cheque)</option>
                     <option value="cash">રોકડ (Cash)</option>
-                    <option value="upi">UPI</option>
+                    <option value="upi">UPI / Online</option>
                     <option value="credit">પૂરેપૂરું ઉધાર (Credit)</option>
                   </select>
                 </div>
@@ -376,15 +465,36 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
 
               <div style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span>બિયારણ રકમ (Items SubTotal):</span>
+                  <strong>₹{itemsSubTotal.toLocaleString('en-IN')}</strong>
+                </div>
+
+                {majuri > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#1e40af' }}>
+                    <span>+ મજૂરી ખર્ચ:</span>
+                    <strong>₹{majuri.toLocaleString('en-IN')}</strong>
+                  </div>
+                )}
+
+                {extra > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#1e40af' }}>
+                    <span>+ ટ્રક ભાડું / અન્ય ખર્ચ:</span>
+                    <strong>₹{extra.toLocaleString('en-IN')}</strong>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderTop: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', fontSize: '1.15rem', fontWeight: '800', color: '#064e3b' }}>
                   <span>કુલ ખરીદી રકમ:</span>
-                  <strong>₹{totalPurchaseAmount.toLocaleString('en-IN')}</strong>
+                  <span>₹{totalPurchaseAmount.toLocaleString('en-IN')}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#16a34a' }}>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.6rem', color: '#16a34a', fontWeight: '600' }}>
                   <span>હાલ ચૂકવેલ રકમ:</span>
-                  <strong>₹{numericPaid.toLocaleString('en-IN')}</strong>
+                  <span>₹{numericPaid.toLocaleString('en-IN')}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px solid #cbd5e1', color: dueAmount > 0 ? '#dc2626' : '#16a34a', fontWeight: '700' }}>
-                  <span>સપ્લાયરને બાકી રકમ:</span>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem', padding: '0.4rem 0.5rem', backgroundColor: dueAmount > 0 ? '#fee2e2' : '#f0fdf4', color: dueAmount > 0 ? '#991b1b' : '#166534', borderRadius: '6px', fontWeight: '700' }}>
+                  <span>સપ્લાયરને બાકી રકમ (ઉધાર):</span>
                   <span>₹{dueAmount.toLocaleString('en-IN')}</span>
                 </div>
               </div>
@@ -400,6 +510,87 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
         )}
 
       </form>
+
+      {/* Quick Add Market Party Modal */}
+      {showAddPartyModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.15rem', color: '#064e3b' }}>
+                નવી માર્કેટ પાર્ટી / વેપારી ઉમેરો
+              </h3>
+              <button onClick={() => setShowAddPartyModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveQuickParty}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">પેઢી / કંપની / માર્કેટ પાર્ટીનું નામ *</label>
+                  <input 
+                    type="text" 
+                    required 
+                    className="form-control" 
+                    placeholder="દા.ત. જૂનાગઢ એગ્રો સીડ્સ / રામ ટ્રેડર્સ"
+                    value={newPartyForm.companyName}
+                    onChange={(e) => setNewPartyForm(prev => ({ ...prev, companyName: e.target.value }))}
+                  />
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">સંપર્ક વ્યક્તિ</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="દા.ત. કિશોરભાઈ"
+                      value={newPartyForm.contactPerson}
+                      onChange={(e) => setNewPartyForm(prev => ({ ...prev, contactPerson: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">મોબાઇલ નંબર</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="૧૦ આંકડાનો મોબાઇલ"
+                      value={newPartyForm.mobile}
+                      onChange={(e) => setNewPartyForm(prev => ({ ...prev, mobile: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">શહેર / માર્કેટ યાર્ડ</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="દા.ત. ગોંડલ / જૂનાગઢ"
+                      value={newPartyForm.city}
+                      onChange={(e) => setNewPartyForm(prev => ({ ...prev, city: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">જૂનું બાકી ચૂકવણું (₹)</label>
+                    <input 
+                      type="number" 
+                      className="form-control" 
+                      placeholder="0"
+                      value={newPartyForm.openingBalance}
+                      onChange={(e) => setNewPartyForm(prev => ({ ...prev, openingBalance: parseFloat(e.target.value) || 0 }))}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAddPartyModal(false)}>રદ કરો</button>
+                <button type="submit" className="btn btn-primary">પાર્ટી સેવ કરો</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

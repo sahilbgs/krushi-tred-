@@ -12,6 +12,7 @@ import { FarmerMaster } from './pages/FarmerMaster';
 import { SupplierMaster } from './pages/SupplierMaster';
 import { SeedMaster } from './pages/SeedMaster';
 import { Payments } from './pages/Payments';
+import { KhataBook } from './pages/KhataBook';
 import { UserManagement } from './pages/UserManagement';
 import { Reports } from './pages/Reports';
 import { Login } from './pages/Login';
@@ -43,6 +44,8 @@ export function App() {
         return <PurchaseEntry onPurchaseCompleted={() => setActiveTab('stock')} />;
       case 'stock':
         return <StockLedger />;
+      case 'khatabook':
+        return <KhataBook />;
       case 'farmers':
         return <FarmerMaster onSelectFarmerBills={() => setActiveTab('reports')} />;
       case 'suppliers':

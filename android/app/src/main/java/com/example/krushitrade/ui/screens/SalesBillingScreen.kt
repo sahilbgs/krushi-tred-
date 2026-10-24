@@ -42,7 +42,10 @@ fun SalesBillingScreen(
     var bagsInput by remember { mutableStateOf("1") }
     var looseKgInput by remember { mutableStateOf("0") }
     var rateInput by remember { mutableStateOf("140") }
+    var majuriInput by remember { mutableStateOf("0") }
+    var extraChargesInput by remember { mutableStateOf("0") }
     var discountInput by remember { mutableStateOf("0") }
+    var isUdhar by remember { mutableStateOf(false) }
     var paidInput by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
 
@@ -53,9 +56,11 @@ fun SalesBillingScreen(
     val rate = rateInput.toDoubleOrNull() ?: 0.0
     val lineTotal = totalKg * rate
 
+    val majuri = majuriInput.toDoubleOrNull() ?: 0.0
+    val extra = extraChargesInput.toDoubleOrNull() ?: 0.0
     val discount = discountInput.toDoubleOrNull() ?: 0.0
-    val netAmount = (lineTotal - discount).coerceAtLeast(0.0)
-    val paid = if (paidInput.isEmpty()) netAmount else (paidInput.toDoubleOrNull() ?: 0.0)
+    val netAmount = (lineTotal - discount + majuri + extra).coerceAtLeast(0.0)
+    val paid = if (isUdhar) 0.0 else (if (paidInput.isEmpty()) netAmount else (paidInput.toDoubleOrNull() ?: 0.0))
     val due = (netAmount - paid).coerceAtLeast(0.0)
 
     Column(
@@ -227,12 +232,55 @@ fun SalesBillingScreen(
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                Text("૩. રકમની ગણતરી", fontWeight = FontWeight.Bold, color = GreenDark)
+                Text("૩. મજૂરી, અન્ય ખર્ચ & ચુકવણી (રોકડ/ઉધાર)", fontWeight = FontWeight.Bold, color = GreenDark)
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("કુલ રકમ:")
-                    Text("₹${lineTotal.toInt()}", fontWeight = FontWeight.Bold)
+                // Cash vs Udhar Quick Toggle
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = { isUdhar = false },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (!isUdhar) GreenPrimary else Color(0xFFE2E8F0),
+                            contentColor = if (!isUdhar) Color.White else Color(0xFF334155)
+                        ),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("🟢 રોકડ (Cash)", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = { isUdhar = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isUdhar) RedDanger else Color(0xFFE2E8F0),
+                            contentColor = if (isUdhar) Color.White else Color(0xFF334155)
+                        ),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("🔴 ઉધાર (Udhar)", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = majuriInput,
+                        onValueChange = { majuriInput = it },
+                        label = { Text("મજૂરી ખર્ચ ₹") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    OutlinedTextField(
+                        value = extraChargesInput,
+                        onValueChange = { extraChargesInput = it },
+                        label = { Text("અન્ય ચાર્જિસ ₹") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -246,14 +294,16 @@ fun SalesBillingScreen(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     )
-                    OutlinedTextField(
-                        value = paidInput,
-                        onValueChange = { paidInput = it },
-                        label = { Text("જમા રોકડ ₹") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
+                    if (!isUdhar) {
+                        OutlinedTextField(
+                            value = paidInput,
+                            onValueChange = { paidInput = it },
+                            label = { Text("જમા રોકડ ₹") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -266,7 +316,7 @@ fun SalesBillingScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        if (due > 0) "બાકી ઉધાર રકમ:" else "ચૂકવવાપાત્ર:",
+                        if (due > 0) "બાકી ઉધાર રકમ (ખાતામાં):" else "કુલ ચૂકવવાપાત્ર:",
                         fontWeight = FontWeight.Bold,
                         color = if (due > 0) RedDanger else GreenDark
                     )
@@ -292,7 +342,9 @@ fun SalesBillingScreen(
                     return@Button
                 }
 
+                val autoBillNo = "KT-2026-" + System.currentTimeMillis().toString().takeLast(5)
                 val saleInvoice = SaleInvoice(
+                    billNo = autoBillNo,
                     farmerId = selectedFarmer!!.id,
                     farmerName = selectedFarmer!!.name,
                     farmerMobile = selectedFarmer!!.mobile,
@@ -311,11 +363,13 @@ fun SalesBillingScreen(
                         )
                     ),
                     subTotal = lineTotal,
+                    majuriAmount = majuri,
+                    extraCharges = extra,
                     discount = discount,
                     netAmount = netAmount,
                     paidAmount = paid,
                     dueAmount = due,
-                    paymentMode = "cash"
+                    paymentMode = if (isUdhar) "credit" else "cash"
                 )
 
                 onSaveSale(saleInvoice)

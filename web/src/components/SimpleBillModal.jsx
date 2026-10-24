@@ -18,16 +18,24 @@ export const SimpleBillModal = ({ sale, onClose }) => {
       `${idx + 1}. ${it.varietyName} - ${it.bags} બોરી ${it.looseKg > 0 ? `+ ${it.looseKg} kg` : ''} (કુલ ${it.totalWeightKg} kg) @ ₹${it.rate} = ₹${it.itemTotal}`
     ).join('%0A');
 
+    let chargesText = '';
+    if (sale.majuriAmount > 0) chargesText += `%0A+ મજૂરી ખર્ચ: ₹${sale.majuriAmount}`;
+    if (sale.extraCharges > 0) chargesText += `%0A+ અન્ય ચાર્જિસ: ₹${sale.extraCharges}`;
+    if (sale.discount > 0) chargesText += `%0A- ડિસ્કાઉન્ટ: ₹${sale.discount}`;
+
+    const paymentTypeLabel = sale.dueAmount <= 0 ? 'રોકડ (CASH)' : (sale.paidAmount > 0 ? 'અંશતઃ રોકડ + ઉધાર' : 'પૂરેપૂરું ઉધાર (UDHAR)');
+
     const msg = `*કૃષિ ટ્રેડ - બિયારણ સાદું બિલ*%0A` +
       `બિલ નં: ${sale.billNo}%0A` +
       `તારીખ: ${sale.billDate}%0A` +
       `ખેડૂત: ${sale.farmerName} (${sale.farmerVillage || ''})%0A` +
+      `પ્રકાર: ${paymentTypeLabel}%0A` +
       `--------------------------------%0A` +
       itemsText + `%0A` +
       `--------------------------------%0A` +
-      `કુલ રકમ: ₹${sale.subTotal}%0A` +
-      `ડિસ્કાઉન્ટ: ₹${sale.discount || 0}%0A` +
-      `ચૂકવવાપાત્ર: ₹${sale.netAmount}%0A` +
+      `બિયારણ રકમ: ₹${sale.subTotal}` +
+      chargesText + `%0A` +
+      `*કુલ ચૂકવવાપાત્ર: ₹${sale.netAmount}*%0A` +
       `જમા રોકડ: ₹${sale.paidAmount}%0A` +
       `*બાકી રકમ (ઉધાર): ₹${sale.dueAmount}*%0A%0A` +
       `કૃષિ ટ્રેડ માંથી ખરીદી કરવા બદલ આભાર! 🙏`;
@@ -130,17 +138,29 @@ export const SimpleBillModal = ({ sale, onClose }) => {
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
             <div style={{ width: '280px', fontSize: '0.92rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0' }}>
-                <span>કુલ રકમ (Sub Total):</span>
+                <span>બિયારણ રકમ (Sub Total):</span>
                 <span>₹{sale.subTotal?.toLocaleString('en-IN')}</span>
               </div>
+              {sale.majuriAmount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0', color: '#1e40af' }}>
+                  <span>+ મજૂરી ખર્ચ:</span>
+                  <span>+ ₹{sale.majuriAmount?.toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {sale.extraCharges > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0', color: '#1e40af' }}>
+                  <span>+ અન્ય ચાર્જિસ / ભાડું:</span>
+                  <span>+ ₹{sale.extraCharges?.toLocaleString('en-IN')}</span>
+                </div>
+              )}
               {sale.discount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0', color: '#dc2626' }}>
-                  <span>ડિસ્કાઉન્ટ:</span>
+                  <span>- ડિસ્કાઉન્ટ:</span>
                   <span>- ₹{sale.discount?.toLocaleString('en-IN')}</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderTop: '1px solid #e2e8f0', fontWeight: '700', fontSize: '1.05rem', color: '#064e3b' }}>
-                <span>ચૂકવવાપાત્ર રકમ:</span>
+                <span>કુલ ચૂકવવાપાત્ર રકમ:</span>
                 <span>₹{sale.netAmount?.toLocaleString('en-IN')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0', color: '#16a34a' }}>

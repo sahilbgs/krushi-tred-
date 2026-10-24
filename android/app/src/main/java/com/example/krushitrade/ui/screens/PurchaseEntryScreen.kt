@@ -36,15 +36,20 @@ fun PurchaseEntryScreen(
     var seedExpanded by remember { mutableStateOf(false) }
 
     var invoiceNo by remember { mutableStateOf("") }
+    var truckNoInput by remember { mutableStateOf("") }
     var bagsInput by remember { mutableStateOf("20") }
     var purchaseRateInput by remember { mutableStateOf("120") }
+    var majuriInput by remember { mutableStateOf("0") }
+    var extraChargesInput by remember { mutableStateOf("0") }
     var paidInput by remember { mutableStateOf("") }
 
     val bags = bagsInput.toIntOrNull() ?: 0
     val bagWeight = selectedSeed?.bagWeightKg ?: 50.0
     val totalWeightKg = bags * bagWeight
     val rate = purchaseRateInput.toDoubleOrNull() ?: 0.0
-    val totalAmount = totalWeightKg * rate
+    val majuri = majuriInput.toDoubleOrNull() ?: 0.0
+    val extra = extraChargesInput.toDoubleOrNull() ?: 0.0
+    val totalAmount = (totalWeightKg * rate) + majuri + extra
     val paid = if (paidInput.isEmpty()) totalAmount else (paidInput.toDoubleOrNull() ?: 0.0)
     val due = (totalAmount - paid).coerceAtLeast(0.0)
 
@@ -111,7 +116,17 @@ fun PurchaseEntryScreen(
                 OutlinedTextField(
                     value = invoiceNo,
                     onValueChange = { invoiceNo = it },
-                    label = { Text("ઇન્વોઇસ / ચલણ નં. *") },
+                    label = { Text("ઇન્વોઇસ / ચલણ નં.") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = truckNoInput,
+                    onValueChange = { truckNoInput = it },
+                    label = { Text("ટ્રક / વાહન નંબર (દા.ત. GJ-11-AB-1234)") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp)
                 )
@@ -208,6 +223,27 @@ fun PurchaseEntryScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = majuriInput,
+                        onValueChange = { majuriInput = it },
+                        label = { Text("મજૂરી ખર્ચ ₹") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    OutlinedTextField(
+                        value = extraChargesInput,
+                        onValueChange = { extraChargesInput = it },
+                        label = { Text("ટ્રક ભાડું / અન્ય ₹") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = paidInput,
                     onValueChange = { paidInput = it },
@@ -234,13 +270,15 @@ fun PurchaseEntryScreen(
 
         Button(
             onClick = {
-                if (selectedSupplier == null || selectedSeed == null || invoiceNo.isEmpty() || bags <= 0) {
+                if (selectedSupplier == null || selectedSeed == null || bags <= 0) {
                     Toast.makeText(context, "બધી વિગતો ભરો", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
 
+                val genInv = if (invoiceNo.isEmpty()) "PUR-${System.currentTimeMillis().toString().takeLast(6)}" else invoiceNo
                 val purchaseRecord = PurchaseRecord(
-                    invoiceNo = invoiceNo,
+                    invoiceNo = genInv,
+                    truckNo = truckNoInput,
                     supplierId = selectedSupplier!!.id,
                     supplierName = selectedSupplier!!.companyName,
                     items = listOf(
@@ -252,9 +290,11 @@ fun PurchaseEntryScreen(
                             netWeightKg = totalWeightKg,
                             rateType = "kg",
                             purchaseRate = rate,
-                            itemTotal = totalAmount
+                            itemTotal = totalWeightKg * rate
                         )
                     ),
+                    majuriAmount = majuri,
+                    extraCharges = extra,
                     totalAmount = totalAmount,
                     paidAmount = paid,
                     dueAmount = due

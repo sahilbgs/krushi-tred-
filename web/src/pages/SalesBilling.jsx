@@ -12,11 +12,15 @@ import {
 } from 'lucide-react';
 
 export const SalesBilling = ({ onBillCreated }) => {
-  const { farmers, seeds, stock, recordSale, addFarmer } = useData();
+  const { farmers, seeds, stock, sales, recordSale, addFarmer } = useData();
   const { userProfile } = useAuth();
 
-  // Selected Farmer
+  // Auto Invoice Number
+  const autoBillNo = "KT-2026-" + (sales.length + 102).toString().padStart(5, '0');
+
+  // Selected Farmer & Search
   const [selectedFarmerId, setSelectedFarmerId] = useState('');
+  const [farmerSearch, setFarmerSearch] = useState('');
   const [showQuickFarmerModal, setShowQuickFarmerModal] = useState(false);
   const [newFarmerForm, setNewFarmerForm] = useState({ name: '', mobile: '', village: '', openingBalance: 0 });
 
@@ -38,8 +42,11 @@ export const SalesBilling = ({ onBillCreated }) => {
   // Items added to the bill
   const [billItems, setBillItems] = useState([]);
   
-  // Financial calculations
+  // Financial calculations & Extra charges
+  const [majuriAmount, setMajuriAmount] = useState('');
+  const [extraCharges, setExtraCharges] = useState('');
   const [discount, setDiscount] = useState(0);
+  const [paymentTypeOption, setPaymentTypeOption] = useState('cash'); // 'cash' | 'credit' | 'partial'
   const [paidAmount, setPaidAmount] = useState('');
   const [paymentMode, setPaymentMode] = useState('cash'); // cash | upi | bank | credit
   const [remarks, setRemarks] = useState('');
@@ -47,6 +54,13 @@ export const SalesBilling = ({ onBillCreated }) => {
 
   // Find active farmer
   const currentFarmer = farmers.find(f => f.id === selectedFarmerId);
+
+  // Filtered farmers by search
+  const filteredFarmers = farmers.filter(f => 
+    f.name.toLowerCase().includes(farmerSearch.toLowerCase()) ||
+    (f.mobile && f.mobile.includes(farmerSearch)) ||
+    (f.village && f.village.toLowerCase().includes(farmerSearch.toLowerCase()))
+  );
 
   // Handle stock selection change
   const handleStockSelection = (e) => {
@@ -131,8 +145,19 @@ export const SalesBilling = ({ onBillCreated }) => {
 
   // Calculations
   const subTotal = billItems.reduce((acc, it) => acc + it.itemTotal, 0);
-  const netAmount = Math.max(0, subTotal - (parseFloat(discount) || 0));
-  const numericPaid = paidAmount === '' ? netAmount : parseFloat(paidAmount) || 0;
+  const majuri = parseFloat(majuriAmount) || 0;
+  const extra = parseFloat(extraCharges) || 0;
+  const disc = parseFloat(discount) || 0;
+  const netAmount = Math.max(0, subTotal - disc + majuri + extra);
+
+  let numericPaid = 0;
+  if (paymentTypeOption === 'cash') {
+    numericPaid = netAmount;
+  } else if (paymentTypeOption === 'credit') {
+    numericPaid = 0;
+  } else {
+    numericPaid = paidAmount === '' ? netAmount : parseFloat(paidAmount) || 0;
+  }
   const dueAmount = Math.max(0, netAmount - numericPaid);
 
   // Quick Farmer Add
@@ -160,6 +185,7 @@ export const SalesBilling = ({ onBillCreated }) => {
     }
 
     const salePayload = {
+      billNo: autoBillNo,
       billDate,
       farmerId: currentFarmer.id,
       farmerName: currentFarmer.name,
@@ -168,11 +194,13 @@ export const SalesBilling = ({ onBillCreated }) => {
       saleCategory,
       items: billItems,
       subTotal,
-      discount: parseFloat(discount) || 0,
+      majuriAmount: majuri,
+      extraCharges: extra,
+      discount: disc,
       netAmount,
       paidAmount: numericPaid,
       dueAmount,
-      paymentMode,
+      paymentMode: paymentTypeOption === 'credit' ? 'credit' : paymentMode,
       remarks,
       createdBy: userProfile?.displayName || 'સ્ટાફ'
     };
@@ -183,6 +211,8 @@ export const SalesBilling = ({ onBillCreated }) => {
     // Reset bill state
     setBillItems([]);
     setDiscount(0);
+    setMajuriAmount('');
+    setExtraCharges('');
     setPaidAmount('');
     setRemarks('');
     setSelectedFarmerId('');
@@ -191,15 +221,21 @@ export const SalesBilling = ({ onBillCreated }) => {
   return (
     <div className="page-body">
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.45rem', fontWeight: '700', color: '#064e3b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Receipt size={24} />
             નવું સાદું વેચાણ બિલ (New Sales Bill)
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.88rem' }}>
-            ખેડૂતને સાદું બિલ આપો • બોરી & છૂટક કિલો સ્ટોક આપોઆપ ઘટશે
+            ખેડૂતને સાદું બિલ આપો • રોકડ કે ઉધાર ખાતાવહીમાં ઓટોમેટિક જમા/ઉધાર
           </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', padding: '0.4rem 0.85rem', borderRadius: '8px', color: '#065f46', fontSize: '0.9rem', fontWeight: '700' }}>
+            ઇનવોઇસ નં: {autoBillNo} <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#059669' }}>(ઓટોમેટિક)</span>
+          </div>
         </div>
       </div>
 
@@ -227,6 +263,17 @@ export const SalesBilling = ({ onBillCreated }) => {
               </button>
             </div>
 
+            <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+              <input 
+                type="text"
+                className="form-control"
+                placeholder="🔍 ખેડૂતનું નામ, ગામ કે મોબાઇલ શોધો..."
+                value={farmerSearch}
+                onChange={(e) => setFarmerSearch(e.target.value)}
+                style={{ fontSize: '0.85rem', backgroundColor: '#f8fafc' }}
+              />
+            </div>
+
             <div className="form-group">
               <label className="form-label">ખેડૂત / પાર્ટી પસંદ કરો *</label>
               <select 
@@ -234,8 +281,8 @@ export const SalesBilling = ({ onBillCreated }) => {
                 value={selectedFarmerId}
                 onChange={(e) => setSelectedFarmerId(e.target.value)}
                 required>
-                <option value="">-- ખેડૂતનું નામ પસંદ કરો --</option>
-                {farmers.map(f => (
+                <option value="">-- ખેડૂત પસંદ કરો ({filteredFarmers.length}) --</option>
+                {filteredFarmers.map(f => (
                   <option key={f.id} value={f.id}>
                     {f.name} - {f.village} ({f.mobile}) {f.currentBalance > 0 ? `[બાકી: ₹${f.currentBalance}]` : ''}
                   </option>
@@ -423,12 +470,107 @@ export const SalesBilling = ({ onBillCreated }) => {
         {billItems.length > 0 && (
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title">૩. રકમની ગણતરી & ચુકવણી પદ્ધતિ</h3>
+              <h3 className="card-title">૩. મજૂરી, અન્ય ખર્ચ & ચુકવણી (રોકડ / ઉધાર)</h3>
+            </div>
+
+            {/* Cash vs Udhar Selector Buttons */}
+            <div style={{ marginBottom: '1.25rem', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <label className="form-label" style={{ marginBottom: '0.5rem', fontWeight: '700' }}>
+                ચુકવણીનો પ્રકાર (Cash or Udhar):
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setPaymentTypeOption('cash');
+                    setPaymentMode('cash');
+                  }}
+                  style={{
+                    padding: '0.75rem 0.5rem',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    fontSize: '0.95rem',
+                    border: paymentTypeOption === 'cash' ? '2px solid #059669' : '1px solid #cbd5e1',
+                    backgroundColor: paymentTypeOption === 'cash' ? '#ecfdf5' : '#ffffff',
+                    color: paymentTypeOption === 'cash' ? '#065f46' : '#475569'
+                  }}>
+                  🟢 પૂરેપૂરી રોકડ (Cash)
+                  <div style={{ fontSize: '0.75rem', fontWeight: '400', marginTop: '0.2rem' }}>બાકી ઉધાર: ₹0</div>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setPaymentTypeOption('credit');
+                    setPaymentMode('credit');
+                  }}
+                  style={{
+                    padding: '0.75rem 0.5rem',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    fontSize: '0.95rem',
+                    border: paymentTypeOption === 'credit' ? '2px solid #dc2626' : '1px solid #cbd5e1',
+                    backgroundColor: paymentTypeOption === 'credit' ? '#fee2e2' : '#ffffff',
+                    color: paymentTypeOption === 'credit' ? '#991b1b' : '#475569'
+                  }}>
+                  🔴 પૂરેપૂરું ઉધાર (Udhar)
+                  <div style={{ fontSize: '0.75rem', fontWeight: '400', marginTop: '0.2rem' }}>ખાતાવહીમાં જમા થશે</div>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setPaymentTypeOption('partial');
+                    setPaymentMode('cash');
+                  }}
+                  style={{
+                    padding: '0.75rem 0.5rem',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    fontSize: '0.95rem',
+                    border: paymentTypeOption === 'partial' ? '2px solid #d97706' : '1px solid #cbd5e1',
+                    backgroundColor: paymentTypeOption === 'partial' ? '#fef3c7' : '#ffffff',
+                    color: paymentTypeOption === 'partial' ? '#92400e' : '#475569'
+                  }}>
+                  🟡 અંશતઃ રોકડ + ઉધાર
+                  <div style={{ fontSize: '0.75rem', fontWeight: '400', marginTop: '0.2rem' }}>અમુક રોકડ, બાકી ઉધાર</div>
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
               
+              {/* Extra Charges Inputs */}
               <div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">મજૂરી ખર્ચ (Labor / Majuri ₹)</label>
+                    <input 
+                      type="number" 
+                      min="0" 
+                      className="form-control" 
+                      placeholder="0"
+                      value={majuriAmount} 
+                      onChange={(e) => setMajuriAmount(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">અન્ય ચાર્જિસ / વાહન ભાડું (₹)</label>
+                    <input 
+                      type="number" 
+                      min="0" 
+                      className="form-control" 
+                      placeholder="0"
+                      value={extraCharges} 
+                      onChange={(e) => setExtraCharges(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">ડિસ્કાઉન્ટ / છૂટ (₹)</label>
                   <input 
@@ -440,51 +582,71 @@ export const SalesBilling = ({ onBillCreated }) => {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">ચુકવણી પ્રકાર (Payment Mode)</label>
-                  <select 
-                    className="form-control"
-                    value={paymentMode}
-                    onChange={(e) => setPaymentMode(e.target.value)}>
-                    <option value="cash">રોકડ (Cash)</option>
-                    <option value="upi">UPI / Google Pay / PhonePe</option>
-                    <option value="bank">બેંક ટ્રાન્સફર (NEFT/RTGS)</option>
-                    <option value="credit">પૂરેપૂરો ઉધાર (Credit)</option>
-                  </select>
-                </div>
+                {paymentTypeOption !== 'credit' && (
+                  <div className="form-group">
+                    <label className="form-label">ચુકવણી માધ્યમ</label>
+                    <select 
+                      className="form-control"
+                      value={paymentMode}
+                      onChange={(e) => setPaymentMode(e.target.value)}>
+                      <option value="cash">રોકડ (Cash)</option>
+                      <option value="upi">UPI / Google Pay / PhonePe</option>
+                      <option value="bank">બેંક ટ્રાન્સફર (NEFT/RTGS)</option>
+                    </select>
+                  </div>
+                )}
 
-                <div className="form-group">
-                  <label className="form-label">જમા રોકડ રકમ (Paid Amount ₹)</label>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    className="form-control" 
-                    placeholder={`પૂરી રકમ: ${netAmount}`}
-                    value={paidAmount} 
-                    onChange={(e) => setPaidAmount(e.target.value)}
-                  />
-                </div>
+                {paymentTypeOption === 'partial' && (
+                  <div className="form-group">
+                    <label className="form-label">જમા આપેલ રોકડ રકમ (Paid ₹) *</label>
+                    <input 
+                      type="number" 
+                      min="0" 
+                      required
+                      className="form-control" 
+                      placeholder="દા.ત. 5000"
+                      value={paidAmount} 
+                      onChange={(e) => setPaidAmount(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Bill Totals Summary Box */}
               <div style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '1rem' }}>
-                  <span>કુલ રકમ (Sub Total):</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '0.95rem' }}>
+                  <span>બિયારણ રકમ (Seeds Sub Total):</span>
                   <strong>₹{subTotal.toLocaleString('en-IN')}</strong>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: '#dc2626' }}>
-                  <span>ડિસ્કાઉન્ટ:</span>
-                  <strong>- ₹{(parseFloat(discount) || 0).toLocaleString('en-IN')}</strong>
-                </div>
+                {majuri > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#1e40af' }}>
+                    <span>+ મજૂરી ખર્ચ:</span>
+                    <strong>₹{majuri.toLocaleString('en-IN')}</strong>
+                  </div>
+                )}
+
+                {extra > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#1e40af' }}>
+                    <span>+ અન્ય ચાર્જિસ / ભાડું:</span>
+                    <strong>₹{extra.toLocaleString('en-IN')}</strong>
+                  </div>
+                )}
+
+                {disc > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#dc2626' }}>
+                    <span>- ડિસ્કાઉન્ટ:</span>
+                    <strong>- ₹{disc.toLocaleString('en-IN')}</strong>
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', borderTop: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', fontSize: '1.25rem', fontWeight: '800', color: '#064e3b' }}>
-                  <span>ચૂકવવાપાત્ર ચોખ્ખી રકમ:</span>
+                  <span>કુલ ચૂકવવાપાત્ર રકમ:</span>
                   <span>₹{netAmount.toLocaleString('en-IN')}</span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem', color: '#16a34a', fontWeight: '600' }}>
-                  <span>જમા થયેલ રકમ:</span>
+                  <span>જમા રોકડ (Paid):</span>
                   <span>₹{numericPaid.toLocaleString('en-IN')}</span>
                 </div>
 
@@ -498,7 +660,7 @@ export const SalesBilling = ({ onBillCreated }) => {
                   borderRadius: '6px',
                   fontWeight: '700'
                 }}>
-                  <span>{dueAmount > 0 ? 'બાકી ઉધાર (Due Balance):' : 'સંપૂર્ણ હિસાબ પૂર્ણ'}</span>
+                  <span>{dueAmount > 0 ? 'બાકી ઉધાર (ખાતાવહીમાં ઉમેરાશે):' : 'સંપૂર્ણ હિસાબ પૂર્ણ (Paid)'}</span>
                   <span>₹{dueAmount.toLocaleString('en-IN')}</span>
                 </div>
               </div>

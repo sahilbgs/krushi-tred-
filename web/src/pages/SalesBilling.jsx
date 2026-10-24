@@ -101,19 +101,15 @@ export const SalesBilling = ({ onBillCreated }) => {
       return;
     }
 
-    // Calculate line total
-    let itemTotal = 0;
-    if (currentItem.rateType === 'kg') {
-      itemTotal = totalKg * currentItem.rate;
-    } else {
-      itemTotal = (bags * currentItem.rate) + (loose * (currentItem.rate / currentItem.bagWeightKg));
-    }
+    // Calculate line total strictly per KG: Total Net Weight (KG) * Rate (₹/kg)
+    const itemTotal = totalKg * currentItem.rate;
 
     const newItem = {
       ...currentItem,
       bags,
       looseKg: loose,
       totalWeightKg: totalKg,
+      rateUnit: 'kg',
       itemTotal: Math.round(itemTotal)
     };
 
@@ -342,23 +338,20 @@ export const SalesBilling = ({ onBillCreated }) => {
 
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">ભાવ પ્રકાર</label>
-                <select 
-                  className="form-control"
-                  value={currentItem.rateType}
-                  onChange={(e) => setCurrentItem(prev => ({ ...prev, rateType: e.target.value }))}>
-                  <option value="kg">પ્રતિ કિલો (₹ / kg)</option>
-                  <option value="bag">પ્રતિ બોરી (₹ / Bag)</option>
-                </select>
+                <label className="form-label">કુલ નેટ વજન (Net Weight)</label>
+                <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#ecfdf5', borderRadius: '6px', border: '1px solid #a7f3d0', fontWeight: '700', color: '#064e3b' }}>
+                  {((parseInt(currentItem.bags || 0) * currentItem.bagWeightKg) + (parseFloat(currentItem.looseKg || 0))).toFixed(1)} kg
+                </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">વેચાણ ભાવ (₹)</label>
+                <label className="form-label">વેચાણ ભાવ પ્રતિ કિલો (₹ / kg) *</label>
                 <input 
                   type="number" 
                   min="0" 
                   step="0.5" 
                   className="form-control" 
+                  style={{ fontWeight: '700', fontSize: '1.05rem', color: '#064e3b' }}
                   value={currentItem.rate} 
                   onChange={(e) => setCurrentItem(prev => ({ ...prev, rate: parseFloat(e.target.value) || 0 }))}
                 />
@@ -401,7 +394,7 @@ export const SalesBilling = ({ onBillCreated }) => {
                     <th>બોરી</th>
                     <th>છૂટક KG</th>
                     <th>કુલ કિલો</th>
-                    <th>ભાવ</th>
+                    <th>ભાવ (₹/kg)</th>
                     <th>રકમ (₹)</th>
                     <th>રદ</th>
                   </tr>
@@ -415,7 +408,7 @@ export const SalesBilling = ({ onBillCreated }) => {
                       <td style={{ fontWeight: '600' }}>{it.bags}</td>
                       <td>{it.looseKg} kg</td>
                       <td style={{ fontWeight: '700', color: '#064e3b' }}>{it.totalWeightKg} kg</td>
-                      <td>₹{it.rate} /{it.rateType}</td>
+                      <td style={{ fontWeight: '600' }}>₹{it.rate} /kg</td>
                       <td style={{ fontWeight: '700' }}>₹{it.itemTotal?.toLocaleString('en-IN')}</td>
                       <td>
                         <button 

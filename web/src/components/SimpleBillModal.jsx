@@ -106,7 +106,7 @@ export const SimpleBillModal = ({ sale, onClose }) => {
                 <th style={{ padding: '0.5rem' }}>બેચ નં</th>
                 <th style={{ padding: '0.5rem', textAlign: 'center' }}>બોરી</th>
                 <th style={{ padding: '0.5rem', textAlign: 'center' }}>કુલ KG</th>
-                <th style={{ padding: '0.5rem', textAlign: 'right' }}>ભાવ</th>
+                <th style={{ padding: '0.5rem', textAlign: 'right' }}>ભાવ (₹ / kg)</th>
                 <th style={{ padding: '0.5rem', textAlign: 'right' }}>રકમ (₹)</th>
               </tr>
             </thead>
@@ -120,8 +120,8 @@ export const SimpleBillModal = ({ sale, onClose }) => {
                   </td>
                   <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>{it.batchNo || '—'}</td>
                   <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>{it.bags}</td>
-                  <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>{it.totalWeightKg} kg</td>
-                  <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right' }}>₹{it.rate}</td>
+                  <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: '700' }}>{it.totalWeightKg} kg</td>
+                  <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right' }}>₹{it.rate} /kg</td>
                   <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: '600' }}>₹{it.itemTotal?.toLocaleString('en-IN')}</td>
                 </tr>
               ))}

@@ -38,14 +38,14 @@ fun PurchaseEntryScreen(
     var invoiceNo by remember { mutableStateOf("") }
     var batchNo by remember { mutableStateOf("LOT-2026/05") }
     var bagsInput by remember { mutableStateOf("20") }
-    var purchaseRateInput by remember { mutableStateOf("6000") }
+    var purchaseRateInput by remember { mutableStateOf("120") }
     var paidInput by remember { mutableStateOf("") }
 
     val bags = bagsInput.toIntOrNull() ?: 0
     val bagWeight = selectedSeed?.bagWeightKg ?: 50.0
     val totalWeightKg = bags * bagWeight
     val rate = purchaseRateInput.toDoubleOrNull() ?: 0.0
-    val totalAmount = bags * rate
+    val totalAmount = totalWeightKg * rate
     val paid = if (paidInput.isEmpty()) totalAmount else (paidInput.toDoubleOrNull() ?: 0.0)
     val due = (totalAmount - paid).coerceAtLeast(0.0)
 
@@ -193,7 +193,7 @@ fun PurchaseEntryScreen(
                     OutlinedTextField(
                         value = purchaseRateInput,
                         onValueChange = { purchaseRateInput = it },
-                        label = { Text("ભાવ ₹/બોરી") },
+                        label = { Text("ખરીદી ભાવ (₹/kg) *") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)

@@ -42,8 +42,8 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
         bagWeightKg: seed.bagWeightKg,
         bags: defaultBags,
         netWeightKg: defaultBags * seed.bagWeightKg,
-        rateType: 'bag',
-        purchaseRate: seed.defaultSaleRatePerBag ? Math.round(seed.defaultSaleRatePerBag * 0.85) : 0
+        rateType: 'kg',
+        purchaseRate: seed.defaultSaleRatePerKg ? Math.round(seed.defaultSaleRatePerKg * 0.85) : 120
       });
     } else {
       setCurrentItem(prev => ({ ...prev, seedId: '' }));
@@ -75,14 +75,10 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       return;
     }
 
-    let lineTotal = 0;
-    if (currentItem.rateType === 'bag') {
-      lineTotal = currentItem.bags * currentItem.purchaseRate;
-    } else {
-      lineTotal = currentItem.netWeightKg * currentItem.purchaseRate;
-    }
+    // Calculate line total strictly per KG: Net Weight (KG) * Purchase Rate (₹/kg)
+    const lineTotal = currentItem.netWeightKg * currentItem.purchaseRate;
 
-    setItems(prev => [...prev, { ...currentItem, itemTotal: Math.round(lineTotal) }]);
+    setItems(prev => [...prev, { ...currentItem, rateType: 'kg', itemTotal: Math.round(lineTotal) }]);
     
     // Reset seed row
     setCurrentItem({
@@ -92,7 +88,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       bagWeightKg: 50,
       bags: 10,
       netWeightKg: 500,
-      rateType: 'bag',
+      rateType: 'kg',
       purchaseRate: 0
     });
   };
@@ -294,11 +290,13 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">ખરીદી ભાવ (₹)</label>
+                <label className="form-label">ખરીદી ભાવ પ્રતિ કિલો (₹ / kg) *</label>
                 <input 
                   type="number" 
+                  step="0.5"
                   className="form-control" 
-                  value={currentItem.purchaseRate}
+                  style={{ fontWeight: '700', fontSize: '1.05rem', color: '#064e3b' }}
+                  value={currentItem.purchaseRate} 
                   onChange={(e) => setCurrentItem(prev => ({ ...prev, purchaseRate: parseFloat(e.target.value) || 0 }))}
                 />
               </div>
@@ -336,7 +334,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
                     <th>બેચ નં</th>
                     <th>બોરી (Bags)</th>
                     <th>કુલ વજન (KG)</th>
-                    <th>ખરીદી ભાવ</th>
+                    <th>ખરીદી ભાવ (₹/kg)</th>
                     <th>કુલ રકમ</th>
                     <th>રદ</th>
                   </tr>
@@ -348,8 +346,8 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
                       <td style={{ fontWeight: '600' }}>{it.varietyName}</td>
                       <td><span className="badge badge-primary">{it.batchNo}</span></td>
                       <td style={{ fontWeight: '700' }}>{it.bags} બોરી</td>
-                      <td>{it.netWeightKg} kg</td>
-                      <td>₹{it.purchaseRate} /{it.rateType}</td>
+                      <td style={{ fontWeight: '700' }}>{it.netWeightKg} kg</td>
+                      <td>₹{it.purchaseRate} /kg</td>
                       <td style={{ fontWeight: '700', color: '#064e3b' }}>₹{it.itemTotal?.toLocaleString('en-IN')}</td>
                       <td>
                         <button 

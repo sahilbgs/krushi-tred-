@@ -56,7 +56,7 @@ export function App() {
       case 'dashboard':
         return <Dashboard setActiveTab={setActiveTab} onOpenBill={(sale) => setCurrentBillModal(sale)} />;
       case 'purchases':
-        return <PurchaseEntry onPurchaseCompleted={() => setActiveTab('stock')} />;
+        return <PurchaseEntry />;
       case 'sales':
         return <SalesBilling onBillCreated={(newSale) => setCurrentBillModal(newSale)} />;
       case 'stock':

@@ -14,7 +14,7 @@ export const SalesBilling = ({ onBillCreated }) => {
   const [farmerName, setFarmerName] = useState('');
   const [farmerMobile, setFarmerMobile] = useState('');
   const [village, setVillage] = useState('');
-  const [paymentMode, setPaymentMode] = useState('CASH');
+  const [paymentMode, setPaymentMode] = useState('cash');
   const [paymentReference, setPaymentReference] = useState('');
   const [paid, setPaid] = useState('0');
   const [note, setNote] = useState('');
@@ -456,10 +456,10 @@ export const SalesBilling = ({ onBillCreated }) => {
           <label>
             ચુકવણી પદ્ધતિ
             <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)}>
-              <option value="CASH">રોકડ (Cash)</option>
-              <option value="BANK">બેંક / UPI</option>
-              <option value="CREDIT">ઉધાર (Credit)</option>
-              <option value="PARTIAL">આંશિક ચુકવણી (Partial)</option>
+              <option value="cash">રોકડ (Cash)</option>
+              <option value="bank">બેંક / UPI</option>
+              <option value="credit">ઉધાર (Credit)</option>
+              <option value="credit">આંશિક ચુકવણી (Partial)</option>
             </select>
           </label>
 

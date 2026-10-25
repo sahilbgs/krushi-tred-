@@ -22,7 +22,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
   const [partyName, setPartyName] = useState('');
   const [partyMobile, setPartyMobile] = useState('');
   const [village, setVillage] = useState('');
-  const [paymentMode, setPaymentMode] = useState('BANK');
+  const [paymentMode, setPaymentMode] = useState('bank');
   const [paymentReference, setPaymentReference] = useState('');
   const [paid, setPaid] = useState('0');
   const [note, setNote] = useState('');
@@ -211,10 +211,6 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     setPaymentReference('');
     setNote('');
     setItems([{ productId: seeds[0]?.id || '', bags: '10', lastBagKg: '35', rate: '2400' }]);
-
-    if (onPurchaseCompleted) {
-      onPurchaseCompleted();
-    }
   };
 
   return (
@@ -449,10 +445,10 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
             <select
               value={paymentMode}
               onChange={e => setPaymentMode(e.target.value)}>
-              <option value="BANK">બેંક ટ્રાન્સફર / NEFT / RTGS</option>
-              <option value="CASH">રોકડ (CASH)</option>
-              <option value="CREDIT">ઉધાર (CREDIT)</option>
-              <option value="PARTIAL">આંશિક ચુકવણી</option>
+              <option value="bank">બેંક ટ્રાન્સફર / NEFT / RTGS</option>
+              <option value="cash">રોકડ (CASH)</option>
+              <option value="credit">ઉધાર (CREDIT)</option>
+              <option value="credit">આંશિક ચુકવણી (PARTIAL)</option>
             </select>
           </label>
         </div>

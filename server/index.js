@@ -201,7 +201,46 @@ app.post('/api/purchases', async (req, res) => {
     const billNumber = purchaseData.billNo || `SN-PUR-${timestamp.getFullYear()}-${Date.now().toString().slice(-4)}`;
     const isFarmer = purchaseData.purchaseType === 'farmer';
 
-    // 1. Insert Purchase
+    // 1. Ensure Party exists in parties table
+    let finalPartyId = purchaseData.partyId || null;
+    if (finalPartyId) {
+      const checkParty = await client.query('SELECT id FROM parties WHERE id = $1', [finalPartyId]);
+      if (checkParty.rows.length === 0) {
+        await client.query(
+          `INSERT INTO parties (id, party_type, code, name, mobile, village, opening_balance, balance_type, current_balance, credit_limit)
+           VALUES ($1, $2, $3, $4, $5, $6, 0, 'dr', 0, 50000)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            finalPartyId,
+            isFarmer ? 'farmer' : 'firm',
+            `P-${Date.now().toString().slice(-4)}`,
+            purchaseData.partyName || 'ખાતેદાર',
+            purchaseData.mobile || null,
+            purchaseData.village || null
+          ]
+        );
+      }
+    } else if (purchaseData.partyName && purchaseData.partyName.trim()) {
+      finalPartyId = 'party_' + Date.now();
+      await client.query(
+        `INSERT INTO parties (id, party_type, code, name, mobile, village, opening_balance, balance_type, current_balance, credit_limit)
+         VALUES ($1, $2, $3, $4, $5, $6, 0, 'dr', 0, 50000)`,
+        [
+          finalPartyId,
+          isFarmer ? 'farmer' : 'firm',
+          `P-${Date.now().toString().slice(-4)}`,
+          purchaseData.partyName.trim(),
+          purchaseData.mobile || null,
+          purchaseData.village || null
+        ]
+      );
+    }
+
+    // 2. Normalize payment mode to lowercase valid enum
+    const rawMode = (purchaseData.paymentMode || 'credit').toString().toLowerCase().trim();
+    const normalizedMode = ['cash', 'bank', 'upi', 'credit', 'cheque'].includes(rawMode) ? rawMode : 'credit';
+
+    // 3. Insert Purchase
     await client.query(
       `INSERT INTO purchases (
         id, purchase_type, bill_no, purchase_date, party_id, party_name,
@@ -213,10 +252,10 @@ app.post('/api/purchases', async (req, res) => {
       ON CONFLICT (bill_no) DO NOTHING`,
       [
         purchaseId,
-        purchaseData.purchaseType || 'farmer',
+        isFarmer ? 'farmer' : 'market',
         billNumber,
         purchaseData.purchaseDate || timestamp.toISOString().split('T')[0],
-        purchaseData.partyId || null,
+        finalPartyId,
         purchaseData.partyName || 'પરચુરણ',
         purchaseData.firmId || null,
         purchaseData.firmName || null,
@@ -236,13 +275,13 @@ app.post('/api/purchases', async (req, res) => {
         parseFloat(purchaseData.netTotal || 0),
         parseFloat(purchaseData.paidAmount || 0),
         parseFloat(purchaseData.dueAmount || 0),
-        purchaseData.paymentMode || 'credit',
+        normalizedMode,
         purchaseData.remarks || null,
         purchaseData.createdBy || 'સ્ટાફ'
       ]
     );
 
-    // 2. Insert Purchase Items & Update Stock Ledger
+    // 4. Insert Purchase Items & Update Stock Ledger
     if (Array.isArray(purchaseData.items)) {
       for (const item of purchaseData.items) {
         const itemId = item.id || ('pitm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
@@ -252,6 +291,7 @@ app.post('/api/purchases', async (req, res) => {
         const man = parseFloat(item.totalMan || (netKg / 20));
         const ratePerMan = parseFloat(item.ratePerMan || item.rate || 0);
         const total = parseFloat(item.itemTotal || 0);
+        const lastBagKg = Math.min(bagWeight, Math.max(0, parseFloat(item.lastBagKg !== undefined ? item.lastBagKg : bagWeight)));
 
         await client.query(
           `INSERT INTO purchase_items (
@@ -264,7 +304,7 @@ app.post('/api/purchases', async (req, res) => {
             item.varietyName,
             bagWeight,
             bags,
-            parseFloat(item.lastBagKg || 35),
+            lastBagKg,
             netKg,
             man,
             ratePerMan,
@@ -389,7 +429,30 @@ app.post('/api/sales', async (req, res) => {
     const saleId = saleData.id || ('sale_' + Date.now());
     const billNumber = saleData.billNo || `SN-SALE-${timestamp.getFullYear()}-${Date.now().toString().slice(-4)}`;
 
-    // 1. Insert Sale
+    // 1. Ensure Party exists in parties table
+    let finalSalePartyId = saleData.farmerId || saleData.partyId || null;
+    if (finalSalePartyId) {
+      const checkParty = await client.query('SELECT id FROM parties WHERE id = $1', [finalSalePartyId]);
+      if (checkParty.rows.length === 0) {
+        await client.query(
+          `INSERT INTO parties (id, party_type, code, name, mobile, village, opening_balance, balance_type, current_balance, credit_limit)
+           VALUES ($1, 'farmer', $2, $3, $4, $5, 0, 'dr', 0, 50000)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            finalSalePartyId,
+            `KH-${Date.now().toString().slice(-4)}`,
+            saleData.farmerName || 'ખેડૂત ગ્રાહક',
+            saleData.farmerMobile || '',
+            saleData.farmerVillage || ''
+          ]
+        );
+      }
+    }
+
+    const rawSaleMode = (saleData.paymentMode || 'cash').toString().toLowerCase().trim();
+    const normalizedSaleMode = ['cash', 'bank', 'upi', 'credit', 'cheque', 'cash_and_credit'].includes(rawSaleMode) ? rawSaleMode : 'cash';
+
+    // 2. Insert Sale
     await client.query(
       `INSERT INTO sales (
         id, bill_no, bill_date, party_id, farmer_name, farmer_mobile, farmer_village,
@@ -400,7 +463,7 @@ app.post('/api/sales', async (req, res) => {
         saleId,
         billNumber,
         saleData.billDate || timestamp.toISOString().split('T')[0],
-        saleData.farmerId || saleData.partyId || null,
+        finalSalePartyId,
         saleData.farmerName || 'ખેડૂત ગ્રાહક',
         saleData.farmerMobile || '',
         saleData.farmerVillage || '',
@@ -410,13 +473,13 @@ app.post('/api/sales', async (req, res) => {
         parseFloat(saleData.netAmount || 0),
         parseFloat(saleData.paidAmount || 0),
         parseFloat(saleData.dueAmount || 0),
-        saleData.paymentMode || 'cash',
+        normalizedSaleMode,
         saleData.remarks || '',
         saleData.createdBy || 'સ્ટાફ'
       ]
     );
 
-    // 2. Insert Sale Items & Deduct Stock
+    // 3. Insert Sale Items & Deduct Stock
     if (Array.isArray(saleData.items)) {
       for (const item of saleData.items) {
         const itemId = item.id || ('sitm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
@@ -559,6 +622,8 @@ app.post('/api/vouchers', async (req, res) => {
     const prefix = v.type === 'receipt' ? 'REC' : 'PAY';
     const voucherNumber = v.voucherNo || `${prefix}-${Date.now().toString().slice(-6)}`;
     const isReceipt = v.type === 'receipt';
+    const rawVMode = (v.paymentMode || 'cash').toString().toLowerCase().trim();
+    const normalizedVMode = ['cash', 'bank', 'upi', 'cheque', 'credit'].includes(rawVMode) ? rawVMode : 'cash';
 
     // 1. Insert into payments
     await client.query(
@@ -575,7 +640,7 @@ app.post('/api/vouchers', async (req, res) => {
         v.partyType || 'farmer',
         v.type || 'receipt',
         amount,
-        v.paymentMode || 'cash',
+        normalizedVMode,
         v.referenceNo || null,
         v.remarks || (isReceipt ? 'રોકડ/બેંક રકમ જમા થઈ' : 'રકમ ચૂકવણી કરવામાં આવી'),
         v.recordedBy || 'સ્ટાફ'

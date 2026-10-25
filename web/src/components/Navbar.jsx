@@ -30,11 +30,11 @@ export const Navbar = () => {
           <Sprout size={26} />
         </div>
         <div>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#064e3b', lineHeight: 1.1 }}>
-            કૃષિ ટ્રેડ
+          <h1 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#064e3b', lineHeight: 1.1, letterSpacing: '0.02em' }}>
+            SHREE NANDINI SEEDS
           </h1>
-          <p style={{ fontSize: '0.78rem', color: '#64748b' }}>
-            બિયારણ ખરીદ, વેચાણ, બિલિંગ & સ્ટોક મેનેજમેન્ટ
+          <p style={{ fontSize: '0.78rem', color: '#059669', fontWeight: '600' }}>
+            શ્રી નંદિની સીડ્સ • ખરીદી, ખાતાવહી & રોજમેળ
           </p>
         </div>
       </div>
@@ -55,7 +55,7 @@ export const Navbar = () => {
               backgroundColor: userProfile?.role === 'admin' ? '#059669' : '#e2e8f0',
               color: userProfile?.role === 'admin' ? '#ffffff' : '#334155'
             }}>
-            Main Admin
+            Ravi (Main Admin)
           </button>
           <button 
             onClick={() => loginAsDemo('sub_user')}
@@ -69,7 +69,7 @@ export const Navbar = () => {
               backgroundColor: userProfile?.role === 'sub_user' ? '#d97706' : '#e2e8f0',
               color: userProfile?.role === 'sub_user' ? '#ffffff' : '#334155'
             }}>
-            Sub User
+            Bhargav (Sub User)
           </button>
         </div>
 

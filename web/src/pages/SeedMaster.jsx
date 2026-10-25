@@ -8,10 +8,10 @@ export const SeedMaster = () => {
   const [newSeed, setNewSeed] = useState({
     varietyName: '',
     cropType: 'મગફળી',
-    company: '',
-    bagWeightKg: 50,
-    defaultSaleRatePerKg: 140,
-    defaultSaleRatePerBag: 7000,
+    company: 'SHREE NANDINI SEEDS',
+    bagWeightKg: 35, // 35 KG Standard
+    defaultPurchaseRatePerMan: 2400,
+    defaultSaleRatePerMan: 2800,
     minStockAlertBags: 10
   });
 
@@ -23,10 +23,10 @@ export const SeedMaster = () => {
     setNewSeed({
       varietyName: '',
       cropType: 'મગફળી',
-      company: '',
-      bagWeightKg: 50,
-      defaultSaleRatePerKg: 140,
-      defaultSaleRatePerBag: 7000,
+      company: 'SHREE NANDINI SEEDS',
+      bagWeightKg: 35,
+      defaultPurchaseRatePerMan: 2400,
+      defaultSaleRatePerMan: 2800,
       minStockAlertBags: 10
     });
   };

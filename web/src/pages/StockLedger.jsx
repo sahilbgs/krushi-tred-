@@ -106,39 +106,45 @@ export const StockLedger = () => {
                 <th>હાજર આખી બોરી</th>
                 <th>છૂટક કિલો (Loose)</th>
                 <th>કુલ વજન (Net KG)</th>
-                <th>છેલ્લો ખરીદી ભાવ</th>
+                <th>કુલ મણ (KG÷20)</th>
+                <th>છેલ્લો ખરીદી ભાવ (₹/મણ)</th>
                 <th>સ્થિતિ</th>
                 {userProfile?.role === 'admin' && <th>એડજસ્ટ</th>}
               </tr>
             </thead>
             <tbody>
-              {filteredStock.map(item => (
-                <tr key={item.id}>
-                  <td style={{ fontWeight: '600', color: '#0f172a' }}>
-                    {item.varietyName}
-                  </td>
-                  <td>{item.bagWeightKg} kg</td>
-                  <td style={{ fontWeight: '700', fontSize: '1.05rem', color: item.availableBags <= 15 ? '#dc2626' : '#059669' }}>
-                    {item.availableBags} બોરી
-                  </td>
-                  <td>{item.availableLooseKg} kg</td>
-                  <td style={{ fontWeight: '700', color: '#064e3b' }}>
-                    {item.totalWeightKg} kg
-                  </td>
-                  <td>
-                    {userProfile?.role === 'admin' || userProfile?.permissions?.viewRates ? (
-                      `₹${item.lastPurchaseRate}`
-                    ) : (
-                      <span style={{ color: '#94a3b8' }}>છુપાયેલ</span>
-                    )}
-                  </td>
-                  <td>
-                    {item.availableBags <= 15 ? (
-                      <span className="badge badge-danger">ઓછો સ્ટોક</span>
-                    ) : (
-                      <span className="badge badge-success">પર્યાપ્ત સ્ટોક</span>
-                    )}
-                  </td>
+              {filteredStock.map(item => {
+                const totalManVal = item.totalMan || (item.totalWeightKg / 20);
+                return (
+                  <tr key={item.id}>
+                    <td style={{ fontWeight: '600', color: '#0f172a' }}>
+                      {item.varietyName}
+                    </td>
+                    <td>{item.bagWeightKg || 35} kg</td>
+                    <td style={{ fontWeight: '700', fontSize: '1.05rem', color: item.availableBags <= 15 ? '#dc2626' : '#059669' }}>
+                      {item.availableBags} બોરી
+                    </td>
+                    <td>{item.availableLooseKg || 0} kg</td>
+                    <td style={{ fontWeight: '700', color: '#064e3b' }}>
+                      {item.totalWeightKg} kg
+                    </td>
+                    <td style={{ fontWeight: '800', color: '#059669' }}>
+                      {Number(totalManVal).toFixed(2)} મણ
+                    </td>
+                    <td>
+                      {userProfile?.role === 'admin' || userProfile?.permissions?.viewRates ? (
+                        `₹${item.lastPurchaseRate || 0}`
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>છુપાયેલ</span>
+                      )}
+                    </td>
+                    <td>
+                      {item.availableBags <= 15 ? (
+                        <span className="badge badge-danger">ઓછો સ્ટોક</span>
+                      ) : (
+                        <span className="badge badge-success">પર્યાપ્ત સ્ટોક</span>
+                      )}
+                    </td>
                   {userProfile?.role === 'admin' && (
                     <td>
                       <button 
@@ -150,7 +156,8 @@ export const StockLedger = () => {
                     </td>
                   )}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

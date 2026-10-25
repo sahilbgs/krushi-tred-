@@ -14,22 +14,50 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Default Admin profile for initial load/offline demo
+  // Default Admin profile: Ravi Chaudhary (Main Admin)
   const defaultAdmin = {
-    uid: "admin_krushi_001",
-    email: "admin@krushitrade.com",
-    displayName: "મુખ્ય સંચાલક (Main Admin)",
+    uid: "admin_ravi_001",
+    email: "ravi@nandiniseeds.com",
+    displayName: "Ravi Chaudhary (મુખ્ય સંચાલક)",
     role: "admin",
+    company: "SHREE NANDINI SEEDS",
     permissions: {
       farmerMaster: true,
       supplierMaster: true,
+      partyMaster: true,
       seedMaster: true,
       purchaseEntry: true,
       salesBilling: true,
       stockManagement: true,
       payments: true,
+      khataBook: true,
+      rojmel: true,
       reports: true,
       userManagement: true,
+      viewRates: true
+    }
+  };
+
+  // Sub User profile: Bhargav Chaudhary (Sub User)
+  const defaultSubUser = {
+    uid: "subuser_bhargav_002",
+    email: "bhargav@nandiniseeds.com",
+    displayName: "Bhargav Chaudhary (સબ યુઝર)",
+    role: "sub_user",
+    company: "SHREE NANDINI SEEDS",
+    permissions: {
+      farmerMaster: true,
+      supplierMaster: true,
+      partyMaster: true,
+      seedMaster: true,
+      purchaseEntry: true,
+      salesBilling: true,
+      stockManagement: true,
+      payments: true,
+      khataBook: true,
+      rojmel: true,
+      reports: false,
+      userManagement: false, // Main Admin દ્વારા સંચાલિત, ડિફૉલ્ટ બંધ
       viewRates: true
     }
   };
@@ -46,7 +74,7 @@ export const AuthProvider = ({ children }) => {
         console.error("Local user parse error", e);
       }
     } else {
-      // Default initial login as Main Admin for smooth onboarding
+      // Default initial login as Ravi Chaudhary (Main Admin)
       setUser({ uid: defaultAdmin.uid, email: defaultAdmin.email });
       setUserProfile(defaultAdmin);
       localStorage.setItem('krushi_active_user', JSON.stringify(defaultAdmin));
@@ -91,35 +119,16 @@ export const AuthProvider = ({ children }) => {
       }
     } else {
       // Offline/Local validation
-      if (email.includes("admin")) {
+      if (email.toLowerCase().includes("ravi") || email.toLowerCase().includes("admin")) {
         setUser({ uid: defaultAdmin.uid, email });
         setUserProfile(defaultAdmin);
         localStorage.setItem('krushi_active_user', JSON.stringify(defaultAdmin));
         return defaultAdmin;
       } else {
-        const subUser = {
-          uid: "subuser_staff_002",
-          email,
-          displayName: "રમેશભાઈ પટેલ (કાઉન્ટર સ્ટાફ)",
-          role: "sub_user",
-          permissions: {
-            farmerMaster: true,
-            supplierMaster: true, // can add market party
-            seedMaster: true,
-            purchaseEntry: true, // can make purchase entries
-            salesBilling: true, // can make sales bills
-            stockManagement: true,
-            payments: true,
-            khataBook: true,
-            reports: false,
-            userManagement: false,
-            viewRates: true
-          }
-        };
-        setUser({ uid: subUser.uid, email });
-        setUserProfile(subUser);
-        localStorage.setItem('krushi_active_user', JSON.stringify(subUser));
-        return subUser;
+        setUser({ uid: defaultSubUser.uid, email });
+        setUserProfile(defaultSubUser);
+        localStorage.setItem('krushi_active_user', JSON.stringify(defaultSubUser));
+        return defaultSubUser;
       }
     }
   };
@@ -131,28 +140,9 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(defaultAdmin);
       localStorage.setItem('krushi_active_user', JSON.stringify(defaultAdmin));
     } else {
-      const staffUser = {
-        uid: "subuser_staff_002",
-        email: "staff@krushitrade.com",
-        displayName: "રમેશભાઈ (કાઉન્ટર સ્ટાફ)",
-        role: "sub_user",
-        permissions: {
-          farmerMaster: true,
-          supplierMaster: true, // can add market party
-          seedMaster: true,
-          purchaseEntry: true, // can make purchase entries
-          salesBilling: true, // can make sales bills
-          stockManagement: true,
-          payments: true,
-          khataBook: true,
-          reports: false,
-          userManagement: false,
-          viewRates: true
-        }
-      };
-      setUser({ uid: staffUser.uid, email: staffUser.email });
-      setUserProfile(staffUser);
-      localStorage.setItem('krushi_active_user', JSON.stringify(staffUser));
+      setUser({ uid: defaultSubUser.uid, email: defaultSubUser.email });
+      setUserProfile(defaultSubUser);
+      localStorage.setItem('krushi_active_user', JSON.stringify(defaultSubUser));
     }
   };
 

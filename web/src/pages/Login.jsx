@@ -61,10 +61,10 @@ export const Login = () => {
             <Sprout size={34} color="#6ee7b7" />
           </div>
           <h2 style={{ fontSize: '1.6rem', fontWeight: '800', letterSpacing: '0.02em' }}>
-            કૃષિ ટ્રેડ (Krushi Trade)
+            SHREE NANDINI SEEDS
           </h2>
           <p style={{ fontSize: '0.9rem', color: '#a7f3d0', marginTop: '0.25rem' }}>
-            બિયારણ ખરીદ, વેચાણ, બિલિંગ & સ્ટોક મેનેજમેન્ટ
+            શ્રી નંદિની સીડ્સ • ખરીદી મોડ્યુલ, ખાતાવહી & રોજમેળ સિસ્ટમ
           </p>
         </div>
 
@@ -95,7 +95,7 @@ export const Login = () => {
                 type="email" 
                 required 
                 className="form-control" 
-                placeholder="દા.ત. admin@krushitrade.com"
+                placeholder="દા.ત. ravi@nandiniseeds.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -137,9 +137,9 @@ export const Login = () => {
                 onClick={() => loginAsDemo('admin')}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#059669', fontWeight: '700' }}>
                   <ShieldCheck size={16} />
-                  Main Admin
+                  Ravi Chaudhary
                 </div>
-                <small style={{ fontSize: '0.72rem', color: '#64748b' }}>સંપૂર્ણ કંટ્રોલ</small>
+                <small style={{ fontSize: '0.72rem', color: '#64748b' }}>Main Admin</small>
               </button>
 
               <button 
@@ -149,9 +149,9 @@ export const Login = () => {
                 onClick={() => loginAsDemo('sub_user')}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#d97706', fontWeight: '700' }}>
                   <User size={16} />
-                  Sub User
+                  Bhargav Chaudhary
                 </div>
-                <small style={{ fontSize: '0.72rem', color: '#64748b' }}>સ્ટાફ પરવાનગી</small>
+                <small style={{ fontSize: '0.72rem', color: '#64748b' }}>Sub User</small>
               </button>
             </div>
           </div>

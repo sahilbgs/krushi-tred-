@@ -167,23 +167,33 @@ fun MainApp(repository: FirebaseRepository) {
                     }
                 )
                 Screen.Purchases -> PurchaseEntryScreen(
-                    suppliers = listOf(
-                        Supplier(id = "sup_1", companyName = "ગુજરાત બીજ નિગમ", city = "ગાંધીનગર"),
-                        Supplier(id = "sup_2", companyName = "જૂનાગઢ સીડ્સ કંપની", city = "જૂનાગઢ")
+                    farmers = initialFarmers,
+                    firms = listOf(
+                        Party(id = "firm_1", partyType = "firm", name = "શ્રી ગણેશ ટ્રેડિંગ કંપની", village = "રાજકોટ યાર્ડ"),
+                        Party(id = "firm_2", partyType = "firm", name = "જય સરદાર એન્ટરપ્રાઇઝ", village = "ગોંડલ યાર્ડ")
+                    ),
+                    traders = listOf(
+                        Party(id = "trd_1", partyType = "trader", name = "રાજુભાઈ પટેલ (દલાલ)", firmId = "firm_1", firmName = "શ્રી ગણેશ ટ્રેડિંગ કંપની"),
+                        Party(id = "trd_2", partyType = "trader", name = "અલ્પેશભાઈ ચોવટિયા", firmId = "firm_2", firmName = "જય સરદાર એન્ટરપ્રાઇઝ")
                     ),
                     seeds = listOf(
-                        SeedProduct(id = "seed_1", varietyName = "GJG-22 (મગફળી)", bagWeightKg = 50.0),
-                        SeedProduct(id = "seed_2", varietyName = "GJG-23 (અર્ધવેલડી)", bagWeightKg = 50.0),
-                        SeedProduct(id = "seed_3", varietyName = "GJ-39 (જીરૂ)", bagWeightKg = 30.0)
+                        SeedProduct(id = "seed_1", varietyName = "GJG-22 (ગુજરાત જૂનાગઢ મગફળી)", bagWeightKg = 35.0, defaultPurchaseRatePerMan = 2400.0),
+                        SeedProduct(id = "seed_2", varietyName = "GJG-23 (અર્ધવેલડી મગફળી)", bagWeightKg = 35.0, defaultPurchaseRatePerMan = 2450.0),
+                        SeedProduct(id = "seed_3", varietyName = "GG-20 (ગુજરાત ગ્રાઉન્ડનટ - ૨૦)", bagWeightKg = 35.0, defaultPurchaseRatePerMan = 2350.0),
+                        SeedProduct(id = "seed_4", varietyName = "GJ-39 (જીરૂ રિસર્ચ બિયારણ)", bagWeightKg = 35.0, defaultPurchaseRatePerMan = 7600.0)
                     ),
                     onSavePurchase = { newPur ->
                         newPur.items.forEach { item ->
                             val existingIdx = initialStock.indexOfFirst { it.seedId == item.seedId || it.varietyName == item.varietyName }
                             if (existingIdx >= 0) {
                                 val cur = initialStock[existingIdx]
+                                val newKg = cur.totalWeightKg + item.netWeightKg
+                                val newBags = cur.availableBags + item.bags
                                 initialStock[existingIdx] = cur.copy(
-                                    availableBags = cur.availableBags + item.bags,
-                                    totalWeightKg = cur.totalWeightKg + item.netWeightKg
+                                    availableBags = newBags,
+                                    availableLooseKg = (newKg - (newBags * 35.0)).coerceAtLeast(0.0),
+                                    totalWeightKg = newKg,
+                                    totalMan = newKg / 20.0
                                 )
                             } else {
                                 initialStock.add(
@@ -191,16 +201,14 @@ fun MainApp(repository: FirebaseRepository) {
                                         id = "stk_${System.currentTimeMillis()}",
                                         seedId = item.seedId,
                                         varietyName = item.varietyName,
-                                        bagWeightKg = item.bagWeightKg,
+                                        bagWeightKg = 35.0,
                                         availableBags = item.bags,
                                         totalWeightKg = item.netWeightKg,
-                                        lastPurchaseRate = item.purchaseRate
+                                        totalMan = item.totalMan,
+                                        lastPurchaseRate = item.ratePerMan
                                     )
                                 )
                             }
-                        }
-                        coroutineScope.launch {
-                            repository.savePurchaseWithStockIncrease(newPur)
                         }
                         currentScreen = Screen.Stock
                     }

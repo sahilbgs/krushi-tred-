@@ -93,7 +93,28 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     
-    // ૧૦. Audit Logs (ઓડિટ લોગ - સુરક્ષા માટે માત્ર create અને admin read)
+    // ૧૦. Party Master (સંપૂર્ણ ખાતેદાર માસ્ટર: ખેડૂત, પેઢી, વેપારી, ટ્રક માલિક)
+    match /parties/{partyId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('partyMaster') || hasPermission('farmerMaster') || hasPermission('supplierMaster');
+      allow delete: if isAdmin();
+    }
+
+    // ૧૧. Vouchers (જમા, ઉધાર, ચુકવણી, જર્નલ, માલ પરત)
+    match /vouchers/{voucherId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('payments') || hasPermission('khataBook');
+      allow delete: if isAdmin();
+    }
+
+    // ૧૨. Rojmel (દૈનિક રોજમેળ)
+    match /rojmel/{entryId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('rojmel') || hasPermission('purchaseEntry') || hasPermission('salesBilling');
+      allow delete: if isAdmin();
+    }
+
+    // ૧૩. Audit Logs (ઓડિટ લોગ - સુરક્ષા માટે માત્ર create અને admin read)
     match /auditLogs/{logId} {
       allow read: if isAdmin();
       allow create: if isAuthenticated();

@@ -198,40 +198,28 @@ export const Reports = ({ onOpenBill }) => {
       {activeReportTab === 'purchases' && (
         <div>
           {/* Summary KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
-            <div className="card" style={{ padding: '1rem', borderLeft: '4px solid #064e3b' }}>
-              <div style={{ fontSize: '0.78rem', color: '#64748b' }}>કુલ ખરીદી (Net Total)</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#064e3b', marginTop: '0.2rem' }}>
-                ₹{Math.round(totalPurchaseNet).toLocaleString('en-IN')}
-              </div>
+          <div className="cards">
+            <div className="metric">
+              <span>કુલ ખરીદી (Net Total)</span>
+              <b>₹{Math.round(totalPurchaseNet).toLocaleString('en-IN')}</b>
             </div>
-
-            <div className="card" style={{ padding: '1rem', borderLeft: '4px solid #059669' }}>
-              <div style={{ fontSize: '0.78rem', color: '#64748b' }}>ચૂકવેલ રકમ (Paid)</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#059669', marginTop: '0.2rem' }}>
-                ₹{Math.round(totalPurchasePaid).toLocaleString('en-IN')}
-              </div>
+            <div className="metric">
+              <span>ચૂકવેલ રકમ (Paid)</span>
+              <b style={{ color: '#15803d' }}>₹{Math.round(totalPurchasePaid).toLocaleString('en-IN')}</b>
             </div>
-
-            <div className="card" style={{ padding: '1rem', borderLeft: '4px solid #ea580c' }}>
-              <div style={{ fontSize: '0.78rem', color: '#64748b' }}>બાકી રકમ (Due / Payable)</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#ea580c', marginTop: '0.2rem' }}>
-                ₹{Math.round(totalPurchaseDue).toLocaleString('en-IN')}
-              </div>
+            <div className="metric">
+              <span>બાકી રકમ (Due / Payable)</span>
+              <b style={{ color: '#b91c1c' }}>₹{Math.round(totalPurchaseDue).toLocaleString('en-IN')}</b>
             </div>
-
-            <div className="card" style={{ padding: '1rem', borderLeft: '4px solid #b45309' }}>
-              <div style={{ fontSize: '0.78rem', color: '#64748b' }}>કુલ ખર્ચ (મજૂરી/કમિશન/બારદાન)</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#b45309', marginTop: '0.2rem' }}>
-                ₹{Math.round(totalPurchaseExpenses).toLocaleString('en-IN')}
-              </div>
+            <div className="metric">
+              <span>કુલ ખર્ચ (મજૂરી/કમિશન/બારદાન)</span>
+              <b style={{ color: '#b45309' }}>₹{Math.round(totalPurchaseExpenses).toLocaleString('en-IN')}</b>
             </div>
           </div>
 
           {/* Table */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="tablewrap">
+            <table>
                 <thead>
                   <tr style={{ backgroundColor: '#064e3b', color: '#ffffff', fontSize: '0.8rem', textAlign: 'left' }}>
                     <th style={{ padding: '0.75rem' }}>તારીખ</th>
@@ -310,7 +298,6 @@ export const Reports = ({ onOpenBill }) => {
                   </tr>
                 </tfoot>
               </table>
-            </div>
           </div>
         </div>
       )}

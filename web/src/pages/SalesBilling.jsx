@@ -1,744 +1,575 @@
 import React, { useState } from 'react';
-import { useData } from '../context/DataContext';
+import { useData, BAG_STD_KG, MAN_STD_KG } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Receipt, 
-  Plus, 
-  Trash2, 
-  UserPlus, 
-  AlertCircle, 
-  CheckCircle2, 
-  Calculator 
-} from 'lucide-react';
 
 export const SalesBilling = ({ onBillCreated }) => {
   const { farmers, seeds, stock, sales, recordSale, addFarmer } = useData();
   const { userProfile } = useAuth();
 
-  // Auto Invoice Number
-  const autoBillNo = "KT-2026-" + (sales.length + 102).toString().padStart(5, '0');
+  // Common Header State
+  const autoBillNo = `KT-S-${new Date().getFullYear()}-${(sales.length + 101).toString().padStart(4, '0')}`;
+  const [billNo, setBillNo] = useState(autoBillNo);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [farmerId, setFarmerId] = useState('');
+  const [farmerName, setFarmerName] = useState('');
+  const [farmerMobile, setFarmerMobile] = useState('');
+  const [village, setVillage] = useState('');
+  const [paymentMode, setPaymentMode] = useState('CASH');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paid, setPaid] = useState('0');
+  const [note, setNote] = useState('');
 
-  // Selected Farmer & Search
-  const [selectedFarmerId, setSelectedFarmerId] = useState('');
-  const [farmerSearch, setFarmerSearch] = useState('');
-  const [showQuickFarmerModal, setShowQuickFarmerModal] = useState(false);
-  const [newFarmerForm, setNewFarmerForm] = useState({ name: '', mobile: '', village: '', openingBalance: 0 });
+  // Additional Charges
+  const [labour, setLabour] = useState('0');
+  const [discount, setDiscount] = useState('0');
 
-  // Bill Meta
-  const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
-  const [saleCategory, setSaleCategory] = useState('retail'); // retail | wholesale
+  // Multi-item rows (Default 35 KG/bag, 20 KG = 1 man, rate in ₹/મણ)
+  const [items, setItems] = useState([
+    { seedId: seeds[0]?.id || '', bags: '5', lastBagKg: '35', rate: '2500' }
+  ]);
 
-  // Current Item Line Input
-  const [currentItem, setCurrentItem] = useState({
-    stockId: '',
-    seedId: '',
-    varietyName: '',
-    bagWeightKg: 50,
-    bags: 1,
-    looseKg: 0,
-    rate: 140
-  });
+  // Notice & Preview Modal
+  const [notice, setNotice] = useState('');
+  const [lastInvoice, setLastInvoice] = useState(null);
 
-  // Items added to the bill
-  const [billItems, setBillItems] = useState([]);
-  
-  // Financial calculations & Extra charges
-  const [majuriAmount, setMajuriAmount] = useState('');
-  const [extraCharges, setExtraCharges] = useState('');
-  const [discount, setDiscount] = useState(0);
-  const [paymentTypeOption, setPaymentTypeOption] = useState('cash'); // 'cash' | 'credit' | 'partial'
-  const [paidAmount, setPaidAmount] = useState('');
-  const [paymentMode, setPaymentMode] = useState('cash'); // cash | upi | bank | credit
-  const [remarks, setRemarks] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const money = n => '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN');
+  const num = v => Math.max(0, Number(v || 0));
 
-  // Find active farmer
-  const currentFarmer = farmers.find(f => f.id === selectedFarmerId);
-
-  // Filtered farmers by search
-  const filteredFarmers = farmers.filter(f => 
-    f.name.toLowerCase().includes(farmerSearch.toLowerCase()) ||
-    (f.mobile && f.mobile.includes(farmerSearch)) ||
-    (f.village && f.village.toLowerCase().includes(farmerSearch.toLowerCase()))
-  );
-
-  // Handle stock selection change
-  const handleStockSelection = (e) => {
-    const stockId = e.target.value;
-    const selectedStock = stock.find(s => s.id === stockId);
-    if (selectedStock) {
-      const seed = seeds.find(sd => sd.id === selectedStock.seedId);
-      const defaultRate = seed ? seed.defaultSaleRatePerKg : 140;
-      setCurrentItem({
-        stockId: selectedStock.id,
-        seedId: selectedStock.seedId,
-        varietyName: selectedStock.varietyName,
-        bagWeightKg: selectedStock.bagWeightKg,
-        bags: 1,
-        looseKg: 0,
-        rate: defaultRate
-      });
-    } else {
-      setCurrentItem(prev => ({ ...prev, stockId: '' }));
-    }
-  };
-
-  // Add Item to Bill
-  const handleAddItem = (e) => {
-    e.preventDefault();
-    setErrorMessage('');
-
-    if (!currentItem.stockId) {
-      setErrorMessage("કૃપા કરીને બિયારણ પસંદ કરો.");
-      return;
-    }
-
-    const available = stock.find(s => s.id === currentItem.stockId);
-    if (!available) return;
-
-    const bags = parseInt(currentItem.bags || 0);
-    const loose = parseFloat(currentItem.looseKg || 0);
-    const totalKg = (bags * currentItem.bagWeightKg) + loose;
-
-    if (totalKg <= 0) {
-      setErrorMessage("કૃપા કરીને માન્ય બોરી અથવા કિલો દાખલ કરો.");
-      return;
-    }
-
-    // Check stock limit
-    if (totalKg > available.totalWeightKg) {
-      setErrorMessage(`સ્ટોકમાં માત્ર ${available.availableBags} બોરી (${available.totalWeightKg} kg) ઉપલબ્ધ છે!`);
-      return;
-    }
-
-    // Calculate line total strictly per KG: Total Net Weight (KG) * Rate (₹/kg)
-    const itemTotal = totalKg * currentItem.rate;
-
-    const newItem = {
-      ...currentItem,
-      bags,
-      looseKg: loose,
-      totalWeightKg: totalKg,
-      rateUnit: 'kg',
-      itemTotal: Math.round(itemTotal)
+  // Totals calculation
+  const totals = items.reduce((sum, row) => {
+    const b = num(row.bags);
+    const lastKg = num(row.lastBagKg);
+    const kg = b > 0 ? (Math.max(0, b - 1) * BAG_STD_KG + Math.min(BAG_STD_KG, lastKg)) : 0;
+    const man = kg / MAN_STD_KG;
+    const rate = num(row.rate);
+    const goods = man * rate;
+    return {
+      bags: sum.bags + b,
+      kg: sum.kg + kg,
+      man: sum.man + man,
+      goods: sum.goods + goods
     };
+  }, { bags: 0, kg: 0, man: 0, goods: 0 });
 
-    setBillItems(prev => [...prev, newItem]);
-    
-    // Reset item input
-    setCurrentItem({
-      stockId: '',
-      seedId: '',
-      varietyName: '',
-      bagWeightKg: 50,
-      bags: 1,
-      looseKg: 0,
-      rateType: 'kg',
-      rate: 0
+  const chargesTotal = num(labour);
+  const netTotal = Math.max(0, totals.goods + chargesTotal - num(discount));
+  const dueAmount = Math.max(0, netTotal - num(paid));
+
+  const handleFarmerChange = (fId) => {
+    setFarmerId(fId);
+    const f = farmers.find(x => x.id === fId);
+    if (f) {
+      setFarmerName(f.name);
+      setFarmerMobile(f.mobile || '');
+      setVillage(f.village || '');
+    }
+  };
+
+  const updateItem = (index, key, value) => {
+    setItems(prev => prev.map((row, i) => i === index ? { ...row, [key]: value } : row));
+  };
+
+  const addItemRow = () => {
+    setItems(prev => [
+      ...prev,
+      { seedId: seeds[0]?.id || '', bags: '1', lastBagKg: '35', rate: '2500' }
+    ]);
+  };
+
+  const removeItemRow = (index) => {
+    if (items.length <= 1) return;
+    setItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setNotice('');
+
+    if (!farmerName.trim()) {
+      setNotice('કૃપા કરીને ખેડૂત / ગ્રાહકનું નામ દાખલ કરો.');
+      return;
+    }
+
+    if (items.length === 0) {
+      setNotice('ઓછામાં ઓછી એક બિયારણની જાત ઉમેરો.');
+      return;
+    }
+
+    // Verify stock availability
+    for (const row of items) {
+      const seed = seeds.find(s => s.id === row.seedId);
+      const st = stock.find(s => s.seedId === row.seedId);
+      const rowKg = Math.max(0, num(row.bags) - 1) * BAG_STD_KG + num(row.lastBagKg);
+      if (st && st.totalWeightKg < rowKg) {
+        setNotice(`ચેતવણી: ${seed?.varietyName || 'બિયારણ'} નો સ્ટોક ઓછો છે (હાજર: ${st.totalWeightKg} KG, માંગ: ${rowKg} KG).`);
+        // We still allow if admin permits, but alert user
+      }
+    }
+
+    const normalizedItems = items.map(row => {
+      const seed = seeds.find(s => s.id === row.seedId);
+      const b = num(row.bags);
+      const lastKg = num(row.lastBagKg);
+      const kg = b > 0 ? (Math.max(0, b - 1) * BAG_STD_KG + Math.min(BAG_STD_KG, lastKg)) : 0;
+      const man = kg / MAN_STD_KG;
+      const ratePerMan = num(row.rate);
+      const amount = Math.round(man * ratePerMan);
+
+      return {
+        seedId: seed?.id || row.seedId,
+        varietyName: seed?.varietyName || 'બિયારણ',
+        bags: b,
+        lastBagKg: lastKg,
+        looseKg: lastKg,
+        totalWeightKg: kg,
+        totalMan: man,
+        rateUnit: 'MAN20KG',
+        rate: ratePerMan,
+        ratePerMan: ratePerMan,
+        amount: amount
+      };
     });
-  };
-
-  // Remove Item
-  const handleRemoveItem = (index) => {
-    setBillItems(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Calculations
-  const subTotal = billItems.reduce((acc, it) => acc + it.itemTotal, 0);
-  const majuri = parseFloat(majuriAmount) || 0;
-  const extra = parseFloat(extraCharges) || 0;
-  const disc = parseFloat(discount) || 0;
-  const netAmount = Math.max(0, subTotal - disc + majuri + extra);
-
-  let numericPaid = 0;
-  if (paymentTypeOption === 'cash') {
-    numericPaid = netAmount;
-  } else if (paymentTypeOption === 'credit') {
-    numericPaid = 0;
-  } else {
-    numericPaid = paidAmount === '' ? netAmount : parseFloat(paidAmount) || 0;
-  }
-  const dueAmount = Math.max(0, netAmount - numericPaid);
-
-  // Quick Farmer Add
-  const handleSaveQuickFarmer = (e) => {
-    e.preventDefault();
-    if (!newFarmerForm.name) return;
-    const created = addFarmer(newFarmerForm);
-    setSelectedFarmerId(created.id);
-    setShowQuickFarmerModal(false);
-    setNewFarmerForm({ name: '', mobile: '', village: '', openingBalance: 0 });
-  };
-
-  // Submit Sale & Generate Bill
-  const handleSubmitBill = (e) => {
-    e.preventDefault();
-    setErrorMessage('');
-
-    if (!selectedFarmerId) {
-      setErrorMessage("કૃપા કરીને ખેડૂત / ગ્રાહક પસંદ કરો.");
-      return;
-    }
-    if (billItems.length === 0) {
-      setErrorMessage("બિલમાં ઓછામાં ઓછું ૧ બિયારણ ઉમેરવું જરૂરી છે.");
-      return;
-    }
 
     const salePayload = {
-      billNo: autoBillNo,
-      billDate,
-      farmerId: currentFarmer.id,
-      farmerName: currentFarmer.name,
-      farmerMobile: currentFarmer.mobile,
-      farmerVillage: currentFarmer.village,
-      saleCategory,
-      items: billItems,
-      subTotal,
-      majuriAmount: majuri,
-      extraCharges: extra,
-      discount: disc,
-      netAmount,
-      paidAmount: numericPaid,
-      dueAmount,
-      paymentMode: paymentTypeOption === 'credit' ? 'credit' : paymentMode,
-      remarks,
-      createdBy: userProfile?.displayName || 'સ્ટાફ'
+      billNo,
+      billDate: date,
+      farmerId: farmerId || `cust_${Date.now()}`,
+      farmerName,
+      farmerMobile,
+      farmerVillage: village,
+      items: normalizedItems,
+      goodsAmount: totals.goods,
+      majuriAmount: chargesTotal,
+      extraCharges: 0,
+      discount: num(discount),
+      netAmount: netTotal,
+      paymentType: num(paid) >= netTotal ? 'cash' : num(paid) > 0 ? 'partial' : 'credit',
+      paidAmount: num(paid),
+      dueAmount: dueAmount,
+      paymentMode: paymentMode.toLowerCase(),
+      remarks: note || `વેચાણ બિલ - ${paymentMode}`
     };
 
-    const savedSale = recordSale(salePayload);
-    onBillCreated(savedSale);
+    try {
+      const savedSale = recordSale(salePayload);
+      const invoiceData = {
+        invoiceNo: billNo,
+        kind: 'sale',
+        partyName: farmerName,
+        partyMobile,
+        village,
+        date,
+        items: normalizedItems,
+        goodsTotal: totals.goods,
+        chargesTotal,
+        discount: num(discount),
+        netTotal,
+        totalAmount: netTotal,
+        paid: num(paid),
+        balance: dueAmount,
+        paymentMode,
+        note
+      };
 
-    // Reset bill state
-    setBillItems([]);
-    setDiscount(0);
-    setMajuriAmount('');
-    setExtraCharges('');
-    setPaidAmount('');
-    setRemarks('');
-    setSelectedFarmerId('');
+      setLastInvoice(invoiceData);
+      setNotice('વેચાણ બિલ, સ્ટોક અને ખાતાવહી સફળતાપૂર્વક સેવ થયા.');
+      if (onBillCreated) onBillCreated(savedSale);
+
+      // Reset form
+      setBillNo(`KT-S-${new Date().getFullYear()}-${(sales.length + 102).toString().padStart(4, '0')}`);
+      setFarmerId('');
+      setFarmerName('');
+      setFarmerMobile('');
+      setVillage('');
+      setPaid('0');
+      setNote('');
+      setItems([{ seedId: seeds[0]?.id || '', bags: '1', lastBagKg: '35', rate: '2500' }]);
+    } catch (err) {
+      setNotice('વેચાણ એન્ટ્રી સેવ કરવામાં ભૂલ આવી: ' + (err.message || 'Error'));
+    }
   };
 
   return (
-    <div className="page-body">
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: '700', color: '#064e3b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Receipt size={24} />
-            નવું સાદું વેચાણ બિલ (New Sales Bill)
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>
-            ખેડૂતને સાદું બિલ આપો • રોકડ કે ઉધાર ખાતાવહીમાં ઓટોમેટિક જમા/ઉધાર
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', padding: '0.4rem 0.85rem', borderRadius: '8px', color: '#065f46', fontSize: '0.9rem', fontWeight: '700' }}>
-            ઇનવોઇસ નં: {autoBillNo} <span style={{ fontSize: '0.75rem', fontWeight: '500', color: '#059669' }}>(ઓટોમેટિક)</span>
-          </div>
-        </div>
-      </div>
-
-      {errorMessage && (
-        <div style={{ backgroundColor: '#fee2e2', border: '1px solid #fca5a5', padding: '0.75rem 1rem', borderRadius: '8px', color: '#991b1b', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <AlertCircle size={20} />
-          <span>{errorMessage}</span>
+    <div>
+      {notice && (
+        <div className="notice" onClick={() => setNotice('')} style={{ marginBottom: '16px' }}>
+          {notice} ×
         </div>
       )}
 
-      <form onSubmit={handleSubmitBill}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
-          
-          {/* Section 1: Customer / Farmer Info */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">૧. ખેડૂત / ગ્રાહકની વિગત</h3>
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
-                style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
-                onClick={() => setShowQuickFarmerModal(true)}>
-                <UserPlus size={15} />
-                નવો ખેડૂત
+      {lastInvoice && (
+        <div className="modal-backdrop">
+          <section className="invoice-sheet">
+            <div className="no-print invoice-actions">
+              <button type="button" className="secondary" onClick={() => window.print()}>
+                🖨️ પ્રિન્ટ / PDF સેવ કરો
+              </button>
+              <button type="button" className="secondary" onClick={() => setLastInvoice(null)}>
+                ✕ બંધ કરો
               </button>
             </div>
 
-            <div className="form-group" style={{ marginBottom: '0.6rem' }}>
-              <input 
-                type="text"
-                className="form-control"
-                placeholder="🔍 ખેડૂતનું નામ, ગામ કે મોબાઇલ શોધો..."
-                value={farmerSearch}
-                onChange={(e) => setFarmerSearch(e.target.value)}
-                style={{ fontSize: '0.85rem', backgroundColor: '#f8fafc' }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">ખેડૂત / પાર્ટી પસંદ કરો *</label>
-              <select 
-                className="form-control"
-                value={selectedFarmerId}
-                onChange={(e) => setSelectedFarmerId(e.target.value)}
-                required>
-                <option value="">-- ખેડૂત પસંદ કરો ({filteredFarmers.length}) --</option>
-                {filteredFarmers.map(f => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} - {f.village} ({f.mobile}) {f.currentBalance > 0 ? `[બાકી: ₹${f.currentBalance}]` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {currentFarmer && (
-              <div style={{ backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.88rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                  <span>ગામ/તાલુકો:</span>
-                  <strong>{currentFarmer.village}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                  <span>મોબાઇલ:</span>
-                  <strong>{currentFarmer.mobile}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: currentFarmer.currentBalance > 0 ? '#dc2626' : '#16a34a' }}>
-                  <span>અગાઉનું જૂનું બાકી (ઉધાર):</span>
-                  <strong>₹{currentFarmer.currentBalance?.toLocaleString('en-IN')}</strong>
-                </div>
-              </div>
-            )}
-
-            <div className="form-row" style={{ marginTop: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">બિલ તારીખ</label>
-                <input 
-                  type="date" 
-                  className="form-control" 
-                  value={billDate} 
-                  onChange={(e) => setBillDate(e.target.value)} 
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">વેચાણ પ્રકાર</label>
-                <select 
-                  className="form-control" 
-                  value={saleCategory} 
-                  onChange={(e) => setSaleCategory(e.target.value)}>
-                  <option value="retail">રીટેઈલ (છૂટક ખેડૂત)</option>
-                  <option value="wholesale">હોલસેલ (વેપારી / ડીલર)</option>
-                </select>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Section 2: Seed & Quantity Input */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">૨. બિયારણ, બોરી & કિલો વિગત</h3>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">બિયારણ જાત પસંદ કરો *</label>
-              <select 
-                className="form-control"
-                value={currentItem.stockId}
-                onChange={handleStockSelection}>
-                <option value="">-- બિયારણ પસંદ કરો --</option>
-                {stock.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.varietyName} (હાજર: {s.availableBags} બોરી + {s.availableLooseKg} kg)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">બોરીની સંખ્યા (Bags)</label>
-                <input 
-                  type="number" 
-                  min="0" 
-                  className="form-control" 
-                  value={currentItem.bags} 
-                  onChange={(e) => setCurrentItem(prev => ({ ...prev, bags: e.target.value }))}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">છૂટક કિલો (Loose KG)</label>
-                <input 
-                  type="number" 
-                  min="0" 
-                  step="0.5" 
-                  className="form-control" 
-                  value={currentItem.looseKg} 
-                  onChange={(e) => setCurrentItem(prev => ({ ...prev, looseKg: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">કુલ નેટ વજન (Net Weight)</label>
-                <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#ecfdf5', borderRadius: '6px', border: '1px solid #a7f3d0', fontWeight: '700', color: '#064e3b' }}>
-                  {((parseInt(currentItem.bags || 0) * currentItem.bagWeightKg) + (parseFloat(currentItem.looseKg || 0))).toFixed(1)} kg
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">વેચાણ ભાવ પ્રતિ કિલો (₹ / kg) *</label>
-                <input 
-                  type="number" 
-                  min="0" 
-                  step="0.5" 
-                  className="form-control" 
-                  style={{ fontWeight: '700', fontSize: '1.05rem', color: '#064e3b' }}
-                  value={currentItem.rate} 
-                  onChange={(e) => setCurrentItem(prev => ({ ...prev, rate: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-            </div>
-
-            <button 
-              type="button" 
-              className="btn btn-primary" 
-              style={{ width: '100%', marginTop: '0.5rem' }}
-              onClick={handleAddItem}>
-              <Plus size={18} />
-              બિલમાં બિયારણ ઉમેરો (Add to Bill)
-            </button>
-
-          </div>
-
-        </div>
-
-        {/* Section 3: Added Items Table */}
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div className="card-header">
-            <h3 className="card-title">
-              બિલની વિગતો ({billItems.length} આઈટમ)
-            </h3>
-          </div>
-
-          {billItems.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
-              હજુ કોઈ બિયારણ ઉમેરેલ નથી. ઉપરથી બિયારણ પસંદ કરી 'બિલમાં બિયારણ ઉમેરો' દબાવો.
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>ક્રમ</th>
-                    <th>બિયારણ જાત</th>
-                    <th>બોરી</th>
-                    <th>છૂટક KG</th>
-                    <th>કુલ કિલો</th>
-                    <th>ભાવ (₹/kg)</th>
-                    <th>રકમ (₹)</th>
-                    <th>રદ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {billItems.map((it, idx) => (
-                    <tr key={idx}>
-                      <td>{idx + 1}</td>
-                      <td style={{ fontWeight: '600' }}>{it.varietyName}</td>
-                      <td style={{ fontWeight: '600' }}>{it.bags}</td>
-                      <td>{it.looseKg} kg</td>
-                      <td style={{ fontWeight: '700', color: '#064e3b' }}>{it.totalWeightKg} kg</td>
-                      <td style={{ fontWeight: '600' }}>₹{it.rate} /kg</td>
-                      <td style={{ fontWeight: '700' }}>₹{it.itemTotal?.toLocaleString('en-IN')}</td>
-                      <td>
-                        <button 
-                          type="button" 
-                          onClick={() => handleRemoveItem(idx)}
-                          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}>
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Section 4: Final Settlement & Payment */}
-        {billItems.length > 0 && (
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">૩. મજૂરી, અન્ય ખર્ચ & ચુકવણી (રોકડ / ઉધાર)</h3>
-            </div>
-
-            {/* Cash vs Udhar Selector Buttons */}
-            <div style={{ marginBottom: '1.25rem', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-              <label className="form-label" style={{ marginBottom: '0.5rem', fontWeight: '700' }}>
-                ચુકવણીનો પ્રકાર (Cash or Udhar):
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setPaymentTypeOption('cash');
-                    setPaymentMode('cash');
-                  }}
-                  style={{
-                    padding: '0.75rem 0.5rem',
-                    borderRadius: '8px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    fontSize: '0.95rem',
-                    border: paymentTypeOption === 'cash' ? '2px solid #059669' : '1px solid #cbd5e1',
-                    backgroundColor: paymentTypeOption === 'cash' ? '#ecfdf5' : '#ffffff',
-                    color: paymentTypeOption === 'cash' ? '#065f46' : '#475569'
-                  }}>
-                  🟢 પૂરેપૂરી રોકડ (Cash)
-                  <div style={{ fontSize: '0.75rem', fontWeight: '400', marginTop: '0.2rem' }}>બાકી ઉધાર: ₹0</div>
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setPaymentTypeOption('credit');
-                    setPaymentMode('credit');
-                  }}
-                  style={{
-                    padding: '0.75rem 0.5rem',
-                    borderRadius: '8px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    fontSize: '0.95rem',
-                    border: paymentTypeOption === 'credit' ? '2px solid #dc2626' : '1px solid #cbd5e1',
-                    backgroundColor: paymentTypeOption === 'credit' ? '#fee2e2' : '#ffffff',
-                    color: paymentTypeOption === 'credit' ? '#991b1b' : '#475569'
-                  }}>
-                  🔴 પૂરેપૂરું ઉધાર (Udhar)
-                  <div style={{ fontSize: '0.75rem', fontWeight: '400', marginTop: '0.2rem' }}>ખાતાવહીમાં જમા થશે</div>
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setPaymentTypeOption('partial');
-                    setPaymentMode('cash');
-                  }}
-                  style={{
-                    padding: '0.75rem 0.5rem',
-                    borderRadius: '8px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    fontSize: '0.95rem',
-                    border: paymentTypeOption === 'partial' ? '2px solid #d97706' : '1px solid #cbd5e1',
-                    backgroundColor: paymentTypeOption === 'partial' ? '#fef3c7' : '#ffffff',
-                    color: paymentTypeOption === 'partial' ? '#92400e' : '#475569'
-                  }}>
-                  🟡 અંશતઃ રોકડ + ઉધાર
-                  <div style={{ fontSize: '0.75rem', fontWeight: '400', marginTop: '0.2rem' }}>અમુક રોકડ, બાકી ઉધાર</div>
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-              
-              {/* Extra Charges Inputs */}
+            <div className="invoice-head">
               <div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">મજૂરી ખર્ચ (Labor / Majuri ₹)</label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      className="form-control" 
-                      placeholder="0"
-                      value={majuriAmount} 
-                      onChange={(e) => setMajuriAmount(e.target.value)}
-                    />
-                  </div>
+                <h1>🌱 SHREE NANDINI SEEDS</h1>
+                <p>બિયારણ વેચાણ બિલ (Sales Bill)</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <b>{lastInvoice.invoiceNo}</b>
+                <p>તારીખ: {lastInvoice.date}</p>
+              </div>
+            </div>
 
-                  <div className="form-group">
-                    <label className="form-label">અન્ય ચાર્જિસ / વાહન ભાડું (₹)</label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      className="form-control" 
-                      placeholder="0"
-                      value={extraCharges} 
-                      onChange={(e) => setExtraCharges(e.target.value)}
-                    />
-                  </div>
-                </div>
+            <p style={{ margin: '8px 0', borderBottom: '1px solid #d1d5db', paddingBottom: '8px' }}>
+              <b>ગ્રાહક/ખેડૂત:</b> {lastInvoice.partyName || '—'} 
+              {lastInvoice.village ? ` | ગામ: ${lastInvoice.village}` : ''}
+              {lastInvoice.partyMobile ? ` | મોબાઇલ: ${lastInvoice.partyMobile}` : ''}
+            </p>
 
-                <div className="form-group">
-                  <label className="form-label">ડિસ્કાઉન્ટ / છૂટ (₹)</label>
+            <table style={{ margin: '12px 0' }}>
+              <thead>
+                <tr>
+                  <th>બિયારણ જાત</th>
+                  <th>બોરી</th>
+                  <th>વજન KG</th>
+                  <th>મણ (20 KG)</th>
+                  <th>ભાવ પ્રતિ મણ (₹)</th>
+                  <th>રકમ (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lastInvoice.items.map((x, i) => (
+                  <tr key={i}>
+                    <td><b>{x.varietyName}</b></td>
+                    <td>{x.bags}</td>
+                    <td>{x.totalWeightKg} KG</td>
+                    <td>{(x.totalMan || 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })}</td>
+                    <td>{money(x.ratePerMan)}</td>
+                    <td><b>{money(x.amount)}</b></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="invoice-summary">
+              <p>માલની કુલ રકમ: <b>{money(lastInvoice.goodsTotal)}</b></p>
+              {lastInvoice.chargesTotal > 0 && (
+                <p>મજૂરી / પેકિંગ ખર્ચ: <b>{money(lastInvoice.chargesTotal)}</b></p>
+              )}
+              {lastInvoice.discount > 0 && (
+                <p>ડિસ્કાઉન્ટ: <b>- {money(lastInvoice.discount)}</b></p>
+              )}
+              <p style={{ fontSize: '1.05rem', borderTop: '1px solid #94a3b8', paddingTop: '4px' }}>
+                નેટ ટોટલ: <b>{money(lastInvoice.netTotal)}</b>
+              </p>
+              <p>ચૂકવેલ રકમ: <b style={{ color: '#15803d' }}>{money(lastInvoice.paid)}</b></p>
+              <p>બાકી રકમ: <b style={{ color: lastInvoice.balance > 0 ? '#b91c1c' : '#15803d' }}>{money(lastInvoice.balance)}</b></p>
+            </div>
+
+            {lastInvoice.note && <p style={{ fontSize: '0.85rem', color: '#64748b' }}>નોંધ: {lastInvoice.note}</p>}
+            <p className="invoice-foot">આ કમ્પ્યુટર જનરેટેડ સેલ્સ બિલ છે. • Shree Nandini Seeds</p>
+          </section>
+        </div>
+      )}
+
+      {/* Main Form Panel */}
+      <form className="panel purchase-form" onSubmit={handleSubmit}>
+        <h2>વેચાણ / સાદું બિલ બનાવો (Sales Billing)</h2>
+
+        <div className="formgrid">
+          <label>
+            બિલ નંબર*
+            <input required value={billNo} onChange={e => setBillNo(e.target.value)} />
+          </label>
+
+          <label>
+            તારીખ*
+            <input required type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </label>
+
+          <label>
+            ખેડૂત / ગ્રાહક પસંદ કરો
+            <select value={farmerId} onChange={e => handleFarmerChange(e.target.value)}>
+              <option value="">માસ્ટરમાંથી પસંદ કરો (વૈકલ્પિક)</option>
+              {farmers.map(f => (
+                <option key={f.id} value={f.id}>
+                  {f.name} {f.village ? `(${f.village})` : ''} — બાકી: ₹{(f.currentBalance || 0).toLocaleString('en-IN')}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            ગ્રાહક / ખેડૂતનું નામ*
+            <input 
+              required 
+              value={farmerName} 
+              onChange={e => setFarmerName(e.target.value)} 
+              placeholder="ખેડૂતનું નામ"
+            />
+          </label>
+
+          <label>
+            મોબાઇલ નંબર
+            <input 
+              value={farmerMobile} 
+              onChange={e => setFarmerMobile(e.target.value)} 
+              placeholder="10 અંકનો મોબાઇલ"
+            />
+          </label>
+
+          <label>
+            ગામ
+            <input 
+              value={village} 
+              onChange={e => setVillage(e.target.value)} 
+              placeholder="ગામ / તાલુકો"
+            />
+          </label>
+        </div>
+
+        {/* Multi-Item Line Rows */}
+        <div className="section-title">
+          <h3>માલની જાત અને વજન</h3>
+          <button type="button" className="secondary" onClick={addItemRow}>
+            ＋ બીજી જાત ઉમેરો
+          </button>
+        </div>
+        <p className="muted">
+          દરેક બોરી 35 KG ગણાશે. 1 મણ = 20 KG. ભાવ પ્રતિ મણ (₹/મણ). કુલ વજન = (કુલ બેગ − 1) × 35 + છેલ્લી બોરીનું વજન.
+        </p>
+
+        {items.map((row, i) => {
+          const b = num(row.bags);
+          const lastKg = num(row.lastBagKg);
+          const kg = b > 0 ? (Math.max(0, b - 1) * BAG_STD_KG + Math.min(BAG_STD_KG, lastKg)) : 0;
+          const man = kg / MAN_STD_KG;
+          const rate = num(row.rate);
+          const lineTotal = man * rate;
+
+          return (
+            <div className="item-row" key={i}>
+              <div className="item-head">
+                <b>આઇટમ {i + 1}</b>
+                {items.length > 1 && (
+                  <button type="button" className="danger" onClick={() => removeItemRow(i)}>
+                    દૂર કરો
+                  </button>
+                )}
+              </div>
+
+              <div className="formgrid">
+                <label>
+                  બિયારણ જાત*
+                  <select 
+                    required 
+                    value={row.seedId} 
+                    onChange={e => updateItem(i, 'seedId', e.target.value)}>
+                    <option value="">જાત પસંદ કરો</option>
+                    {seeds.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.varietyName} {s.cropType ? `(${s.cropType})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  કુલ બેગ (35 KG/બોરી)
                   <input 
+                    required 
+                    type="number" 
+                    min="1" 
+                    step="1" 
+                    value={row.bags} 
+                    onChange={e => updateItem(i, 'bags', e.target.value)}
+                  />
+                </label>
+
+                <label>
+                  છેલ્લી બેગનું વજન (KG)
+                  <input 
+                    required 
+                    type="number" 
+                    min="0.01" 
+                    max="35" 
+                    step="0.01" 
+                    value={row.lastBagKg} 
+                    onChange={e => updateItem(i, 'lastBagKg', e.target.value)}
+                  />
+                </label>
+
+                <label>
+                  ભાવ પ્રતિ મણ (₹/મણ)*
+                  <input 
+                    required 
                     type="number" 
                     min="0" 
-                    className="form-control" 
-                    value={discount} 
-                    onChange={(e) => setDiscount(e.target.value)}
+                    step="0.01" 
+                    value={row.rate} 
+                    onChange={e => updateItem(i, 'rate', e.target.value)}
                   />
-                </div>
+                </label>
 
-                {paymentTypeOption !== 'credit' && (
-                  <div className="form-group">
-                    <label className="form-label">ચુકવણી માધ્યમ</label>
-                    <select 
-                      className="form-control"
-                      value={paymentMode}
-                      onChange={(e) => setPaymentMode(e.target.value)}>
-                      <option value="cash">રોકડ (Cash)</option>
-                      <option value="upi">UPI / Google Pay / PhonePe</option>
-                      <option value="bank">બેંક ટ્રાન્સફર (NEFT/RTGS)</option>
-                    </select>
-                  </div>
-                )}
-
-                {paymentTypeOption === 'partial' && (
-                  <div className="form-group">
-                    <label className="form-label">જમા આપેલ રોકડ રકમ (Paid ₹) *</label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      required
-                      className="form-control" 
-                      placeholder="દા.ત. 5000"
-                      value={paidAmount} 
-                      onChange={(e) => setPaidAmount(e.target.value)}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Bill Totals Summary Box */}
-              <div style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '0.95rem' }}>
-                  <span>બિયારણ રકમ (Seeds Sub Total):</span>
-                  <strong>₹{subTotal.toLocaleString('en-IN')}</strong>
-                </div>
-
-                {majuri > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#1e40af' }}>
-                    <span>+ મજૂરી ખર્ચ:</span>
-                    <strong>₹{majuri.toLocaleString('en-IN')}</strong>
-                  </div>
-                )}
-
-                {extra > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#1e40af' }}>
-                    <span>+ અન્ય ચાર્જિસ / ભાડું:</span>
-                    <strong>₹{extra.toLocaleString('en-IN')}</strong>
-                  </div>
-                )}
-
-                {disc > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: '#dc2626' }}>
-                    <span>- ડિસ્કાઉન્ટ:</span>
-                    <strong>- ₹{disc.toLocaleString('en-IN')}</strong>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', borderTop: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', fontSize: '1.25rem', fontWeight: '800', color: '#064e3b' }}>
-                  <span>કુલ ચૂકવવાપાત્ર રકમ:</span>
-                  <span>₹{netAmount.toLocaleString('en-IN')}</span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem', color: '#16a34a', fontWeight: '600' }}>
-                  <span>જમા રોકડ (Paid):</span>
-                  <span>₹{numericPaid.toLocaleString('en-IN')}</span>
-                </div>
-
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  marginTop: '0.5rem', 
-                  padding: '0.5rem', 
-                  backgroundColor: dueAmount > 0 ? '#fee2e2' : '#f0fdf4',
-                  color: dueAmount > 0 ? '#991b1b' : '#166534',
-                  borderRadius: '6px',
-                  fontWeight: '700'
-                }}>
-                  <span>{dueAmount > 0 ? 'બાકી ઉધાર (ખાતાવહીમાં ઉમેરાશે):' : 'સંપૂર્ણ હિસાબ પૂર્ણ (Paid)'}</span>
-                  <span>₹{dueAmount.toLocaleString('en-IN')}</span>
+                <div className="line-total">
+                  <span>કુલ વજન</span>
+                  <b>{kg.toLocaleString('en-IN')} KG</b>
+                  <span>કુલ મણ (1 મણ = 20 KG)</span>
+                  <b>{man.toLocaleString('en-IN', { maximumFractionDigits: 3 })} મણ</b>
+                  <span>માલની રકમ</span>
+                  <b>{money(lineTotal)}</b>
                 </div>
               </div>
-
             </div>
+          );
+        })}
 
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-              <button 
-                type="submit" 
-                className="btn btn-primary" 
-                style={{ padding: '0.85rem 2rem', fontSize: '1.1rem' }}>
-                <CheckCircle2 size={20} />
-                સાદું બિલ બનાવો & સ્ટોક ઘટાડો (Generate Bill)
-              </button>
-            </div>
-
-          </div>
-        )}
-
-      </form>
-
-      {/* Quick Add Farmer Modal */}
-      {showQuickFarmerModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '450px' }}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.1rem', color: '#064e3b' }}>નવો ખેડૂત ઉમેરો (Quick Add)</h3>
-              <button onClick={() => setShowQuickFarmerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
-            </div>
-            <form onSubmit={handleSaveQuickFarmer}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label className="form-label">ખેડૂતનું પૂરું નામ *</label>
-                  <input 
-                    type="text" 
-                    required 
-                    className="form-control" 
-                    value={newFarmerForm.name} 
-                    onChange={(e) => setNewFarmerForm(prev => ({ ...prev, name: e.target.value }))} 
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">મોબાઇલ નંબર</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    value={newFarmerForm.mobile} 
-                    onChange={(e) => setNewFarmerForm(prev => ({ ...prev, mobile: e.target.value }))} 
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">ગામ / તાલુકો</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    value={newFarmerForm.village} 
-                    onChange={(e) => setNewFarmerForm(prev => ({ ...prev, village: e.target.value }))} 
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">અગાઉનું જૂનું ઉધાર (જો હોય તો ₹)</label>
-                  <input 
-                    type="number" 
-                    className="form-control" 
-                    value={newFarmerForm.openingBalance} 
-                    onChange={(e) => setNewFarmerForm(prev => ({ ...prev, openingBalance: e.target.value }))} 
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowQuickFarmerModal(false)}>રદ કરો</button>
-                <button type="submit" className="btn btn-primary">સેવ કરો</button>
-              </div>
-            </form>
+        {/* Charges & Discount */}
+        <div className="item-row">
+          <h3>મજૂરી અને ડિસ્કાઉન્ટ</h3>
+          <div className="formgrid">
+            <label>
+              મજૂરી / હમાલી (₹)
+              <input 
+                type="number" 
+                min="0" 
+                step="0.01" 
+                value={labour} 
+                onChange={e => setLabour(e.target.value)}
+              />
+            </label>
+            <label>
+              ડિસ્કાઉન્ટ / છૂટછાટ (₹)
+              <input 
+                type="number" 
+                min="0" 
+                step="0.01" 
+                value={discount} 
+                onChange={e => setDiscount(e.target.value)}
+              />
+            </label>
           </div>
         </div>
-      )}
 
+        {/* Payment & Remarks Grid */}
+        <div className="formgrid payment-grid">
+          <label>
+            ચુકવણી પદ્ધતિ
+            <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)}>
+              <option value="CASH">રોકડ (Cash)</option>
+              <option value="BANK">બેંક / UPI</option>
+              <option value="CREDIT">ઉધાર (Credit)</option>
+              <option value="PARTIAL">આંશિક ચુકવણી (Partial)</option>
+            </select>
+          </label>
+
+          <label>
+            ચૂકવેલી રકમ (₹)
+            <input 
+              type="number" 
+              min="0" 
+              step="0.01" 
+              value={paid} 
+              onChange={e => setPaid(e.target.value)}
+            />
+          </label>
+
+          <label>
+            બેંક / UPI રેફરન્સ નં.
+            <input 
+              value={paymentReference} 
+              onChange={e => setPaymentReference(e.target.value)} 
+              placeholder="દા.ત. UPI-492819"
+            />
+          </label>
+
+          <label className="full">
+            નોંધ (Remarks)
+            <textarea 
+              rows="2" 
+              value={note} 
+              onChange={e => setNote(e.target.value)} 
+              placeholder="બિલ અંગે નોંધ..."
+            />
+          </label>
+        </div>
+
+        {/* Live Total Strip */}
+        <div className="total-strip">
+          <div>
+            <span>કુલ વજન</span>
+            <b>{totals.kg.toLocaleString('en-IN')} KG</b>
+          </div>
+          <div>
+            <span>કુલ મણ</span>
+            <b>{totals.man.toLocaleString('en-IN', { maximumFractionDigits: 3 })}</b>
+          </div>
+          <div>
+            <span>માલની કુલ રકમ</span>
+            <b>{money(totals.goods)}</b>
+          </div>
+          <div>
+            <span>મજૂરી - છૂટ</span>
+            <b>{money(chargesTotal - num(discount))}</b>
+          </div>
+          <div>
+            <span>નેટ ટોટલ</span>
+            <b>{money(netTotal)}</b>
+          </div>
+          <div>
+            <span>બાકી રકમ</span>
+            <b style={{ color: dueAmount > 0 ? '#fca5a5' : '#86efac' }}>{money(dueAmount)}</b>
+          </div>
+        </div>
+
+        <button type="submit" className="primary-action">
+          વેચાણ સેવ કરો અને બિલ બનાવો
+        </button>
+        <p className="muted">
+          ભાવ પ્રતિ મણ (20 KG). 1 બોરી = 35 KG. સેવ કરવાથી સ્ટોકમાંથી માલ બાદ થશે અને ગ્રાહકના ખાતામાં એન્ટ્રી જમા-ઉધાર થશે.
+        </p>
+      </form>
+
+      {/* Recent Sales History */}
+      <h2 style={{ marginTop: '28px' }}>વેચાણ યાદી (Recent Sales)</h2>
+      <div className="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>બિલ નંબર</th>
+              <th>તારીખ</th>
+              <th>ગ્રાહકનું નામ</th>
+              <th>આઇટમ્સ</th>
+              <th>કુલ KG</th>
+              <th>કુલ રકમ</th>
+              <th>ચૂકવેલ</th>
+              <th>બાકી</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sales.map(s => {
+              const totalKg = s.items?.reduce((a, x) => a + (x.totalWeightKg || (x.bags * 35)), 0) || 0;
+              return (
+                <tr key={s.id}>
+                  <td><b>{s.billNo}</b></td>
+                  <td>{s.billDate}</td>
+                  <td>
+                    {s.farmerName} {s.farmerVillage ? `(${s.farmerVillage})` : ''}
+                  </td>
+                  <td>{s.items?.map(x => x.varietyName).join(', ') || '—'}</td>
+                  <td>{totalKg.toLocaleString('en-IN')} KG</td>
+                  <td><b>{money(s.netAmount)}</b></td>
+                  <td style={{ color: '#15803d' }}>{money(s.paidAmount)}</td>
+                  <td style={{ color: s.dueAmount > 0 ? '#b91c1c' : '#64748b', fontWeight: s.dueAmount > 0 ? '700' : 'normal' }}>
+                    {money(s.dueAmount)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
+export default SalesBilling;

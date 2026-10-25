@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { Boxes, Search, SlidersHorizontal, Plus, Minus, CheckCircle, AlertTriangle } from 'lucide-react';
 
 export const StockLedger = () => {
   const { stock, adjustStock } = useData();
@@ -20,6 +19,7 @@ export const StockLedger = () => {
   const totalBags = stock.reduce((sum, s) => sum + (parseInt(s.availableBags) || 0), 0);
   const totalLooseKg = stock.reduce((sum, s) => sum + (parseFloat(s.availableLooseKg) || 0), 0);
   const totalWeightKg = stock.reduce((sum, s) => sum + (parseFloat(s.totalWeightKg) || 0), 0);
+  const totalMan = totalWeightKg / 20;
 
   const handleSaveAdjustment = (e) => {
     e.preventDefault();
@@ -36,181 +36,150 @@ export const StockLedger = () => {
   };
 
   return (
-    <div className="page-body">
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: '700', color: '#064e3b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Boxes size={24} />
-            સ્ટોક લેજર – બોરી & કિલો મેનેજમેન્ટ (Stock Ledger)
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>
-            દરેક બિયારણ જાત વાઇઝ હાજર બોરી અને છૂટક કિલો સ્ટોક
-          </p>
+    <div>
+      {/* 3 Stock Summary Cards */}
+      <div className="cards">
+        <div className="metric">
+          <span>કુલ હાજર બોરી (35 KG સ્ટાન્ડર્ડ)</span>
+          <b>{totalBags.toLocaleString('en-IN')} બોરી</b>
         </div>
-
-        {/* Search */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.4rem 0.8rem', width: '280px' }}>
-          <Search size={18} color="#94a3b8" />
-          <input 
-            type="text" 
-            placeholder="બિયારણ શોધો..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ border: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', fontFamily: 'inherit' }}
-          />
+        <div className="metric">
+          <span>કુલ છૂટક કિલો (Loose KG)</span>
+          <b>{totalLooseKg.toFixed(2)} KG</b>
         </div>
-      </div>
-
-      {/* Stock Summary Cards */}
-      <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
-        <div className="stat-card" style={{ borderLeft: '4px solid #059669' }}>
-          <div className="stat-icon" style={{ backgroundColor: '#ecfdf5', color: '#059669' }}>
-            <Boxes size={26} />
-          </div>
-          <div className="stat-info">
-            <div className="stat-value">{totalBags.toLocaleString('en-IN')}</div>
-            <div className="stat-label">કુલ હાજર આખી બોરી (Full Bags)</div>
-          </div>
-        </div>
-
-        <div className="stat-card" style={{ borderLeft: '4px solid #d97706' }}>
-          <div className="stat-icon" style={{ backgroundColor: '#fef3c7', color: '#d97706' }}>
-            <Boxes size={26} />
-          </div>
-          <div className="stat-info">
-            <div className="stat-value">{totalLooseKg} kg</div>
-            <div className="stat-label">કુલ છૂટક કિલો (Loose KG)</div>
-          </div>
-        </div>
-
-        <div className="stat-card" style={{ borderLeft: '4px solid #3b82f6' }}>
-          <div className="stat-icon" style={{ backgroundColor: '#eff6ff', color: '#3b82f6' }}>
-            <Boxes size={26} />
-          </div>
-          <div className="stat-info">
-            <div className="stat-value">{totalWeightKg.toLocaleString('en-IN')} kg</div>
-            <div className="stat-label">કુલ ગોડાઉન નેટ વજન (Net Weight)</div>
+        <div className="metric">
+          <span>કુલ ગોડાઉન નેટ વજન (Net KG)</span>
+          <b>{totalWeightKg.toLocaleString('en-IN')} KG</b>
+          <div style={{ fontSize: '0.82rem', color: '#16a34a', marginTop: '4px' }}>
+            ({totalMan.toFixed(2)} મણ • 1 મણ = 20 KG)
           </div>
         </div>
       </div>
 
-      {/* Stock Items Table */}
-      <div className="card">
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>બિયારણ જાત</th>
-                <th>૧ બોરીનું વજન</th>
-                <th>હાજર આખી બોરી</th>
-                <th>છૂટક કિલો (Loose)</th>
-                <th>કુલ વજન (Net KG)</th>
-                <th>કુલ મણ (KG÷20)</th>
-                <th>છેલ્લો ખરીદી ભાવ (₹/મણ)</th>
-                <th>સ્થિતિ</th>
-                {userProfile?.role === 'admin' && <th>એડજસ્ટ</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredStock.map(item => {
-                const totalManVal = item.totalMan || (item.totalWeightKg / 20);
-                return (
-                  <tr key={item.id}>
-                    <td style={{ fontWeight: '600', color: '#0f172a' }}>
-                      {item.varietyName}
-                    </td>
-                    <td>{item.bagWeightKg || 35} kg</td>
-                    <td style={{ fontWeight: '700', fontSize: '1.05rem', color: item.availableBags <= 15 ? '#dc2626' : '#059669' }}>
-                      {item.availableBags} બોરી
-                    </td>
-                    <td>{item.availableLooseKg || 0} kg</td>
-                    <td style={{ fontWeight: '700', color: '#064e3b' }}>
-                      {item.totalWeightKg} kg
-                    </td>
-                    <td style={{ fontWeight: '800', color: '#059669' }}>
-                      {Number(totalManVal).toFixed(2)} મણ
-                    </td>
-                    <td>
-                      {userProfile?.role === 'admin' || userProfile?.permissions?.viewRates ? (
-                        `₹${item.lastPurchaseRate || 0}`
-                      ) : (
-                        <span style={{ color: '#94a3b8' }}>છુપાયેલ</span>
-                      )}
-                    </td>
-                    <td>
-                      {item.availableBags <= 15 ? (
-                        <span className="badge badge-danger">ઓછો સ્ટોક</span>
-                      ) : (
-                        <span className="badge badge-success">પર્યાપ્ત સ્ટોક</span>
-                      )}
-                    </td>
+      {/* Search Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+        <h2 style={{ margin: 0 }}>વર્તમાન સ્ટોક લેજર (Godown Inventory)</h2>
+        <input 
+          type="text" 
+          placeholder="🔍 બિયારણ જાત શોધો..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ maxWidth: '280px' }}
+        />
+      </div>
+
+      {/* Stock Table */}
+      <div className="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>બિયારણ જાત</th>
+              <th>૧ બોરી વજન</th>
+              <th>હાજર આખી બોરી</th>
+              <th>છૂટક કિલો</th>
+              <th>કુલ વજન (Net KG)</th>
+              <th>કુલ મણ (KG ÷ 20)</th>
+              <th>છેલ્લો ખરીદી ભાવ (₹/મણ)</th>
+              <th>સ્થિતિ</th>
+              {userProfile?.role === 'admin' && <th>એડજસ્ટ</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredStock.map(item => {
+              const totalManVal = item.totalMan || (item.totalWeightKg / 20);
+              return (
+                <tr key={item.id}>
+                  <td><b>{item.varietyName}</b></td>
+                  <td>{item.bagWeightKg || 35} KG</td>
+                  <td style={{ fontWeight: '700', color: (item.availableBags || 0) <= 15 ? '#b91c1c' : '#15803d' }}>
+                    {item.availableBags} બોરી
+                  </td>
+                  <td>{item.availableLooseKg || 0} KG</td>
+                  <td style={{ fontWeight: '700' }}>
+                    {item.totalWeightKg} KG
+                  </td>
+                  <td style={{ fontWeight: '700', color: '#15803d' }}>
+                    {Number(totalManVal).toFixed(2)} મણ
+                  </td>
+                  <td>
+                    {userProfile?.role === 'admin' || userProfile?.permissions?.viewRates ? (
+                      `₹${item.lastPurchaseRate || 0}`
+                    ) : (
+                      <span style={{ color: '#94a3b8' }}>—</span>
+                    )}
+                  </td>
+                  <td>
+                    {(item.availableBags || 0) <= 15 ? (
+                      <span style={{ color: '#b91c1c', fontWeight: '700', fontSize: '0.85rem' }}>ઓછો સ્ટોક</span>
+                    ) : (
+                      <span style={{ color: '#15803d', fontSize: '0.85rem' }}>પર્યાપ્ત</span>
+                    )}
+                  </td>
                   {userProfile?.role === 'admin' && (
                     <td>
                       <button 
-                        className="btn btn-secondary"
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                        type="button"
+                        className="secondary"
+                        style={{ padding: '3px 8px', fontSize: '0.8rem' }}
                         onClick={() => setSelectedStockForAdjust(item)}>
                         સુધારો
                       </button>
                     </td>
                   )}
                 </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       {/* Stock Adjustment Modal */}
       {selectedStockForAdjust && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '480px' }}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.15rem', color: '#064e3b' }}>
-                સ્ટોક એડજસ્ટમેન્ટ: {selectedStockForAdjust.varietyName}
+        <div className="modal-backdrop">
+          <div className="panel" style={{ maxWidth: '480px', width: '100%', margin: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0, color: '#14532d' }}>
+                સ્ટોક સુધારો: {selectedStockForAdjust.varietyName}
               </h3>
               <button 
+                type="button"
+                className="secondary"
                 onClick={() => setSelectedStockForAdjust(null)} 
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                style={{ padding: '4px 8px', fontSize: '0.85rem' }}>
                 ✕
               </button>
             </div>
-            <form onSubmit={handleSaveAdjustment}>
-              <div className="modal-body">
-                <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.88rem' }}>
-                  <div>હાલનો સ્ટોક: <strong>{selectedStockForAdjust.availableBags} બોરી + {selectedStockForAdjust.availableLooseKg} kg ({selectedStockForAdjust.totalWeightKg} kg)</strong></div>
-                </div>
 
-                <div className="form-group">
-                  <label className="form-label">બોરી વધારો (+) અથવા ઘટાડો (-) કરો</label>
+            <form onSubmit={handleSaveAdjustment}>
+              <p className="muted" style={{ margin: '0 0 12px 0' }}>
+                હાલનો સ્ટોક: <b>{selectedStockForAdjust.availableBags} બોરી + {selectedStockForAdjust.availableLooseKg} KG ({selectedStockForAdjust.totalWeightKg} KG)</b>
+              </p>
+
+              <div className="formgrid">
+                <label>
+                  બોરી વધારો (+) અથવા ઘટાડો (-)
                   <input 
                     type="number" 
-                    className="form-control" 
                     placeholder="દા.ત. +2 અથવા -1"
                     value={adjustBags} 
                     onChange={(e) => setAdjustBags(e.target.value)} 
                   />
-                  <small style={{ color: '#64748b' }}>ઘટાડવા માટે માઇનસ (-) ચિહ્ન વાપરો</small>
-                </div>
+                </label>
 
-                <div className="form-group">
-                  <label className="form-label">છૂટક કિલો વધારો (+) અથવા ઘટાડો (-)</label>
+                <label>
+                  છૂટક કિલો વધારો (+) અથવા ઘટાડો (-)
                   <input 
                     type="number" 
                     step="0.5" 
-                    className="form-control" 
                     placeholder="દા.ત. +5 અથવા -2.5"
                     value={adjustKg} 
                     onChange={(e) => setAdjustKg(e.target.value)} 
                   />
-                </div>
+                </label>
 
-                <div className="form-group">
-                  <label className="form-label">કારણ (Reason for Adjustment)</label>
+                <label className="full">
+                  કારણ (Reason)
                   <select 
-                    className="form-control"
                     value={adjustReason}
                     onChange={(e) => setAdjustReason(e.target.value)}>
                     <option value="ગોડાઉન ઓડિટ ગણતરી">ગોડાઉન ઓડિટ ગણતરી (Physical Audit)</option>
@@ -218,22 +187,22 @@ export const StockLedger = () => {
                     <option value="સેમ્પલ / ડેમો આપેલ">સેમ્પલ / ડેમો આપેલ (Sample)</option>
                     <option value="અન્ય સુધારો">અન્ય સુધારો</option>
                   </select>
-                </div>
+                </label>
               </div>
 
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setSelectedStockForAdjust(null)}>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <button type="button" className="secondary" onClick={() => setSelectedStockForAdjust(null)}>
                   રદ કરો
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  સુધારો સેવ કરો
+                <button type="submit" className="primary-action" style={{ width: 'auto', padding: '8px 18px' }}>
+                  સુધારો સાચવો
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 };
+export default StockLedger;

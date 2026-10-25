@@ -1,156 +1,155 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
-import { Truck, Plus, Phone, MapPin, Building2 } from 'lucide-react';
 
 export const SupplierMaster = () => {
   const { suppliers, addSupplier } = useData();
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [notice, setNotice] = useState('');
+
   const [newSup, setNewSup] = useState({
     companyName: '',
     contactPerson: '',
     mobile: '',
     city: '',
-    openingBalance: 0
+    openingBalance: '0'
   });
 
   const handleSave = (e) => {
     e.preventDefault();
-    if (!newSup.companyName) return;
-    addSupplier(newSup);
-    setShowAddModal(false);
+    if (!newSup.companyName.trim()) return;
+
+    addSupplier({
+      ...newSup,
+      openingBalance: parseFloat(newSup.openingBalance) || 0,
+      currentBalance: parseFloat(newSup.openingBalance) || 0
+    });
+
+    setNotice(`પેઢી / સપ્લાયર "${newSup.companyName}" સફળતાપૂર્વક ઉમેરાયા.`);
     setNewSup({
       companyName: '',
       contactPerson: '',
       mobile: '',
       city: '',
-      openingBalance: 0
+      openingBalance: '0'
     });
+    setShowAddForm(false);
   };
 
   return (
-    <div className="page-body">
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: '700', color: '#064e3b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Truck size={24} />
-            સપ્લાયર્સ માસ્ટર (Supplier Master)
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>
-            બિયારણ ઉત્પાદક કંપનીઓ અને ડિલરોની માહિતી અને ચૂકવવાપાત્ર બાકી રકમ
-          </p>
-        </div>
-
-        <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-          <Plus size={18} />
-          નવો સપ્લાયર ઉમેરો
-        </button>
-      </div>
-
-      <div className="card">
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>કોડ</th>
-                <th>કંપનીનું નામ</th>
-                <th>સંપર્ક વ્યક્તિ</th>
-                <th>મોબાઇલ</th>
-                <th>શહેર</th>
-                <th>ચૂકવવાપાત્ર બાકી (Pending ₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {suppliers.map(sup => (
-                <tr key={sup.id}>
-                  <td><span className="badge badge-primary">{sup.code}</span></td>
-                  <td style={{ fontWeight: '600', color: '#0f172a' }}>{sup.companyName}</td>
-                  <td>{sup.contactPerson || '—'}</td>
-                  <td>{sup.mobile || '—'}</td>
-                  <td>{sup.city || '—'}</td>
-                  <td style={{ fontWeight: '700', color: sup.currentBalance > 0 ? '#dc2626' : '#16a34a' }}>
-                    ₹{sup.currentBalance?.toLocaleString('en-IN')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {showAddModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '480px' }}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', color: '#064e3b' }}>નવો સપ્લાયર ઉમેરો</h3>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
-            </div>
-            <form onSubmit={handleSave}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label className="form-label">કંપની / પેઢીનું નામ *</label>
-                  <input 
-                    type="text" 
-                    required 
-                    className="form-control" 
-                    placeholder="દા.ત. ગુજરાત સ્ટેટ સીડ્સ કોર્પોરેશન"
-                    value={newSup.companyName}
-                    onChange={(e) => setNewSup(prev => ({ ...prev, companyName: e.target.value }))}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">સંપર્ક વ્યક્તિ (Contact Person)</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    value={newSup.contactPerson}
-                    onChange={(e) => setNewSup(prev => ({ ...prev, contactPerson: e.target.value }))}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">મોબાઇલ નંબર</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      value={newSup.mobile}
-                      onChange={(e) => setNewSup(prev => ({ ...prev, mobile: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">શહેર</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      value={newSup.city}
-                      onChange={(e) => setNewSup(prev => ({ ...prev, city: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">જૂનું ચૂકવવાપાત્ર બાકી (Opening Balance ₹)</label>
-                  <input 
-                    type="number" 
-                    className="form-control" 
-                    value={newSup.openingBalance}
-                    onChange={(e) => setNewSup(prev => ({ ...prev, openingBalance: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>રદ કરો</button>
-                <button type="submit" className="btn btn-primary">સેવ કરો</button>
-              </div>
-            </form>
-          </div>
+    <div>
+      {notice && (
+        <div className="notice" onClick={() => setNotice('')} style={{ marginBottom: '16px' }}>
+          {notice} ×
         </div>
       )}
 
+      {/* Header & Toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+        <button 
+          type="button"
+          className="primary-action" 
+          style={{ width: 'auto', padding: '9px 18px' }}
+          onClick={() => setShowAddForm(prev => !prev)}>
+          {showAddForm ? '✕ ફોર્મ બંધ કરો' : '＋ નવી પેઢી / સપ્લાયર ઉમેરો'}
+        </button>
+      </div>
+
+      {/* Inline Form */}
+      {showAddForm && (
+        <form className="panel formgrid" onSubmit={handleSave} style={{ marginBottom: '24px' }}>
+          <h2 style={{ gridColumn: '1 / -1', margin: 0, color: '#14532d' }}>
+            નવી પેઢી / સપ્લાયર ઉમેરો
+          </h2>
+
+          <label>
+            કંપની / પેઢીનું નામ*
+            <input 
+              required 
+              value={newSup.companyName} 
+              onChange={e => setNewSup({ ...newSup, companyName: e.target.value })}
+              placeholder="દા.ત. શ્રી ગણેશ ટ્રેડિંગ કંપની"
+            />
+          </label>
+
+          <label>
+            સંપર્ક વ્યક્તિ (Contact Person)
+            <input 
+              value={newSup.contactPerson} 
+              onChange={e => setNewSup({ ...newSup, contactPerson: e.target.value })}
+              placeholder="વેપારી / માલિકનું નામ"
+            />
+          </label>
+
+          <label>
+            મોબાઇલ નંબર
+            <input 
+              value={newSup.mobile} 
+              onChange={e => setNewSup({ ...newSup, mobile: e.target.value })}
+              placeholder="10 અંકનો મોબાઇલ"
+            />
+          </label>
+
+          <label>
+            શહેર / માર્કેટ યાર્ડ
+            <input 
+              value={newSup.city} 
+              onChange={e => setNewSup({ ...newSup, city: e.target.value })}
+              placeholder="રાજકોટ, ગોંડલ..."
+            />
+          </label>
+
+          <label>
+            શરૂઆતનું જૂનું લેણું/દેવું (Opening Balance ₹)
+            <input 
+              type="number" 
+              min="0"
+              value={newSup.openingBalance} 
+              onChange={e => setNewSup({ ...newSup, openingBalance: e.target.value })}
+            />
+          </label>
+
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '8px' }}>
+            <button type="submit" className="primary-action" style={{ width: 'auto', padding: '10px 24px' }}>
+              પેઢી સાચવો
+            </button>
+            <button type="button" className="secondary" onClick={() => setShowAddForm(false)}>
+              રદ કરો
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Supplier List Table */}
+      <h2>પેઢી / સપ્લાયર્સ યાદી ({suppliers.length})</h2>
+      <div className="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>કોડ</th>
+              <th>કંપની / પેઢીનું નામ</th>
+              <th>સંપર્ક વ્યક્તિ</th>
+              <th>મોબાઇલ</th>
+              <th>શહેર / યાર્ડ</th>
+              <th>ચૂકવવાપાત્ર બાકી (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {suppliers.map(sup => (
+              <tr key={sup.id}>
+                <td><b>{sup.code || 'SUP'}</b></td>
+                <td><b>{sup.companyName}</b></td>
+                <td>{sup.contactPerson || '—'}</td>
+                <td>{sup.mobile || '—'}</td>
+                <td>{sup.city || '—'}</td>
+                <td style={{ fontWeight: '700', color: (sup.currentBalance || 0) > 0 ? '#b91c1c' : '#15803d' }}>
+                  ₹{(sup.currentBalance || 0).toLocaleString('en-IN')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
+export default SupplierMaster;

@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
-import { Users, UserPlus, Search, MessageSquare, Phone, MapPin } from 'lucide-react';
 
-export const FarmerMaster = ({ onSelectFarmerBills }) => {
-  const { farmers, addFarmer, sales } = useData();
+export const FarmerMaster = () => {
+  const { farmers, addFarmer } = useData();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedFarmerHistory, setSelectedFarmerHistory] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [notice, setNotice] = useState('');
 
   const [newFarmer, setNewFarmer] = useState({
     name: '',
@@ -15,300 +14,188 @@ export const FarmerMaster = ({ onSelectFarmerBills }) => {
     village: '',
     taluka: '',
     address: '',
-    farmerType: 'farmer',
-    openingBalance: 0,
-    creditLimit: 50000
+    openingBalance: '0'
   });
 
   const filteredFarmers = farmers.filter(f => 
     f.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    f.mobile.includes(searchTerm) ||
+    (f.mobile && f.mobile.includes(searchTerm)) ||
     (f.village && f.village.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleSave = (e) => {
     e.preventDefault();
-    if (!newFarmer.name) return;
-    addFarmer(newFarmer);
-    setShowAddModal(false);
+    if (!newFarmer.name.trim()) return;
+
+    addFarmer({
+      ...newFarmer,
+      openingBalance: parseFloat(newFarmer.openingBalance) || 0,
+      currentBalance: parseFloat(newFarmer.openingBalance) || 0,
+      balanceType: 'dr'
+    });
+
+    setNotice(`ખેડૂત "${newFarmer.name}" સફળતાપૂર્વક ઉમેરાયા.`);
     setNewFarmer({
       name: '',
       mobile: '',
       village: '',
       taluka: '',
       address: '',
-      farmerType: 'farmer',
-      openingBalance: 0,
-      creditLimit: 50000
+      openingBalance: '0'
     });
+    setShowAddForm(false);
   };
 
-  const handleWhatsAppReminder = (farmer) => {
-    if (!farmer.mobile) {
-      alert("મોબાઇલ નંબર નથી મળ્યો.");
-      return;
-    }
-    const cleanMobile = farmer.mobile.replace(/\D/g, '');
-    const fullMobile = cleanMobile.length === 10 ? '91' + cleanMobile : cleanMobile;
-    const msg = `નમસ્તે શ્રી ${farmer.name}, કૃષિ ટ્રેડ તરફથી આપના ખાતાની બાકી રકમ ₹${farmer.currentBalance} છે. કૃપા કરીને અનુકૂળતા મુજબ જમા કરાવવા વિનંતી. આભાર!`;
-    window.open(`https://wa.me/${fullMobile}?text=${encodeURIComponent(msg)}`, '_blank');
+  const handleWhatsApp = (f) => {
+    if (!f.mobile) return;
+    const clean = f.mobile.replace(/\D/g, '');
+    const num = clean.length === 10 ? '91' + clean : clean;
+    const msg = `નમસ્તે શ્રી ${f.name}, SHREE NANDINI SEEDS તરફથી આપના ખાતાની બાકી રકમ ₹${f.currentBalance || 0} છે. આભાર!`;
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   return (
-    <div className="page-body">
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: '700', color: '#064e3b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Users size={24} />
-            ખેડૂત / ગ્રાહક માસ્ટર (Farmer Master)
+    <div>
+      {notice && (
+        <div className="notice" onClick={() => setNotice('')} style={{ marginBottom: '16px' }}>
+          {notice} ×
+        </div>
+      )}
+
+      {/* Header & Controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+        <button 
+          type="button"
+          className="primary-action" 
+          style={{ width: 'auto', padding: '9px 18px' }}
+          onClick={() => setShowAddForm(prev => !prev)}>
+          {showAddForm ? '✕ ફોર્મ બંધ કરો' : '＋ નવો ખેડૂત / ગ્રાહક ઉમેરો'}
+        </button>
+
+        <input 
+          type="text" 
+          placeholder="🔍 ખેડૂતનું નામ, ગામ કે નંબર શોધો..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          style={{ maxWidth: '300px' }}
+        />
+      </div>
+
+      {/* Inline Form */}
+      {showAddForm && (
+        <form className="panel formgrid" onSubmit={handleSave} style={{ marginBottom: '24px' }}>
+          <h2 style={{ gridColumn: '1 / -1', margin: 0, color: '#14532d' }}>
+            નવો ખેડૂત / ગ્રાહક ઉમેરો
           </h2>
-          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>
-            ખેડૂત અને વેપારીઓની માહિતી, જૂનું લેણું અને ઉધાર મર્યાદા
-          </p>
-        </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.4rem 0.8rem', width: '260px' }}>
-            <Search size={18} color="#94a3b8" />
+          <label>
+            ખેડૂતનું પૂરું નામ*
             <input 
-              type="text" 
-              placeholder="નામ, મોબાઇલ કે ગામ શોધો..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ border: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', fontFamily: 'inherit' }}
+              required 
+              value={newFarmer.name} 
+              onChange={e => setNewFarmer({ ...newFarmer, name: e.target.value })}
+              placeholder="દા.ત. રમેશભાઈ પટેલ"
             />
+          </label>
+
+          <label>
+            મોબાઇલ નંબર
+            <input 
+              value={newFarmer.mobile} 
+              onChange={e => setNewFarmer({ ...newFarmer, mobile: e.target.value })}
+              placeholder="10 અંકનો નંબર"
+            />
+          </label>
+
+          <label>
+            ગામ
+            <input 
+              value={newFarmer.village} 
+              onChange={e => setNewFarmer({ ...newFarmer, village: e.target.value })}
+              placeholder="દા.ત. ગોંડલ"
+            />
+          </label>
+
+          <label>
+            તાલુકો
+            <input 
+              value={newFarmer.taluka} 
+              onChange={e => setNewFarmer({ ...newFarmer, taluka: e.target.value })}
+              placeholder="તાલુકો"
+            />
+          </label>
+
+          <label>
+            સરનામું
+            <input 
+              value={newFarmer.address} 
+              onChange={e => setNewFarmer({ ...newFarmer, address: e.target.value })}
+              placeholder="સરનામું"
+            />
+          </label>
+
+          <label>
+            શરૂઆતનું જૂનું લેણું (Opening Balance ₹)
+            <input 
+              type="number" 
+              min="0"
+              value={newFarmer.openingBalance} 
+              onChange={e => setNewFarmer({ ...newFarmer, openingBalance: e.target.value })}
+            />
+          </label>
+
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '8px' }}>
+            <button type="submit" className="primary-action" style={{ width: 'auto', padding: '10px 24px' }}>
+              ખેડૂત સાચવો
+            </button>
+            <button type="button" className="secondary" onClick={() => setShowAddForm(false)}>
+              રદ કરો
+            </button>
           </div>
+        </form>
+      )}
 
-          <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-            <UserPlus size={18} />
-            નવો ખેડૂત ઉમેરો
-          </button>
-        </div>
-      </div>
-
-      {/* Farmers Table */}
-      <div className="card">
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>કોડ</th>
-                <th>ખેડૂતનું નામ</th>
-                <th>મોબાઇલ</th>
-                <th>ગામ / તાલુકો</th>
-                <th>પ્રકાર</th>
-                <th>બાકી રકમ (ઉધાર)</th>
-                <th>ઉધાર મર્યાદા</th>
-                <th>એક્શન</th>
+      {/* Farmers List Table */}
+      <h2>ખેડૂત / ગ્રાહક યાદી ({filteredFarmers.length})</h2>
+      <div className="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>કોડ</th>
+              <th>ખેડૂતનું નામ</th>
+              <th>મોબાઇલ</th>
+              <th>ગામ / તાલુકો</th>
+              <th>બાકી રકમ (Balance)</th>
+              <th>WhatsApp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredFarmers.map(f => (
+              <tr key={f.id}>
+                <td><b>{f.code || 'KH'}</b></td>
+                <td><b>{f.name}</b></td>
+                <td>{f.mobile || '—'}</td>
+                <td>{f.village || '—'}{f.taluka ? `, ${f.taluka}` : ''}</td>
+                <td style={{ fontWeight: '700', color: (f.currentBalance || 0) > 0 ? '#b91c1c' : '#15803d' }}>
+                  ₹{(f.currentBalance || 0).toLocaleString('en-IN')}
+                </td>
+                <td>
+                  {f.mobile ? (
+                    <button 
+                      type="button"
+                      className="secondary" 
+                      style={{ padding: '3px 8px', fontSize: '0.8rem', color: '#15803d' }}
+                      onClick={() => handleWhatsApp(f)}>
+                      WhatsApp
+                    </button>
+                  ) : '—'}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredFarmers.map(farmer => (
-                <tr key={farmer.id}>
-                  <td><span className="badge badge-primary">{farmer.code}</span></td>
-                  <td style={{ fontWeight: '600' }}>{farmer.name}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <Phone size={14} color="#64748b" />
-                      {farmer.mobile || '—'}
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <MapPin size={14} color="#64748b" />
-                      {farmer.village} {farmer.taluka ? `(${farmer.taluka})` : ''}
-                    </div>
-                  </td>
-                  <td>
-                    <span className="badge badge-secondary" style={{ textTransform: 'capitalize' }}>
-                      {farmer.farmerType === 'farmer' ? 'ખેડૂત' : farmer.farmerType === 'dealer' ? 'ડીલર' : 'રીટેઈલર'}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: '700', fontSize: '1rem', color: farmer.currentBalance > 0 ? '#dc2626' : '#16a34a' }}>
-                    ₹{farmer.currentBalance?.toLocaleString('en-IN')}
-                  </td>
-                  <td style={{ color: '#475569' }}>₹{farmer.creditLimit?.toLocaleString('en-IN')}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
-                      {farmer.currentBalance > 0 && (
-                        <button 
-                          className="btn"
-                          title="બાકી ઉધાર માટે WhatsApp મેસેજ મોકલો"
-                          style={{ backgroundColor: '#25D366', color: 'white', padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
-                          onClick={() => handleWhatsAppReminder(farmer)}>
-                          <MessageSquare size={14} />
-                          ઉઘરાણી
-                        </button>
-                      )}
-                      <button 
-                        className="btn btn-secondary"
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
-                        onClick={() => setSelectedFarmerHistory(farmer)}>
-                        હિસાબ
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
-
-      {/* Add Farmer Modal */}
-      {showAddModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '520px' }}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', color: '#064e3b' }}>નવો ખેડૂત / ગ્રાહક ઉમેરો</h3>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
-            </div>
-            <form onSubmit={handleSave}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label className="form-label">પૂરું નામ *</label>
-                  <input 
-                    type="text" 
-                    required 
-                    className="form-control" 
-                    placeholder="દા.ત. રમેશભાઈ પટેલ"
-                    value={newFarmer.name}
-                    onChange={(e) => setNewFarmer(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">મોબાઇલ નંબર</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="૧૦ આંકડાનો મોબાઇલ"
-                      value={newFarmer.mobile}
-                      onChange={(e) => setNewFarmer(prev => ({ ...prev, mobile: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">ગ્રાહક પ્રકાર</label>
-                    <select 
-                      className="form-control"
-                      value={newFarmer.farmerType}
-                      onChange={(e) => setNewFarmer(prev => ({ ...prev, farmerType: e.target.value }))}>
-                      <option value="farmer">ખેડૂત (Farmer)</option>
-                      <option value="dealer">ડીલર (Dealer)</option>
-                      <option value="retailer">રીટેઈલર (Retailer)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">ગામ</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="ગામનું નામ"
-                      value={newFarmer.village}
-                      onChange={(e) => setNewFarmer(prev => ({ ...prev, village: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">તાલુકો / જિલ્લો</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="તાલુકો"
-                      value={newFarmer.taluka}
-                      onChange={(e) => setNewFarmer(prev => ({ ...prev, taluka: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">જૂનું લેણું / Opening Balance (₹)</label>
-                    <input 
-                      type="number" 
-                      className="form-control" 
-                      value={newFarmer.openingBalance}
-                      onChange={(e) => setNewFarmer(prev => ({ ...prev, openingBalance: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">ઉધાર મર્યાદા / Credit Limit (₹)</label>
-                    <input 
-                      type="number" 
-                      className="form-control" 
-                      value={newFarmer.creditLimit}
-                      onChange={(e) => setNewFarmer(prev => ({ ...prev, creditLimit: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>રદ કરો</button>
-                <button type="submit" className="btn btn-primary">સેવ કરો</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Farmer History Modal */}
-      {selectedFarmerHistory && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '650px' }}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', color: '#064e3b' }}>
-                {selectedFarmerHistory.name} - ખાતાવહી ઇતિહાસ
-              </h3>
-              <button onClick={() => setSelectedFarmerHistory(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1.25rem' }}>
-                <div>ગામ: <strong>{selectedFarmerHistory.village}</strong></div>
-                <div>મોબાઇલ: <strong>{selectedFarmerHistory.mobile}</strong></div>
-                <div>હાલનું બાકી લેણું: <strong style={{ color: '#dc2626' }}>₹{selectedFarmerHistory.currentBalance?.toLocaleString('en-IN')}</strong></div>
-                <div>ઉધાર મર્યાદા: <strong>₹{selectedFarmerHistory.creditLimit?.toLocaleString('en-IN')}</strong></div>
-              </div>
-
-              <h4 style={{ fontSize: '1rem', marginBottom: '0.75rem', color: '#0f172a' }}>વેચાણ બિલ ઇતિહાસ:</h4>
-              <div className="table-responsive">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>બિલ નં</th>
-                      <th>તારીખ</th>
-                      <th>કુલ રકમ</th>
-                      <th>જમા રોકડ</th>
-                      <th>બાકી રકમ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sales.filter(s => s.farmerId === selectedFarmerHistory.id).map(s => (
-                      <tr key={s.id}>
-                        <td>{s.billNo}</td>
-                        <td>{s.billDate}</td>
-                        <td>₹{s.netAmount}</td>
-                        <td style={{ color: '#16a34a' }}>₹{s.paidAmount}</td>
-                        <td style={{ color: s.dueAmount > 0 ? '#dc2626' : '#16a34a', fontWeight: '600' }}>
-                          ₹{s.dueAmount}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setSelectedFarmerHistory(null)}>બંધ કરો</button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };
+export default FarmerMaster;

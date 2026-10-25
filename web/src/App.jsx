@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useAuth } from './context/AuthContext';
-import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { SimpleBillModal } from './components/SimpleBillModal';
 
@@ -17,15 +16,30 @@ import { UserManagement } from './pages/UserManagement';
 import { Reports } from './pages/Reports';
 import { Login } from './pages/Login';
 
+const tabTitles = {
+  dashboard: 'ડેશબોર્ડ',
+  purchases: 'બિયારણ ખરીદી (Purchase Entry)',
+  sales: 'વેચાણ / સાદું બિલ (Sales Billing)',
+  stock: 'વર્તમાન સ્ટોક લેજર (Stock Ledger)',
+  khatabook: 'પાર્ટી ખાતાવહી & દૈનિક રોજમેળ',
+  farmers: 'ખેડૂત / ગ્રાહક માસ્ટર (Farmers)',
+  suppliers: 'પેઢી / સપ્લાયર્સ માસ્ટર (Suppliers)',
+  seeds: 'બીજની જાતો માસ્ટર (Seed Varieties)',
+  payments: 'જમા-ઉધાર વાઉચર એન્ટ્રી (Payments)',
+  reports: 'હિસાબી રિપોર્ટ્સ (Reports & Ledger)',
+  users: 'યુઝર પરવાનગી અને અધિકારો'
+};
+
 export function App() {
-  const { user, loading } = useAuth();
+  const { user, userProfile, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentBillModal, setCurrentBillModal] = useState(null);
+  const [notice, setNotice] = useState('');
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', color: '#064e3b' }}>
-        લોડિંગ થઈ રહ્યું છે...
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', color: '#14532d', background: '#f5f7f5' }}>
+        🌱 શ્રી નંદિની સીડ્સ સિસ્ટમ લોડિંગ થઈ રહી છે...
       </div>
     );
   }
@@ -38,10 +52,10 @@ export function App() {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard setActiveTab={setActiveTab} onOpenBill={(sale) => setCurrentBillModal(sale)} />;
-      case 'sales':
-        return <SalesBilling onBillCreated={(newSale) => setCurrentBillModal(newSale)} />;
       case 'purchases':
         return <PurchaseEntry onPurchaseCompleted={() => setActiveTab('stock')} />;
+      case 'sales':
+        return <SalesBilling onBillCreated={(newSale) => setCurrentBillModal(newSale)} />;
       case 'stock':
         return <StockLedger />;
       case 'khatabook':
@@ -54,23 +68,40 @@ export function App() {
         return <SeedMaster />;
       case 'payments':
         return <Payments />;
-      case 'users':
-        return <UserManagement />;
       case 'reports':
         return <Reports onOpenBill={(sale) => setCurrentBillModal(sale)} />;
+      case 'users':
+        return <UserManagement />;
       default:
         return <Dashboard setActiveTab={setActiveTab} onOpenBill={(sale) => setCurrentBillModal(sale)} />;
     }
   };
 
   return (
-    <div className="app-container">
+    <div className="app">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      <div className="main-content">
-        <Navbar />
+      <main className="content">
+        <header>
+          <div>
+            <h1>{tabTitles[activeTab] || 'SHREE NANDINI SEEDS'}</h1>
+            <p className="muted">બીજ ખરીદી (35 KG/બોરી • ₹/મણ) • વેચાણ • બિલિંગ • સ્ટોક • ખાતાવહી</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="role">
+              {userProfile?.role === 'admin' ? 'Main Admin (Ravi Chaudhary)' : 'Sub User (Bhargav Chaudhary)'}
+            </span>
+          </div>
+        </header>
+
+        {notice && (
+          <div className="notice" onClick={() => setNotice('')}>
+            {notice} ×
+          </div>
+        )}
+
         {renderActiveTab()}
-      </div>
+      </main>
 
       {currentBillModal && (
         <SimpleBillModal 
@@ -82,3 +113,4 @@ export function App() {
   );
 }
 export default App;
+

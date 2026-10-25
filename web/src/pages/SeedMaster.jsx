@@ -1,202 +1,170 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
-import { Sprout, Plus, Scale } from 'lucide-react';
 
 export const SeedMaster = () => {
   const { seeds, addSeedProduct } = useData();
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [notice, setNotice] = useState('');
+
   const [newSeed, setNewSeed] = useState({
     varietyName: '',
     cropType: 'મગફળી',
     company: 'SHREE NANDINI SEEDS',
-    bagWeightKg: 35, // 35 KG Standard
-    defaultPurchaseRatePerMan: 2400,
-    defaultSaleRatePerMan: 2800,
-    minStockAlertBags: 10
+    bagWeightKg: '35',
+    defaultPurchaseRatePerMan: '2400',
+    defaultSaleRatePerMan: '2800'
   });
 
   const handleSave = (e) => {
     e.preventDefault();
-    if (!newSeed.varietyName) return;
-    addSeedProduct(newSeed);
-    setShowAddModal(false);
+    if (!newSeed.varietyName.trim()) return;
+
+    addSeedProduct({
+      ...newSeed,
+      bagWeightKg: parseFloat(newSeed.bagWeightKg) || 35,
+      defaultPurchaseRatePerMan: parseFloat(newSeed.defaultPurchaseRatePerMan) || 2400,
+      defaultSaleRatePerMan: parseFloat(newSeed.defaultSaleRatePerMan) || 2800,
+      defaultSaleRatePerBag: Math.round((parseFloat(newSeed.defaultSaleRatePerMan) || 2800) * (35 / 20)),
+      defaultSaleRatePerKg: Math.round((parseFloat(newSeed.defaultSaleRatePerMan) || 2800) / 20)
+    });
+
+    setNotice(`બિયારણ જાત "${newSeed.varietyName}" સફળતાપૂર્વક ઉમેરાઈ.`);
     setNewSeed({
       varietyName: '',
       cropType: 'મગફળી',
       company: 'SHREE NANDINI SEEDS',
-      bagWeightKg: 35,
-      defaultPurchaseRatePerMan: 2400,
-      defaultSaleRatePerMan: 2800,
-      minStockAlertBags: 10
+      bagWeightKg: '35',
+      defaultPurchaseRatePerMan: '2400',
+      defaultSaleRatePerMan: '2800'
     });
+    setShowAddForm(false);
   };
 
   return (
-    <div className="page-body">
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: '700', color: '#064e3b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Sprout size={24} />
-            બિયારણ જાતો માસ્ટર (Seed Varieties Master)
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>
-            નવી બિયારણ વેરાયટી, બોરીનું પ્રમાણિત વજન (KG) અને વેચાણ ભાવ દર
-          </p>
-        </div>
-
-        <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-          <Plus size={18} />
-          નવી બિયારણ જાત ઉમેરો
-        </button>
-      </div>
-
-      <div className="card">
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>બિયારણ જાતનું નામ</th>
-                <th>પાક પ્રકાર</th>
-                <th>કંપની / સંશોધન કેન્દ્ર</th>
-                <th>૧ બોરીનું વજન (Standard KG)</th>
-                <th>પ્રતિ KG ડિફોલ્ટ ભાવ</th>
-                <th>પ્રતિ બોરી ડિફોલ્ટ ભાવ</th>
-                <th>લઘુત્તમ સ્ટોક ચેતવણી</th>
-              </tr>
-            </thead>
-            <tbody>
-              {seeds.map(sd => (
-                <tr key={sd.id}>
-                  <td style={{ fontWeight: '600', color: '#064e3b' }}>{sd.varietyName}</td>
-                  <td><span className="badge badge-primary">{sd.cropType}</span></td>
-                  <td>{sd.company || '—'}</td>
-                  <td style={{ fontWeight: '600' }}>{sd.bagWeightKg} kg</td>
-                  <td>₹{sd.defaultSaleRatePerKg} /kg</td>
-                  <td>₹{sd.defaultSaleRatePerBag} /બોરી</td>
-                  <td><span className="badge badge-warning">{sd.minStockAlertBags} બોરી</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {showAddModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '520px' }}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', color: '#064e3b' }}>નવી બિયારણ વેરાયટી ઉમેરો</h3>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
-            </div>
-            <form onSubmit={handleSave}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label className="form-label">બિયારણ જાતનું પૂરું નામ *</label>
-                  <input 
-                    type="text" 
-                    required 
-                    className="form-control" 
-                    placeholder="દા.ત. GJG-22 (ગુજરાત જૂનાગઢ મગફળી)"
-                    value={newSeed.varietyName}
-                    onChange={(e) => setNewSeed(prev => ({ ...prev, varietyName: e.target.value }))}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">પાક પ્રકાર (Crop Type)</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="દા.ત. મગફળી, કપાસ, જીરૂ, ઘઉં"
-                      value={newSeed.cropType}
-                      onChange={(e) => setNewSeed(prev => ({ ...prev, cropType: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">કંપની / બ્રાન્ડ</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="દા.ત. જૂનાગઢ કૃષિ યુનિવર્સિટી"
-                      value={newSeed.company}
-                      onChange={(e) => setNewSeed(prev => ({ ...prev, company: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">૧ બોરીનું પ્રમાણિત વજન (KG) *</label>
-                    <input 
-                      type="number" 
-                      required 
-                      className="form-control" 
-                      placeholder="50"
-                      value={newSeed.bagWeightKg}
-                      onChange={(e) => {
-                        const w = parseFloat(e.target.value) || 50;
-                        setNewSeed(prev => ({
-                          ...prev,
-                          bagWeightKg: w,
-                          defaultSaleRatePerBag: w * prev.defaultSaleRatePerKg
-                        }));
-                      }}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">લઘુત્તમ સ્ટોક ચેતવણી (Bags)</label>
-                    <input 
-                      type="number" 
-                      className="form-control" 
-                      value={newSeed.minStockAlertBags}
-                      onChange={(e) => setNewSeed(prev => ({ ...prev, minStockAlertBags: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">વેચાણ ભાવ પ્રતિ કિલો (₹)</label>
-                    <input 
-                      type="number" 
-                      className="form-control" 
-                      value={newSeed.defaultSaleRatePerKg}
-                      onChange={(e) => {
-                        const r = parseFloat(e.target.value) || 0;
-                        setNewSeed(prev => ({
-                          ...prev,
-                          defaultSaleRatePerKg: r,
-                          defaultSaleRatePerBag: r * prev.bagWeightKg
-                        }));
-                      }}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">વેચાણ ભાવ પ્રતિ બોરી (₹)</label>
-                    <input 
-                      type="number" 
-                      className="form-control" 
-                      value={newSeed.defaultSaleRatePerBag}
-                      onChange={(e) => setNewSeed(prev => ({ ...prev, defaultSaleRatePerBag: parseFloat(e.target.value) || 0 }))}
-                    />
-                  </div>
-                </div>
-
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>રદ કરો</button>
-                <button type="submit" className="btn btn-primary">સેવ કરો</button>
-              </div>
-            </form>
-          </div>
+    <div>
+      {notice && (
+        <div className="notice" onClick={() => setNotice('')} style={{ marginBottom: '16px' }}>
+          {notice} ×
         </div>
       )}
 
+      {/* Header & Toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+        <button 
+          type="button"
+          className="primary-action" 
+          style={{ width: 'auto', padding: '9px 18px' }}
+          onClick={() => setShowAddForm(prev => !prev)}>
+          {showAddForm ? '✕ ફોર્મ બંધ કરો' : '＋ નવી બીજ જાત ઉમેરો'}
+        </button>
+      </div>
+
+      {/* Inline Form */}
+      {showAddForm && (
+        <form className="panel formgrid" onSubmit={handleSave} style={{ marginBottom: '24px' }}>
+          <h2 style={{ gridColumn: '1 / -1', margin: 0, color: '#14532d' }}>
+            બીજની નવી જાત ઉમેરો (Seed Variety)
+          </h2>
+
+          <label>
+            બીજનું નામ / Variety*
+            <input 
+              required 
+              value={newSeed.varietyName} 
+              onChange={e => setNewSeed({ ...newSeed, varietyName: e.target.value })}
+              placeholder="દા.ત. GJG-22 અથવા GG-20"
+            />
+          </label>
+
+          <label>
+            પાક પ્રકાર (Crop)
+            <input 
+              value={newSeed.cropType} 
+              onChange={e => setNewSeed({ ...newSeed, cropType: e.target.value })}
+              placeholder="મગફળી, સોયાબીન, ચણા..."
+            />
+          </label>
+
+          <label>
+            કંપની
+            <input 
+              value={newSeed.company} 
+              onChange={e => setNewSeed({ ...newSeed, company: e.target.value })}
+              placeholder="SHREE NANDINI SEEDS"
+            />
+          </label>
+
+          <label>
+            એક બોરીનું વજન (Standard KG)*
+            <input 
+              type="number" 
+              required
+              min="1"
+              value={newSeed.bagWeightKg} 
+              onChange={e => setNewSeed({ ...newSeed, bagWeightKg: e.target.value })}
+            />
+          </label>
+
+          <label>
+            ખરીદી ડિફોલ્ટ ભાવ (₹/મણ)
+            <input 
+              type="number" 
+              min="0"
+              value={newSeed.defaultPurchaseRatePerMan} 
+              onChange={e => setNewSeed({ ...newSeed, defaultPurchaseRatePerMan: e.target.value })}
+            />
+          </label>
+
+          <label>
+            વેચાણ ડિફોલ્ટ ભાવ (₹/મણ)
+            <input 
+              type="number" 
+              min="0"
+              value={newSeed.defaultSaleRatePerMan} 
+              onChange={e => setNewSeed({ ...newSeed, defaultSaleRatePerMan: e.target.value })}
+            />
+          </label>
+
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '8px' }}>
+            <button type="submit" className="primary-action" style={{ width: 'auto', padding: '10px 24px' }}>
+              બીજ સાચવો
+            </button>
+            <button type="button" className="secondary" onClick={() => setShowAddForm(false)}>
+              રદ કરો
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Seeds Table */}
+      <h2>બીજ જાતો યાદી ({seeds.length})</h2>
+      <div className="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>બીજ જાત</th>
+              <th>પાક પ્રકાર</th>
+              <th>કંપની</th>
+              <th>૧ બોરીનું વજન (KG)</th>
+              <th>ડિફોલ્ટ ખરીદી ભાવ (₹/મણ)</th>
+              <th>ડિફોલ્ટ વેચાણ ભાવ (₹/મણ)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {seeds.map(s => (
+              <tr key={s.id}>
+                <td><b>{s.varietyName}</b></td>
+                <td>{s.cropType}</td>
+                <td>{s.company || '—'}</td>
+                <td><b>{s.bagWeightKg} KG</b></td>
+                <td>₹{s.defaultPurchaseRatePerMan || 2400}</td>
+                <td>₹{s.defaultSaleRatePerMan || 2800}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
+export default SeedMaster;

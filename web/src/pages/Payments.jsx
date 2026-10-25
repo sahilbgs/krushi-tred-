@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { CreditCard, Plus, CheckCircle, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 
 export const Payments = () => {
-  const { farmers, suppliers, payments, recordPayment } = useData();
+  const { farmers, suppliers, partyTransactions, recordPayment } = useData();
   const { userProfile } = useAuth();
 
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [notice, setNotice] = useState('');
   const [partyType, setPartyType] = useState('farmer'); // farmer | supplier
   const [partyId, setPartyId] = useState('');
   const [amount, setAmount] = useState('');
@@ -26,7 +26,7 @@ export const Payments = () => {
     recordPayment({
       partyType,
       partyId,
-      partyName: partyType === 'farmer' ? currentParty.name : currentParty.companyName,
+      partyName: partyType === 'farmer' ? currentParty?.name : currentParty?.companyName,
       type: partyType === 'farmer' ? 'receipt' : 'payment',
       amount: parseFloat(amount),
       paymentMode,
@@ -35,218 +35,172 @@ export const Payments = () => {
       recordedBy: userProfile?.displayName || 'સ્ટાફ'
     });
 
-    setShowAddModal(false);
+    setNotice(`₹${amount} ની વાઉચર એન્ટ્રી સફળતાપૂર્વક સાચવવામાં આવી.`);
+    setShowAddForm(false);
     setPartyId('');
     setAmount('');
     setReferenceNo('');
     setRemarks('');
   };
 
+  // Filter receipt / payment transactions
+  const voucherTransactions = partyTransactions.filter(tx => 
+    tx.voucherType === 'receipt' || tx.voucherType === 'payment'
+  );
+
   return (
-    <div className="page-body">
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: '700', color: '#064e3b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <CreditCard size={24} />
-            જમા-ઉધાર વસૂલાત & ચુકવણી (Payments Ledger)
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>
-            ખેડૂતો પાસેથી બાકી ઉઘરાણી જમા લેવી અથવા સપ્લાયર્સને ચુકવણી નોંધવી
-          </p>
-        </div>
-
-        <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-          <Plus size={18} />
-          નવી રસીદ / ચુકવણી નોંધો
-        </button>
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <h3 className="card-title">ચુકવણી & વસૂલાત ઇતિહાસ</h3>
-        </div>
-
-        {payments.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
-            હજુ કોઈ અલગ પેમેન્ટ વ્યવહાર નોંધાયેલ નથી.
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>રસીદ નં</th>
-                  <th>તારીખ</th>
-                  <th>પાર્ટી વિગત</th>
-                  <th>પ્રકાર</th>
-                  <th>મોડ</th>
-                  <th>રકમ (₹)</th>
-                  <th>નોંધ / રેફરન્સ</th>
-                  <th>નોંધનાર</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map(pay => (
-                  <tr key={pay.id}>
-                    <td><span className="badge badge-primary">{pay.receiptNo}</span></td>
-                    <td>{pay.date}</td>
-                    <td style={{ fontWeight: '600' }}>
-                      {pay.partyName}
-                      <small style={{ display: 'block', color: '#64748b' }}>
-                        {pay.partyType === 'farmer' ? 'ખેડૂત' : 'સપ્લાયર'}
-                      </small>
-                    </td>
-                    <td>
-                      {pay.type === 'receipt' ? (
-                        <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <ArrowDownLeft size={14} /> આવક (જમા)
-                        </span>
-                      ) : (
-                        <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <ArrowUpRight size={14} /> જાવક (ચુકવણી)
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ textTransform: 'uppercase' }}>{pay.paymentMode}</td>
-                    <td style={{ fontWeight: '700', fontSize: '1.05rem', color: pay.type === 'receipt' ? '#16a34a' : '#dc2626' }}>
-                      ₹{pay.amount?.toLocaleString('en-IN')}
-                    </td>
-                    <td>{pay.referenceNo ? `Ref: ${pay.referenceNo} ` : ''}{pay.remarks || '—'}</td>
-                    <td>{pay.recordedBy}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {showAddModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', color: '#064e3b' }}>નવી જમા / ઉધાર એન્ટ્રી</h3>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
-            </div>
-            <form onSubmit={handleSavePayment}>
-              <div className="modal-body">
-                
-                <div className="form-group">
-                  <label className="form-label">વ્યવહાર પ્રકાર</label>
-                  <div style={{ display: 'flex', gap: '1rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                      <input 
-                        type="radio" 
-                        name="ptype" 
-                        checked={partyType === 'farmer'} 
-                        onChange={() => { setPartyType('farmer'); setPartyId(''); }} 
-                      />
-                      ખેડૂત પાસેથી ઉધાર વસૂલાત (જમા)
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                      <input 
-                        type="radio" 
-                        name="ptype" 
-                        checked={partyType === 'supplier'} 
-                        onChange={() => { setPartyType('supplier'); setPartyId(''); }} 
-                      />
-                      સપ્લાયરને ચુકવણી (જાવક)
-                    </label>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    {partyType === 'farmer' ? 'ખેડૂત પસંદ કરો *' : 'સપ્લાયર કંપની પસંદ કરો *'}
-                  </label>
-                  <select 
-                    className="form-control"
-                    value={partyId}
-                    onChange={(e) => setPartyId(e.target.value)}
-                    required>
-                    <option value="">-- પસંદ કરો --</option>
-                    {partyType === 'farmer' ? (
-                      farmers.map(f => (
-                        <option key={f.id} value={f.id}>
-                          {f.name} - {f.village} (બાકી ઉધાર: ₹{f.currentBalance})
-                        </option>
-                      ))
-                    ) : (
-                      suppliers.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.companyName} (ચૂકવવાના બાકી: ₹{s.currentBalance})
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-
-                {currentParty && (
-                  <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #e2e8f0', color: currentParty.currentBalance > 0 ? '#dc2626' : '#16a34a' }}>
-                    હાલની બાકી રકમ: <strong>₹{currentParty.currentBalance?.toLocaleString('en-IN')}</strong>
-                  </div>
-                )}
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">રકમ (₹) *</label>
-                    <input 
-                      type="number" 
-                      required 
-                      min="1"
-                      className="form-control" 
-                      placeholder="દા.ત. 5000"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">ચુકવણી મોડ</label>
-                    <select 
-                      className="form-control"
-                      value={paymentMode}
-                      onChange={(e) => setPaymentMode(e.target.value)}>
-                      <option value="cash">રોકડ (Cash)</option>
-                      <option value="upi">UPI (GPay/PhonePe)</option>
-                      <option value="bank">બેંક ટ્રાન્સફર (NEFT/RTGS)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">ટ્રાન્ઝેક્શન / રેફરન્સ / Cheque નં</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="UPI Ref અથવા Cheque નં."
-                    value={referenceNo}
-                    onChange={(e) => setReferenceNo(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">નોંધ (Remarks)</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="દા.ત. જૂના બિલ પેટે જમા"
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                  />
-                </div>
-
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>રદ કરો</button>
-                <button type="submit" className="btn btn-primary">રસીદ સેવ કરો</button>
-              </div>
-            </form>
-          </div>
+    <div>
+      {notice && (
+        <div className="notice" onClick={() => setNotice('')} style={{ marginBottom: '16px' }}>
+          {notice} ×
         </div>
       )}
 
+      {/* Header & Toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+        <button 
+          type="button"
+          className="primary-action" 
+          style={{ width: 'auto', padding: '9px 18px' }}
+          onClick={() => setShowAddForm(prev => !prev)}>
+          {showAddForm ? '✕ ફોર્મ બંધ કરો' : '＋ નવી રસીદ / ચુકવણી વાઉચર'}
+        </button>
+      </div>
+
+      {/* Inline Form */}
+      {showAddForm && (
+        <form className="panel formgrid" onSubmit={handleSavePayment} style={{ marginBottom: '24px' }}>
+          <h2 style={{ gridColumn: '1 / -1', margin: 0, color: '#14532d' }}>
+            નવી રસીદ / ચુકવણી નોંધો
+          </h2>
+
+          <label>
+            વ્યવહાર પ્રકાર
+            <select value={partyType} onChange={e => { setPartyType(e.target.value); setPartyId(''); }}>
+              <option value="farmer">ખેડૂત પાસેથી વસૂલાત (Receipt / જમા)</option>
+              <option value="supplier">પેઢી/સપ્લાયરને ચુકવણી (Payment / ઉધાર)</option>
+            </select>
+          </label>
+
+          <label>
+            {partyType === 'farmer' ? 'ખેડૂત પસંદ કરો*' : 'પેઢી/સપ્લાયર પસંદ કરો*'}
+            <select required value={partyId} onChange={e => setPartyId(e.target.value)}>
+              <option value="">પાર્ટી પસંદ કરો</option>
+              {partyType === 'farmer' ? (
+                farmers.map(f => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} {f.village ? `(${f.village})` : ''} — બાકી: ₹{(f.currentBalance || 0).toLocaleString('en-IN')}
+                  </option>
+                ))
+              ) : (
+                suppliers.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.companyName} ({s.city}) — બાકી: ₹{(s.currentBalance || 0).toLocaleString('en-IN')}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+
+          <label>
+            રકમ (₹)*
+            <input 
+              required 
+              type="number" 
+              min="1" 
+              step="0.01"
+              value={amount} 
+              onChange={e => setAmount(e.target.value)}
+              placeholder="રકમ ₹"
+            />
+          </label>
+
+          <label>
+            ચુકવણી પદ્ધતિ (Mode)
+            <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)}>
+              <option value="cash">રોકડ (Cash)</option>
+              <option value="upi">UPI / GPay / PhonePe</option>
+              <option value="bank">બેંક ટ્રાન્સફર (NEFT / RTGS)</option>
+              <option value="cheque">ચેક (Cheque)</option>
+            </select>
+          </label>
+
+          <label>
+            રેફરન્સ / ચેક / UTR નંબર
+            <input 
+              value={referenceNo} 
+              onChange={e => setReferenceNo(e.target.value)}
+              placeholder="દા.ત. UTR-942851"
+            />
+          </label>
+
+          <label className="full">
+            નોંધ (Remarks)
+            <input 
+              value={remarks} 
+              onChange={e => setRemarks(e.target.value)}
+              placeholder="વિગતવાર નોંધ..."
+            />
+          </label>
+
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '8px' }}>
+            <button type="submit" className="primary-action" style={{ width: 'auto', padding: '10px 24px' }}>
+              વાઉચર સેવ કરો
+            </button>
+            <button type="button" className="secondary" onClick={() => setShowAddForm(false)}>
+              રદ કરો
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Voucher Transactions Table */}
+      <h2>તાજેતરના જમા-ઉધાર વાઉચર ({voucherTransactions.length})</h2>
+      <div className="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>વાઉચર નં</th>
+              <th>તારીખ</th>
+              <th>પાર્ટીનું નામ</th>
+              <th>પ્રકાર</th>
+              <th>પદ્ધતિ</th>
+              <th>રકમ (₹)</th>
+              <th>નોંધ / વિગત</th>
+            </tr>
+          </thead>
+          <tbody>
+            {voucherTransactions.length === 0 ? (
+              <tr>
+                <td colSpan="7" style={{ textAlign: 'center', color: '#64748b', padding: '16px' }}>
+                  હજુ કોઈ અલગ વાઉચર વ્યવહાર નોંધાયેલ નથી.
+                </td>
+              </tr>
+            ) : (
+              voucherTransactions.map(tx => (
+                <tr key={tx.id}>
+                  <td><b>{tx.voucherNo}</b></td>
+                  <td>{tx.date}</td>
+                  <td><b>{tx.partyName}</b></td>
+                  <td>
+                    {tx.voucherType === 'receipt' ? (
+                      <span style={{ color: '#15803d', fontWeight: '700' }}>જમા (Receipt)</span>
+                    ) : (
+                      <span style={{ color: '#b91c1c', fontWeight: '700' }}>ચુકવણી (Payment)</span>
+                    )}
+                  </td>
+                  <td>{tx.paymentMode?.toUpperCase()}</td>
+                  <td style={{ fontWeight: '700', color: tx.credit > 0 ? '#15803d' : '#b91c1c' }}>
+                    ₹{(tx.credit || tx.debit || 0).toLocaleString('en-IN')}
+                  </td>
+                  <td>{tx.particulars || tx.remarks || '—'}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
+export default Payments;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 
-export const Sidebar = ({ activeTab, setActiveTab }) => {
+export const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
   const { user, userProfile, hasPermission, logout } = useAuth();
 
   const menuItems = [
@@ -19,29 +19,57 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
   ];
 
   return (
-    <aside>
-      <div className="brand">🌱 SHREE NANDINI SEEDS</div>
-      <p className="muted" style={{ color: '#86efac', fontSize: '0.85rem', margin: '0 0 10px 0' }}>
-        {userProfile?.displayName || user?.email || 'User'}
-      </p>
-
-      {menuItems.map(item => {
-        if (!item.allowed) return null;
-        const isActive = activeTab === item.id;
-        return (
-          <button
-            key={item.id}
-            className={`nav ${isActive ? 'active' : ''}`}
-            onClick={() => setActiveTab(item.id)}
+    <aside className={`app-sidebar ${isOpen ? 'open' : ''}`}>
+      <div className="sidebar-header">
+        <div>
+          <div className="brand">🌱 SHREE NANDINI SEEDS</div>
+          <p className="muted" style={{ color: '#86efac', fontSize: '0.82rem', margin: '2px 0 0 0' }}>
+            {userProfile?.displayName || user?.email || 'User'}
+          </p>
+        </div>
+        {onClose && (
+          <button 
+            type="button" 
+            className="sidebar-close-btn" 
+            onClick={onClose}
+            aria-label="મેનુ બંધ કરો"
           >
-            {item.label}
+            ✕
           </button>
-        );
-      })}
+        )}
+      </div>
 
-      <button className="nav logout" onClick={logout}>
-        લૉગઆઉટ
-      </button>
+      <nav className="sidebar-nav">
+        {menuItems.map(item => {
+          if (!item.allowed) return null;
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              className={`nav ${isActive ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab(item.id);
+                if (onClose) onClose();
+              }}
+            >
+              <span>{item.label}</span>
+              {isActive && <span className="nav-active-dot">●</span>}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="sidebar-footer">
+        <button 
+          className="nav logout" 
+          onClick={() => {
+            if (onClose) onClose();
+            logout();
+          }}
+        >
+          <span>🚪 લૉગઆઉટ</span>
+        </button>
+      </div>
     </aside>
   );
 };

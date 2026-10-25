@@ -4,7 +4,29 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: '0.0.0.0',
     port: 3000,
-    open: false
+    open: false,
+    allowedHosts: ['krushi.aceglory.in', 'krushi-trade.aceglory.in'],
+    hmr: {
+      clientPort: 443
+    },
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:5005',
+        changeOrigin: true
+      }
+    }
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 3000,
+    allowedHosts: ['krushi.aceglory.in', 'krushi-trade.aceglory.in'],
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:5005',
+        changeOrigin: true
+      }
+    }
   }
 });

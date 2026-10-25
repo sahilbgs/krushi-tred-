@@ -2,6 +2,8 @@
 web/node_modules/
 web/dist/
 web/.env
+server/node_modules/
+server/.env
 
 # Android build artifacts and caches
 android/.gradle/

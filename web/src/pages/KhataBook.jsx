@@ -307,7 +307,7 @@ export const KhataBook = () => {
       {/* 1. KHATAVAHI / PARTY LEDGER VIEW */}
       {/* ========================================================= */}
       {activeMainTab === 'ledger' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: '1.25rem' }}>
+        <div className="khatabook-grid">
           
           {/* Left Column: Party Selector List */}
           <div className="card" style={{ padding: '1rem', height: 'fit-content' }}>
@@ -542,7 +542,7 @@ export const KhataBook = () => {
                       style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', width: '130px' }}>
                       <option value="all">તમામ જાતો</option>
                       {seeds.map(s => (
-                        <option key={s.id} value={s.varietyName}>{s.varietyName.split(' ')[0]}</option>
+                        <option key={s.id} value={s.varietyName}>{s.varietyName}</option>
                       ))}
                     </select>
                   </div>

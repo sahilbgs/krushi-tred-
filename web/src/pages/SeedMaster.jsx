@@ -151,16 +151,23 @@ export const SeedMaster = () => {
             </tr>
           </thead>
           <tbody>
-            {seeds.map(s => (
-              <tr key={s.id}>
-                <td><b>{s.varietyName}</b></td>
-                <td>{s.cropType}</td>
-                <td>{s.company || '—'}</td>
-                <td><b>{s.bagWeightKg} KG</b></td>
-                <td>₹{s.defaultPurchaseRatePerMan || 2400}</td>
-                <td>₹{s.defaultSaleRatePerMan || 2800}</td>
-              </tr>
-            ))}
+            {seeds.map(s => {
+              const cleanVariety = (s.varietyName || '').replace(/\s*\(.*?\)\s*/g, '').trim() || s.varietyName;
+              const cleanWeight = String(s.bagWeightKg || 35).replace(/[^0-9.]/g, '');
+              const cleanBuyRate = String(s.defaultPurchaseRatePerMan || 2400).replace(/[^0-9.]/g, '');
+              const cleanSaleRate = String(s.defaultSaleRatePerMan || 2800).replace(/[^0-9.]/g, '');
+
+              return (
+                <tr key={s.id}>
+                  <td><b>{cleanVariety}</b></td>
+                  <td>{s.cropType}</td>
+                  <td>{s.company || '—'}</td>
+                  <td><b>{cleanWeight}</b></td>
+                  <td>{cleanBuyRate}</td>
+                  <td>{cleanSaleRate}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

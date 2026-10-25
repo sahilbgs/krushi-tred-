@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from './context/AuthContext';
+import { useData } from './context/DataContext';
 import { Sidebar } from './components/Sidebar';
 import { SimpleBillModal } from './components/SimpleBillModal';
 
@@ -32,7 +33,9 @@ const tabTitles = {
 
 export function App() {
   const { user, userProfile, loading } = useAuth();
+  const { dbStatus, refreshData } = useData();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentBillModal, setCurrentBillModal] = useState(null);
   const [notice, setNotice] = useState('');
 
@@ -78,18 +81,102 @@ export function App() {
   };
 
   return (
-    <div className="app">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      
-      <main className="content">
-        <header>
-          <div>
-            <h1>{tabTitles[activeTab] || 'SHREE NANDINI SEEDS'}</h1>
-            <p className="muted">બીજ ખરીદી (35 KG/બોરી • ₹/મણ) • વેચાણ • બિલિંગ • સ્ટોક • ખાતાવહી</p>
+    <div className="app-layout">
+      {/* Mobile Top Navigation Bar */}
+      <div className="mobile-topbar">
+        <button 
+          type="button" 
+          className="hamburger-btn" 
+          onClick={() => setMobileMenuOpen(prev => !prev)}
+          aria-label="મેનુ ખોલો"
+        >
+          <span className="bar"></span>
+          <span className="bar"></span>
+          <span className="bar"></span>
+        </button>
+
+        <div className="mobile-brand">
+          <span style={{ fontSize: '1.15rem' }}>🌱</span>
+          <span style={{ fontWeight: '800', letterSpacing: '0.3px' }}>શ્રી નંદિની સીડ્સ</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button 
+            type="button" 
+            onClick={refreshData}
+            title="PostgreSQL Dynamic Sync"
+            style={{
+              fontSize: '0.72rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: dbStatus === 'connected' ? '#ecfdf5' : '#fef3c7',
+              color: dbStatus === 'connected' ? '#047857' : '#b45309',
+              border: '1px solid ' + (dbStatus === 'connected' ? '#a7f3d0' : '#fde68a'),
+              padding: '3px 8px',
+              borderRadius: '999px',
+              fontWeight: '700',
+              cursor: 'pointer'
+            }}
+          >
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: dbStatus === 'connected' ? '#10b981' : '#f59e0b' }}></span>
+            {dbStatus === 'connected' ? 'Live DB' : 'Sync'}
+          </button>
+          <div className="mobile-role-pill">
+            {userProfile?.displayName ? userProfile.displayName.split(' ')[0] : 'Admin'}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="role">
-              {userProfile?.role === 'admin' ? 'Main Admin (Ravi Chaudhary)' : 'Sub User (Bhargav Chaudhary)'}
+        </div>
+      </div>
+
+      {/* Drawer Backdrop Overlay for Mobile */}
+      {mobileMenuOpen && (
+        <div 
+          className="sidebar-backdrop" 
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar Drawer */}
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+      />
+      
+      {/* Main Content Area */}
+      <main className="content">
+        <header className="page-header">
+          <div className="page-title-box">
+            <h1>{tabTitles[activeTab] || 'SHREE NANDINI SEEDS'}</h1>
+            <p className="muted header-subtitle">બીજ ખરીદી (35 KG/બોરી • ₹/મણ) • વેચાણ • બિલિંગ • સ્ટોક • ખાતાવહી</p>
+          </div>
+          <div className="header-actions">
+            <button 
+              type="button" 
+              onClick={refreshData}
+              title="PostgreSQL Live Centralized DB Sync"
+              style={{
+                background: dbStatus === 'connected' ? '#ecfdf5' : '#fef3c7',
+                color: dbStatus === 'connected' ? '#047857' : '#b45309',
+                border: '1px solid ' + (dbStatus === 'connected' ? '#a7f3d0' : '#fde68a'),
+                padding: '6px 14px',
+                borderRadius: '20px',
+                fontSize: '0.82rem',
+                fontWeight: '700',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '7px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: dbStatus === 'connected' ? '#10b981' : '#f59e0b' }}></span>
+              {dbStatus === 'connected' ? 'PostgreSQL Live' : 'સિન્ક થાય છે...'}
+            </button>
+            <span className={`role ${userProfile?.role === 'sub_user' ? 'sub' : ''}`}>
+              {userProfile?.role === 'admin' ? 'Main Admin (Ravi)' : 'Sub User (Bhargav)'}
             </span>
           </div>
         </header>

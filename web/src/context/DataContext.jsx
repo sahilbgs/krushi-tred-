@@ -16,306 +16,81 @@ const DataContext = createContext(null);
 export const BAG_STD_KG = 35; // 1 Bag = 35 KG
 export const MAN_STD_KG = 20; // 1 Man (મણ) = 20 KG
 
-// Seed Variety Master (35 KG Standard Bag Weight)
+// Seed Variety Master (35 KG Standard Bag Weight - Only Number/Code)
 const initialSeeds = [
   {
     id: "seed_1",
-    varietyName: "GJG-22 (ગુજરાત જૂનાગઢ મગફળી)",
-    cropType: "મગફળી (Groundnut)",
+    varietyName: "GJG-22",
+    cropType: "મગફળી",
     company: "જૂનાગઢ કૃષિ યુનિવર્સિટી",
     bagWeightKg: 35,
-    defaultSaleRatePerMan: 2800, // ₹ પ્રતિ મણ (20 KG)
     defaultPurchaseRatePerMan: 2400,
+    defaultSaleRatePerMan: 2800,
+    defaultSaleRatePerBag: 4900,
+    defaultSaleRatePerKg: 140,
     minStockAlertBags: 15
   },
   {
     id: "seed_2",
-    varietyName: "GJG-23 (અર્ધવેલડી મગફળી)",
-    cropType: "મગફળી (Groundnut)",
+    varietyName: "GJG-23",
+    cropType: "મગફળી",
     company: "સરદાર કૃષિ નગર",
     bagWeightKg: 35,
-    defaultSaleRatePerMan: 2900,
     defaultPurchaseRatePerMan: 2450,
+    defaultSaleRatePerMan: 2900,
+    defaultSaleRatePerBag: 5075,
+    defaultSaleRatePerKg: 145,
     minStockAlertBags: 12
   },
   {
     id: "seed_3",
-    varietyName: "GG-20 (ગુજરાત ગ્રાઉન્ડનટ - ૨૦)",
-    cropType: "મગફળી (Groundnut)",
+    varietyName: "GG-20",
+    cropType: "મગફળી",
     company: "જૂનાગઢ એગ્રીકલ્ચર",
     bagWeightKg: 35,
-    defaultSaleRatePerMan: 2750,
     defaultPurchaseRatePerMan: 2350,
+    defaultSaleRatePerMan: 2750,
+    defaultSaleRatePerBag: 4813,
+    defaultSaleRatePerKg: 138,
     minStockAlertBags: 10
   },
   {
     id: "seed_4",
-    varietyName: "GJ-39 (જીરૂ રિસર્ચ બિયારણ)",
-    cropType: "જીરૂ (Cumin)",
+    varietyName: "GJ-39",
+    cropType: "જીરૂ",
     company: "ગુજરાત સીડ્સ નિગમ",
     bagWeightKg: 35,
-    defaultSaleRatePerMan: 8400,
     defaultPurchaseRatePerMan: 7600,
+    defaultSaleRatePerMan: 8400,
+    defaultSaleRatePerBag: 14700,
+    defaultSaleRatePerKg: 420,
     minStockAlertBags: 8
   },
   {
     id: "seed_5",
-    varietyName: "GW-496 (ટુકડી ઘઉં બિયારણ)",
-    cropType: "ઘઉં (Wheat)",
+    varietyName: "GW-496",
+    cropType: "ઘઉં",
     company: "મહાગુજરાત સીડ્સ",
     bagWeightKg: 35,
-    defaultSaleRatePerMan: 960,
     defaultPurchaseRatePerMan: 820,
+    defaultSaleRatePerMan: 960,
+    defaultSaleRatePerBag: 1680,
+    defaultSaleRatePerKg: 48,
     minStockAlertBags: 20
   }
 ];
 
 // Initial Stock based on 35 KG bags & 20 KG man calculation
 const initialStock = [
-  {
-    id: "stock_1",
-    seedId: "seed_1",
-    varietyName: "GJG-22 (ગુજરાત જૂનાગઢ મગફળી)",
-    bagWeightKg: 35,
-    availableBags: 150,
-    availableLooseKg: 20,
-    totalWeightKg: (150 * 35) + 20, // 5270 KG
-    totalMan: ((150 * 35) + 20) / 20, // 263.5 મણ
-    lastPurchaseRate: 2400
-  },
-  {
-    id: "stock_2",
-    seedId: "seed_2",
-    varietyName: "GJG-23 (અર્ધવેલડી મગફળી)",
-    bagWeightKg: 35,
-    availableBags: 90,
-    availableLooseKg: 15,
-    totalWeightKg: (90 * 35) + 15, // 3165 KG
-    totalMan: ((90 * 35) + 15) / 20, // 158.25 મણ
-    lastPurchaseRate: 2450
-  },
-  {
-    id: "stock_3",
-    seedId: "seed_3",
-    varietyName: "GG-20 (ગુજરાત ગ્રાઉન્ડનટ - ૨૦)",
-    bagWeightKg: 35,
-    availableBags: 110,
-    availableLooseKg: 0,
-    totalWeightKg: 110 * 35, // 3850 KG
-    totalMan: (110 * 35) / 20, // 192.5 મણ
-    lastPurchaseRate: 2350
-  },
-  {
-    id: "stock_4",
-    seedId: "seed_4",
-    varietyName: "GJ-39 (જીરૂ રિસર્ચ બિયારણ)",
-    bagWeightKg: 35,
-    availableBags: 30,
-    availableLooseKg: 10,
-    totalWeightKg: (30 * 35) + 10, // 1060 KG
-    totalMan: ((30 * 35) + 10) / 20, // 53 મણ
-    lastPurchaseRate: 7600
-  },
-  {
-    id: "stock_5",
-    seedId: "seed_5",
-    varietyName: "GW-496 (ટુકડી ઘઉં બિયારણ)",
-    bagWeightKg: 35,
-    availableBags: 180,
-    availableLooseKg: 0,
-    totalWeightKg: 180 * 35, // 6300 KG
-    totalMan: (180 * 35) / 20, // 315 મણ
-    lastPurchaseRate: 820
-  }
+  { id: "stk_1", seedId: "seed_1", varietyName: "GJG-22", bagWeightKg: 35, availableBags: 0, availableLooseKg: 0, totalWeightKg: 0, totalMan: 0, lastPurchaseRate: 2400 },
+  { id: "stk_2", seedId: "seed_2", varietyName: "GJG-23", bagWeightKg: 35, availableBags: 0, availableLooseKg: 0, totalWeightKg: 0, totalMan: 0, lastPurchaseRate: 2450 },
+  { id: "stk_3", seedId: "seed_3", varietyName: "GG-20", bagWeightKg: 35, availableBags: 0, availableLooseKg: 0, totalWeightKg: 0, totalMan: 0, lastPurchaseRate: 2350 },
+  { id: "stk_4", seedId: "seed_4", varietyName: "GJ-39", bagWeightKg: 35, availableBags: 0, availableLooseKg: 0, totalWeightKg: 0, totalMan: 0, lastPurchaseRate: 7600 },
+  { id: "stk_5", seedId: "seed_5", varietyName: "GW-496", bagWeightKg: 35, availableBags: 0, availableLooseKg: 0, totalWeightKg: 0, totalMan: 0, lastPurchaseRate: 820 }
 ];
 
 // Unified Party Master (Farmers, Traders, Firms, Truck Owners)
-const initialParties = [
-  // ૧. ખેડૂતો (Farmers)
-  {
-    id: "party_f1",
-    partyType: "farmer",
-    code: "KH-001",
-    name: "મનસુખભાઈ કાનજીભાઈ પટેલ",
-    firmName: "",
-    mobile: "9825123456",
-    village: "વડાલ",
-    taluka: "જૂનાગઢ",
-    openingBalance: 12500, // Dr (લેવાના બાકી)
-    balanceType: "dr",
-    currentBalance: 12500,
-    creditLimit: 50000
-  },
-  {
-    id: "party_f2",
-    partyType: "farmer",
-    code: "KH-002",
-    name: "ભરતભાઈ અરજણભાઈ આહીર",
-    firmName: "",
-    mobile: "9712345678",
-    village: "ગોંડલ (ગુંદાળા)",
-    taluka: "ગોંડલ",
-    openingBalance: 0,
-    balanceType: "dr",
-    currentBalance: 0,
-    creditLimit: 40000
-  },
-  {
-    id: "party_f3",
-    partyType: "farmer",
-    code: "KH-003",
-    name: "પ્રવીણભાઈ વાળા (ખેડૂત/ડીલર)",
-    firmName: "",
-    mobile: "9909012345",
-    village: "ધારી",
-    taluka: "અમરેલી",
-    openingBalance: 34000,
-    balanceType: "dr",
-    currentBalance: 34000,
-    creditLimit: 100000
-  },
-  {
-    id: "party_f4",
-    partyType: "farmer",
-    code: "KH-004",
-    name: "હસમુખભાઈ રવજીભાઈ ચોવટિયા",
-    firmName: "",
-    mobile: "9898124578",
-    village: "વિસાવદર",
-    taluka: "વિસાવદર",
-    openingBalance: 0,
-    balanceType: "dr",
-    currentBalance: 0,
-    creditLimit: 75000
-  },
-
-  // ૨. પેઢીઓ (Firms / Pethis)
-  {
-    id: "firm_1",
-    partyType: "firm",
-    code: "FIRM-01",
-    name: "શ્રી ગણેશ ટ્રેડિંગ કંપની",
-    firmName: "શ્રી ગણેશ ટ્રેડિંગ કંપની",
-    mobile: "9426012345",
-    village: "રાજકોટ માર્કેટિંગ યાર્ડ",
-    taluka: "રાજકોટ",
-    openingBalance: 85000, // Cr (આપવાના બાકી)
-    balanceType: "cr",
-    currentBalance: 85000
-  },
-  {
-    id: "firm_2",
-    partyType: "firm",
-    code: "FIRM-02",
-    name: "જય સરદાર એન્ટરપ્રાઇઝ",
-    firmName: "જય સરદાર એન્ટરપ્રાઇઝ",
-    mobile: "9824054321",
-    village: "ગોંડલ માર્કેટ યાર્ડ",
-    taluka: "ગોંડલ",
-    openingBalance: 42000,
-    balanceType: "cr",
-    currentBalance: 42000
-  },
-  {
-    id: "firm_3",
-    partyType: "firm",
-    code: "FIRM-03",
-    name: "ઉમિયા એગ્રો એજન્સી",
-    firmName: "ઉમિયા એગ્રો એજન્સી",
-    mobile: "9824411223",
-    village: "જૂનાગઢ માર્કેટ યાર્ડ",
-    taluka: "જૂનાગઢ",
-    openingBalance: 25000,
-    balanceType: "cr",
-    currentBalance: 25000
-  },
-
-  // ૩. વેપારીઓ (Traders - Linked to Firms for auto-filter)
-  {
-    id: "trader_1",
-    partyType: "trader",
-    code: "TRD-01",
-    name: "રાજુભાઈ પટેલ (દલાલ/વેપારી)",
-    firmId: "firm_1",
-    firmName: "શ્રી ગણેશ ટ્રેડિંગ કંપની",
-    mobile: "9879011223",
-    village: "રાજકોટ",
-    taluka: "રાજકોટ",
-    openingBalance: 0,
-    balanceType: "cr",
-    currentBalance: 0
-  },
-  {
-    id: "trader_2",
-    partyType: "trader",
-    code: "TRD-02",
-    name: "વિપુલભાઈ શાહ (બ્રોકર)",
-    firmId: "firm_1",
-    firmName: "શ્રી ગણેશ ટ્રેડિંગ કંપની",
-    mobile: "9825599887",
-    village: "રાજકોટ",
-    taluka: "રાજકોટ",
-    openingBalance: 0,
-    balanceType: "cr",
-    currentBalance: 0
-  },
-  {
-    id: "trader_3",
-    partyType: "trader",
-    code: "TRD-03",
-    name: "અલ્પેશભાઈ ચોવટિયા",
-    firmId: "firm_2",
-    firmName: "જય સરદાર એન્ટરપ્રાઇઝ",
-    mobile: "9428877665",
-    village: "ગોંડલ",
-    taluka: "ગોંડલ",
-    openingBalance: 0,
-    balanceType: "cr",
-    currentBalance: 0
-  },
-  {
-    id: "trader_4",
-    partyType: "trader",
-    code: "TRD-04",
-    name: "દિનેશભાઈ દોંગા",
-    firmId: "firm_3",
-    firmName: "ઉમિયા એગ્રો એજન્સી",
-    mobile: "9824133445",
-    village: "જૂનાગઢ",
-    taluka: "જૂનાગઢ",
-    openingBalance: 0,
-    balanceType: "cr",
-    currentBalance: 0
-  },
-
-  // ૪. ટ્રક માલિકો (Truck Owners)
-  {
-    id: "truck_1",
-    partyType: "truck_owner",
-    code: "TRK-01",
-    name: "જય ખોડિયાર ટ્રાન્સપોર્ટ (કાળુભાઈ)",
-    firmName: "",
-    mobile: "9825000111",
-    village: "ગોંડલ",
-    truckNo: "GJ-11-X-4589",
-    openingBalance: 0,
-    balanceType: "cr",
-    currentBalance: 0
-  },
-  {
-    id: "truck_2",
-    partyType: "truck_owner",
-    code: "TRK-02",
-    name: "શ્રી રામ રોડવેઝ (વિજયભાઈ)",
-    firmName: "",
-    mobile: "9825000222",
-    village: "રાજકોટ",
-    truckNo: "GJ-03-BW-7812",
-    openingBalance: 0,
-    balanceType: "cr",
-    currentBalance: 0
-  }
-];
+const initialParties = [];
 
 // Initial Sub Users
 const initialSubUsers = [
@@ -368,256 +143,84 @@ const initialSubUsers = [
 ];
 
 // Sample Purchases (Direct Farmer & Market Trader)
-const initialPurchases = [
-  {
-    id: "pur_001",
-    purchaseType: "farmer", // farmer | market
-    billNo: "SN-PUR-2026-0001",
-    purchaseDate: "2026-10-24",
-    partyId: "party_f1",
-    partyName: "મનસુખભાઈ કાનજીભાઈ પટેલ",
-    village: "વડાલ",
-    mobile: "9825123456",
-    truckNo: "",
-    truckOwner: "",
-    items: [
-      {
-        seedId: "seed_1",
-        varietyName: "GJG-22 (ગુજરાત જૂનાગઢ મગફળી)",
-        bags: 20,
-        lastBagKg: 35, // 0 to 35
-        netWeightKg: ((20 - 1) * 35) + 35, // 700 KG
-        totalMan: 700 / 20, // 35 મણ
-        ratePerMan: 2400, // ₹/મણ
-        itemTotal: 35 * 2400 // 84,000
-      }
-    ],
-    itemsSubTotal: 84000,
-    majuriRatePerBag: 10,
-    majuriAmount: 200, // 20 * 10
-    marketCommission: 0,
-    firmCommission: 0,
-    bardanExpense: 0,
-    totalExpenses: 200,
-    netTotal: 84200,
-    paidAmount: 50000,
-    dueAmount: 34200,
-    paymentMode: "bank",
-    remarks: "સીધી ખેડૂત પાસેથી ખરીદી - બેંક ટ્રાન્સફર",
-    createdBy: "Ravi Chaudhary"
-  },
-  {
-    id: "pur_002",
-    purchaseType: "market",
-    billNo: "SN-PUR-2026-0002",
-    purchaseDate: "2026-10-25",
-    firmId: "firm_1",
-    firmName: "શ્રી ગણેશ ટ્રેડિંગ કંપની",
-    traderId: "trader_1",
-    traderName: "રાજુભાઈ પટેલ (દલાલ/વેપારી)",
-    partyId: "firm_1",
-    partyName: "શ્રી ગણેશ ટ્રેડિંગ કંપની (રાજુભાઈ પટેલ)",
-    village: "રાજકોટ માર્કેટિંગ યાર્ડ",
-    mobile: "9879011223",
-    truckNo: "GJ-11-X-4589",
-    truckOwner: "જય ખોડિયાર ટ્રાન્સપોર્ટ",
-    items: [
-      {
-        seedId: "seed_2",
-        varietyName: "GJG-23 (અર્ધવેલડી મગફળી)",
-        bags: 30,
-        lastBagKg: 30, // 29 bags * 35 + 30 = 1045 KG
-        netWeightKg: ((30 - 1) * 35) + 30, // 1045 KG
-        totalMan: 1045 / 20, // 52.25 મણ
-        ratePerMan: 2450,
-        itemTotal: Math.round(52.25 * 2450) // 128,013
-      }
-    ],
-    itemsSubTotal: 128013,
-    marketCommission: 1280,
-    firmCommission: 640,
-    bardanExpense: 900,
-    majuriAmount: 600,
-    totalExpenses: 3420,
-    netTotal: 131433,
-    paidAmount: 100000,
-    dueAmount: 31433,
-    paymentMode: "bank",
-    remarks: "માર્કેટ યાર્ડમાંથી માલ ખરીદ્યો",
-    createdBy: "Ravi Chaudhary"
-  }
-];
+const initialPurchases = [];
 
 // Initial Sales
-const initialSales = [
-  {
-    id: "sale_001",
-    billNo: "SN-BILL-2026-00101",
-    billDate: "2026-10-25",
-    farmerId: "party_f1",
-    farmerName: "મનસુખભાઈ કાનજીભાઈ પટેલ",
-    farmerMobile: "9825123456",
-    farmerVillage: "વડાલ",
-    items: [
-      {
-        seedId: "seed_1",
-        varietyName: "GJG-22 (ગુજરાત જૂનાગઢ મગફળી)",
-        bagWeightKg: 35,
-        bags: 2,
-        looseKg: 10,
-        totalWeightKg: 80, // 2*35 + 10
-        totalMan: 4, // 80 / 20
-        rateUnit: "man",
-        rate: 2800,
-        itemTotal: 4 * 2800 // 11,200
-      }
-    ],
-    subTotal: 11200,
-    majuriAmount: 50,
-    discount: 250,
-    netAmount: 11000,
-    paidAmount: 6000,
-    dueAmount: 5000,
-    paymentMode: "cash_and_credit",
-    createdBy: "Bhargav Chaudhary",
-    createdAt: new Date().toISOString()
-  }
-];
+const initialSales = [];
 
 // Initial Party Ledger Transactions
-const initialPartyTransactions = [
-  {
-    id: "tx_001",
-    date: "2026-10-24",
-    time: "10:30 AM",
-    partyId: "party_f1",
-    partyName: "મનસુખભાઈ કાનજીભાઈ પટેલ",
-    partyType: "farmer",
-    voucherNo: "SN-PUR-2026-0001",
-    voucherType: "purchase",
-    particulars: "બિયારણ ખરીદી (ખેડૂત પાસેથી)",
-    varietyName: "GJG-22",
-    bags: 20,
-    weightKg: 700,
-    totalMan: 35,
-    ratePerMan: 2400,
-    debit: 0,
-    credit: 84200, // જમા (આપવાના)
-    paymentMode: "—",
-    remarks: "૨૦ બેગ ખરીદી",
-    billId: "pur_001"
-  },
-  {
-    id: "tx_002",
-    date: "2026-10-24",
-    time: "11:00 AM",
-    partyId: "party_f1",
-    partyName: "મનસુખભાઈ કાનજીભાઈ પટેલ",
-    partyType: "farmer",
-    voucherNo: "REC-PAY-001",
-    voucherType: "payment",
-    particulars: "રોકડ/બેંક ચુકવણી ખરીદી પેટે",
-    varietyName: "—",
-    bags: 0,
-    weightKg: 0,
-    totalMan: 0,
-    ratePerMan: 0,
-    debit: 50000, // ઉધાર (ખાતેદારના ખાતામાં ડેબિટ / ચૂકવ્યા)
-    credit: 0,
-    paymentMode: "bank",
-    remarks: "NEFT ચુકવણી",
-    billId: "pur_001"
-  },
-  {
-    id: "tx_003",
-    date: "2026-10-25",
-    time: "02:15 PM",
-    partyId: "party_f1",
-    partyName: "મનસુખભાઈ કાનજીભાઈ પટેલ",
-    partyType: "farmer",
-    voucherNo: "SN-BILL-2026-00101",
-    voucherType: "sale",
-    particulars: "બિયારણ વેચાણ બિલ",
-    varietyName: "GJG-22",
-    bags: 2,
-    weightKg: 80,
-    totalMan: 4,
-    ratePerMan: 2800,
-    debit: 11000, // ઉધાર (લેવાના)
-    credit: 6000, // રોકડ જમા
-    paymentMode: "cash",
-    remarks: "૨ બેગ + ૧૦ કિલો વેચાણ",
-    billId: "sale_001"
-  }
-];
+const initialPartyTransactions = [];
 
 // Initial Daily Rojmel (Day Book)
-const initialRojmel = [
-  {
-    id: "roj_001",
-    date: "2026-10-24",
-    time: "10:30 AM",
-    voucherNo: "SN-PUR-2026-0001",
-    voucherType: "purchase",
-    partyName: "મનસુખભાઈ કાનજીભાઈ પટેલ",
-    particulars: "GJG-22 ખરીદી (૨૦ બેગ, ૭૦૦ KG)",
-    varietyName: "GJG-22",
-    bags: 20,
-    weightKg: 700,
-    totalMan: 35,
-    credit: 84200, // ખરીદી ક્રેડિટ
-    debit: 0,
-    account: "purchase",
-    paymentMode: "credit",
-    remarks: "ખેડૂત ખરીદી બિલ"
-  },
-  {
-    id: "roj_002",
-    date: "2026-10-24",
-    time: "11:00 AM",
-    voucherNo: "REC-PAY-001",
-    voucherType: "payment",
-    partyName: "મનસુખભાઈ કાનજીભાઈ પટેલ",
-    particulars: "બેંક ટ્રાન્સફર ચૂકવણી",
-    varietyName: "—",
-    bags: 0,
-    weightKg: 0,
-    totalMan: 0,
-    credit: 0,
-    debit: 50000, // બેંકમાંથી પૈસા ગયા (Debit)
-    account: "bank",
-    paymentMode: "bank",
-    remarks: "HDFC Bank ટ્રાન્સફર"
-  },
-  {
-    id: "roj_003",
-    date: "2026-10-25",
-    time: "02:15 PM",
-    voucherNo: "SN-BILL-2026-00101",
-    voucherType: "sale",
-    partyName: "મનસુખભાઈ કાનજીભાઈ પટેલ",
-    particulars: "GJG-22 વેચાણ (૨ બેગ, ૮૦ KG)",
-    varietyName: "GJG-22",
-    bags: 2,
-    weightKg: 80,
-    totalMan: 4,
-    credit: 6000, // રોકડ આવક (Credit into Cash Book)
-    debit: 0,
-    account: "cash",
-    paymentMode: "cash",
-    remarks: "રોકડ વેચાણ જમા"
+const initialRojmel = [];
+
+// Auto-reset demo localStorage in users' browsers
+const APP_STORAGE_VERSION = 'krushi_clean_tx_keep_khedut_v8_20261025';
+if (typeof window !== 'undefined' && localStorage.getItem('krushi_data_version') !== APP_STORAGE_VERSION) {
+  // 1. KEEP sn_seeds (5 varieties kept)
+  if (!localStorage.getItem('sn_seeds')) {
+    localStorage.setItem('sn_seeds', JSON.stringify(initialSeeds));
   }
-];
+
+  // 2. KEEP sn_parties (All Farmer and party master data kept intact)
+  // Reset currentBalance to openingBalance so deleted purchases/sales leave clean balance
+  try {
+    const savedParties = JSON.parse(localStorage.getItem('sn_parties') || '[]');
+    if (Array.isArray(savedParties) && savedParties.length > 0) {
+      const resetParties = savedParties.map(p => ({
+        ...p,
+        currentBalance: parseFloat(p.openingBalance || 0)
+      }));
+      localStorage.setItem('sn_parties', JSON.stringify(resetParties));
+    }
+  } catch (e) {
+    console.error(e);
+  }
+
+  // 3. DELETE purchases, sales, transactions, rojmel
+  localStorage.removeItem('sn_purchases');
+  localStorage.removeItem('sn_sales');
+  localStorage.removeItem('sn_party_transactions');
+  localStorage.removeItem('sn_rojmel');
+
+  // 4. Reset stock to 0
+  localStorage.setItem('sn_stock', JSON.stringify(initialStock));
+
+  localStorage.setItem('krushi_data_version', APP_STORAGE_VERSION);
+}
 
 export const DataProvider = ({ children }) => {
   const [seeds, setSeeds] = useState(() => {
     const saved = localStorage.getItem('sn_seeds');
-    return saved ? JSON.parse(saved) : initialSeeds;
+    if (!saved) return initialSeeds;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return initialSeeds;
+      return parsed.map(s => ({
+        ...s,
+        varietyName: (s.varietyName || '').replace(/\s*\(.*?\)\s*/g, '').trim() || s.varietyName,
+        bagWeightKg: parseFloat(s.bagWeightKg) || 35,
+        defaultPurchaseRatePerMan: parseFloat(s.defaultPurchaseRatePerMan) || 2400,
+        defaultSaleRatePerMan: parseFloat(s.defaultSaleRatePerMan) || 2800
+      }));
+    } catch {
+      return initialSeeds;
+    }
   });
 
   const [stock, setStock] = useState(() => {
     const saved = localStorage.getItem('sn_stock');
-    return saved ? JSON.parse(saved) : initialStock;
+    if (!saved) return initialStock;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return initialStock;
+      return parsed.map(item => ({
+        ...item,
+        varietyName: (item.varietyName || '').replace(/\s*\(.*?\)\s*/g, '').trim() || item.varietyName
+      }));
+    } catch {
+      return initialStock;
+    }
   });
 
   const [parties, setParties] = useState(() => {
@@ -637,12 +240,24 @@ export const DataProvider = ({ children }) => {
 
   const [partyTransactions, setPartyTransactions] = useState(() => {
     const saved = localStorage.getItem('sn_party_transactions');
-    return saved ? JSON.parse(saved) : initialPartyTransactions;
+    if (!saved) return initialPartyTransactions;
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.filter(tx => tx.voucherNo !== 'REC-562983') : initialPartyTransactions;
+    } catch {
+      return initialPartyTransactions;
+    }
   });
 
   const [rojmel, setRojmel] = useState(() => {
     const saved = localStorage.getItem('sn_rojmel');
-    return saved ? JSON.parse(saved) : initialRojmel;
+    if (!saved) return initialRojmel;
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.filter(r => r.voucherNo !== 'REC-562983') : initialRojmel;
+    } catch {
+      return initialRojmel;
+    }
   });
 
   const [subUsers, setSubUsers] = useState(() => {
@@ -654,7 +269,65 @@ export const DataProvider = ({ children }) => {
   const farmers = parties.filter(p => p.partyType === 'farmer');
   const suppliers = parties.filter(p => p.partyType === 'firm' || p.partyType === 'trader');
 
-  // Local storage synchronization
+  // Database Live Status ('connected' | 'syncing' | 'offline')
+  const [dbStatus, setDbStatus] = useState('syncing');
+
+  const loadFromBackend = async (silent = false) => {
+    try {
+      if (!silent) setDbStatus('syncing');
+      const res = await fetch('/api/initial-data');
+      if (!res.ok) throw new Error('API fetch error: ' + res.status);
+      const json = await res.json();
+      if (json.success && json.data) {
+        const {
+          seeds: apiSeeds,
+          parties: apiParties,
+          stock: apiStock,
+          purchases: apiPurchases,
+          sales: apiSales,
+          partyTransactions: apiTransactions,
+          rojmel: apiRojmel
+        } = json.data;
+
+        if (Array.isArray(apiSeeds) && apiSeeds.length > 0) setSeeds(apiSeeds);
+        if (Array.isArray(apiParties)) setParties(apiParties);
+        if (Array.isArray(apiStock) && apiStock.length > 0) setStock(apiStock);
+        if (Array.isArray(apiPurchases)) setPurchases(apiPurchases);
+        if (Array.isArray(apiSales)) setSales(apiSales);
+        if (Array.isArray(apiTransactions)) setPartyTransactions(apiTransactions);
+        if (Array.isArray(apiRojmel)) setRojmel(apiRojmel);
+
+        setDbStatus('connected');
+      }
+    } catch (err) {
+      console.warn('Backend PostgreSQL sync error:', err.message);
+      setDbStatus('offline');
+    }
+  };
+
+  useEffect(() => {
+    loadFromBackend();
+
+    // Auto-sync from PostgreSQL every 4 seconds so all phones & browsers see live data
+    const interval = setInterval(() => {
+      loadFromBackend(true);
+    }, 4000);
+
+    const onFocus = () => loadFromBackend(true);
+    window.addEventListener('focus', onFocus);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') loadFromBackend(true);
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
+
+  // Local storage synchronization (fast cache)
   useEffect(() => {
     localStorage.setItem('sn_seeds', JSON.stringify(seeds));
     localStorage.setItem('sn_stock', JSON.stringify(stock));
@@ -674,8 +347,8 @@ export const DataProvider = ({ children }) => {
                    partyData.partyType === 'truck_owner' ? 'TRK' : 'PTY';
     const count = parties.filter(p => p.partyType === partyData.partyType).length + 1;
     const newParty = {
-      id: "pty_" + Date.now(),
-      code: `${prefix}-${count.toString().padStart(3, '0')}`,
+      id: partyData.id || ("pty_" + Date.now()),
+      code: partyData.code || `${prefix}-${count.toString().padStart(3, '0')}`,
       openingBalance: parseFloat(partyData.openingBalance || 0),
       currentBalance: parseFloat(partyData.openingBalance || 0),
       balanceType: partyData.balanceType || (partyData.partyType === 'farmer' ? 'dr' : 'cr'),
@@ -684,11 +357,32 @@ export const DataProvider = ({ children }) => {
     };
 
     setParties(prev => [newParty, ...prev]);
+
+    // Send to PostgreSQL Backend
+    fetch('/api/parties', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newParty)
+    }).then(res => res.json()).then(res => {
+      if (res.success) loadFromBackend(true);
+    }).catch(err => console.error('Error saving party to PostgreSQL:', err));
+
     return newParty;
   };
 
   const updateParty = (id, updatedData) => {
     setParties(prev => prev.map(p => p.id === id ? { ...p, ...updatedData } : p));
+    const target = parties.find(p => p.id === id);
+    if (target) {
+      const merged = { ...target, ...updatedData };
+      fetch('/api/parties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(merged)
+      }).then(res => res.json()).then(res => {
+        if (res.success) loadFromBackend(true);
+      }).catch(err => console.error('Error updating party in PostgreSQL:', err));
+    }
   };
 
   // Backward-compatible wrappers for old farmer / supplier calls
@@ -699,7 +393,7 @@ export const DataProvider = ({ children }) => {
   // ૨. બિયારણ જાત ઉમેરવી
   const addSeedProduct = (seedData) => {
     const newSeed = {
-      id: "seed_" + Date.now(),
+      id: seedData.id || ("seed_" + Date.now()),
       bagWeightKg: BAG_STD_KG, // 35 KG standard
       defaultSaleRatePerMan: parseFloat(seedData.defaultSaleRatePerMan || 0),
       defaultPurchaseRatePerMan: parseFloat(seedData.defaultPurchaseRatePerMan || 0),
@@ -707,6 +401,15 @@ export const DataProvider = ({ children }) => {
       ...seedData
     };
     setSeeds(prev => [...prev, newSeed]);
+
+    fetch('/api/seeds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSeed)
+    }).then(res => res.json()).then(res => {
+      if (res.success) loadFromBackend(true);
+    }).catch(err => console.error('Error saving seed to PostgreSQL:', err));
+
     return newSeed;
   };
 
@@ -861,6 +564,15 @@ export const DataProvider = ({ children }) => {
     setPartyTransactions(prev => [...newTxList, ...prev]);
     setRojmel(prev => [rojmelEntry, ...prev]);
 
+    // Send to PostgreSQL Backend
+    fetch('/api/purchases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(purchaseRecord)
+    }).then(res => res.json()).then(res => {
+      if (res.success) loadFromBackend(true);
+    }).catch(err => console.error('Error saving purchase to PostgreSQL:', err));
+
     return purchaseRecord;
   };
 
@@ -964,6 +676,15 @@ export const DataProvider = ({ children }) => {
     setPartyTransactions(prev => [saleLedgerEntry, ...prev]);
     setRojmel(prev => [rojmelEntry, ...prev]);
 
+    // Send to PostgreSQL Backend
+    fetch('/api/sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(saleRecord)
+    }).then(res => res.json()).then(res => {
+      if (res.success) loadFromBackend(true);
+    }).catch(err => console.error('Error saving sale to PostgreSQL:', err));
+
     return saleRecord;
   };
 
@@ -997,10 +718,17 @@ export const DataProvider = ({ children }) => {
       setParties(prev => prev.map(p => {
         if (p.id === voucherData.partyId) {
           let updatedBal = p.currentBalance || 0;
+          const isFarmer = p.partyType === 'farmer';
           if (isReceipt) {
-            updatedBal = Math.max(0, updatedBal - amount);
+            // જમા: ખેડૂત ચૂકવે તો લેણું ઘટે
+            updatedBal = updatedBal - amount;
           } else if (isPayment) {
-            updatedBal = Math.max(0, updatedBal - amount);
+            // ઉધાર: ખેડૂતને ચૂકવીએ તો લેણું વધે, પેઢીને ચૂકવીએ તો દેવું ઘટે
+            if (isFarmer) {
+              updatedBal = updatedBal + amount;
+            } else {
+              updatedBal = updatedBal - amount;
+            }
           }
           return { ...p, currentBalance: updatedBal };
         }
@@ -1052,19 +780,69 @@ export const DataProvider = ({ children }) => {
     };
     setRojmel(prev => [rojEntry, ...prev]);
 
+    // Send to PostgreSQL Backend
+    fetch('/api/vouchers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(vRecord)
+    }).then(res => res.json()).then(res => {
+      if (res.success) loadFromBackend(true);
+    }).catch(err => console.error('Error saving voucher to PostgreSQL:', err));
+
     return vRecord;
   };
 
   // Backward compatibility alias for payments
   const recordPayment = (paymentData) => {
     return recordVoucher({
-      type: 'receipt',
+      type: paymentData.type || 'receipt',
       partyId: paymentData.partyId,
       partyName: paymentData.partyName,
       amount: paymentData.amount,
       paymentMode: paymentData.paymentMode,
+      referenceNo: paymentData.referenceNo,
       remarks: paymentData.remarks
     });
+  };
+
+  // ૬. વાઉચર / રસીદ / પેમેન્ટ ડિલીટ કરવું (Delete Voucher)
+  const deleteVoucher = (voucherNo, txId) => {
+    const targetTx = partyTransactions.find(tx => (voucherNo && tx.voucherNo === voucherNo) || (txId && tx.id === txId));
+    if (targetTx && targetTx.partyId) {
+      const amount = parseFloat(targetTx.credit || targetTx.debit || 0);
+      const isReceipt = targetTx.voucherType === 'receipt';
+      const isPayment = targetTx.voucherType === 'payment';
+
+      setParties(prev => prev.map(p => {
+        if (p.id === targetTx.partyId) {
+          let updatedBal = p.currentBalance || 0;
+          const isFarmer = p.partyType === 'farmer';
+          if (isReceipt) {
+            updatedBal = updatedBal + amount;
+          } else if (isPayment) {
+            if (isFarmer) {
+              updatedBal = updatedBal - amount;
+            } else {
+              updatedBal = updatedBal + amount;
+            }
+          }
+          return { ...p, currentBalance: updatedBal };
+        }
+        return p;
+      }));
+    }
+
+    setPartyTransactions(prev => prev.filter(tx => (voucherNo ? tx.voucherNo !== voucherNo : true) && (txId ? tx.id !== txId : true)));
+    setRojmel(prev => prev.filter(r => voucherNo ? r.voucherNo !== voucherNo : true));
+
+    // Send to PostgreSQL Backend
+    if (voucherNo) {
+      fetch(`/api/vouchers/${encodeURIComponent(voucherNo)}`, {
+        method: 'DELETE'
+      }).then(res => res.json()).then(res => {
+        if (res.success) loadFromBackend(true);
+      }).catch(err => console.error('Error deleting voucher from PostgreSQL:', err));
+    }
   };
 
   // ૬. સ્ટોક સુધારો (Manual Stock Adjustment)
@@ -1085,6 +863,15 @@ export const DataProvider = ({ children }) => {
       }
       return s;
     }));
+
+    // Send to PostgreSQL Backend
+    fetch('/api/stock/adjust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stockId, bagDiff, kgDiff, reason })
+    }).then(res => res.json()).then(res => {
+      if (res.success) loadFromBackend(true);
+    }).catch(err => console.error('Error adjusting stock in PostgreSQL:', err));
   };
 
   // ૭. સબ-યુઝર સંચાલન (Admin only)
@@ -1103,6 +890,23 @@ export const DataProvider = ({ children }) => {
     setSubUsers(prev => prev.map(u => u.uid === uid ? { ...u, permissions } : u));
   };
 
+  const eraseAllData = () => {
+    setSeeds([]);
+    setStock([]);
+    setParties([]);
+    setPurchases([]);
+    setSales([]);
+    setPartyTransactions([]);
+    setRojmel([]);
+    localStorage.removeItem('sn_seeds');
+    localStorage.removeItem('sn_stock');
+    localStorage.removeItem('sn_parties');
+    localStorage.removeItem('sn_purchases');
+    localStorage.removeItem('sn_sales');
+    localStorage.removeItem('sn_party_transactions');
+    localStorage.removeItem('sn_rojmel');
+  };
+
   return (
     <DataContext.Provider value={{
       companyName: "SHREE NANDINI SEEDS",
@@ -1118,6 +922,8 @@ export const DataProvider = ({ children }) => {
       partyTransactions,
       rojmel,
       subUsers,
+      dbStatus,
+      refreshData: () => loadFromBackend(false),
       addParty,
       updateParty,
       addFarmer,
@@ -1128,9 +934,11 @@ export const DataProvider = ({ children }) => {
       recordSale,
       recordVoucher,
       recordPayment,
+      deleteVoucher,
       adjustStock,
       createSubUser,
-      updateSubUserPermissions
+      updateSubUserPermissions,
+      eraseAllData
     }}>
       {children}
     </DataContext.Provider>

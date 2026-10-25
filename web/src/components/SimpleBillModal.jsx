@@ -92,7 +92,7 @@ export const SimpleBillModal = ({ sale, onClose }) => {
           </div>
 
           {/* Bill & Customer Metadata */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.9rem', marginBottom: '1.25rem', backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div className="bill-meta-grid" style={{ fontSize: '0.9rem', marginBottom: '1.25rem', backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
             <div>
               <div><strong>બિલ નં:</strong> {sale.billNo}</div>
               <div><strong>તારીખ:</strong> {sale.billDate}</div>

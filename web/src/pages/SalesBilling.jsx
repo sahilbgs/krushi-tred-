@@ -368,7 +368,7 @@ export const SalesBilling = ({ onBillCreated }) => {
                     <option value="">જાત પસંદ કરો</option>
                     {seeds.map(s => (
                       <option key={s.id} value={s.id}>
-                        {s.varietyName} {s.cropType ? `(${s.cropType})` : ''}
+                        {s.varietyName}
                       </option>
                     ))}
                   </select>

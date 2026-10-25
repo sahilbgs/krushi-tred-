@@ -552,7 +552,7 @@ export const DataProvider = ({ children }) => {
       bags: purchaseData.items.reduce((sum, it) => sum + parseInt(it.bags || 0), 0),
       weightKg: purchaseData.items.reduce((sum, it) => sum + parseFloat(it.netWeightKg || 0), 0),
       totalMan: purchaseData.items.reduce((sum, it) => sum + parseFloat(it.totalMan || 0), 0),
-      credit: paidAmount > 0 ? 0 : 0,
+      credit: paidAmount > 0 ? 0 : netTotal,
       debit: paidAmount > 0 ? paidAmount : 0, // જો રોકડ/બેંક ચુકવાયા હોય તો બુકમાંથી Debit
       account: purchaseData.paymentMode === 'cash' ? 'cash' : 'bank',
       paymentMode: purchaseData.paymentMode,
@@ -654,7 +654,7 @@ export const DataProvider = ({ children }) => {
       bags: saleData.items.reduce((s, it) => s + parseInt(it.bags || 0), 0),
       weightKg: saleData.items.reduce((s, it) => s + parseFloat(it.totalWeightKg || 0), 0),
       totalMan: saleData.items.reduce((s, it) => s + parseFloat(it.totalMan || (it.totalWeightKg / MAN_STD_KG)), 0),
-      credit: paidAmount, // રોકડ/બેંકમાં રકમ આવી (Credit into Cash/Bank book)
+      credit: paidAmount > 0 ? paidAmount : netAmount, // આવક
       debit: 0,
       account: saleData.paymentMode === 'cash' ? 'cash' : 'bank',
       paymentMode: saleData.paymentMode,

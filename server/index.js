@@ -35,12 +35,12 @@ app.get('/api/initial-data', async (req, res) => {
       pool.query(`SELECT id, variety_name AS "varietyName", crop_type AS "cropType", company, bag_weight_kg AS "bagWeightKg", default_purchase_rate_per_man AS "defaultPurchaseRatePerMan", default_sale_rate_per_man AS "defaultSaleRatePerMan", default_sale_rate_per_bag AS "defaultSaleRatePerBag", default_sale_rate_per_kg AS "defaultSaleRatePerKg", min_stock_alert_bags AS "minStockAlertBags" FROM seed_varieties WHERE is_active = true ORDER BY created_at ASC`),
       pool.query(`SELECT id, party_type AS "partyType", code, name, firm_name AS "firmName", mobile, village, taluka, opening_balance AS "openingBalance", balance_type AS "balanceType", current_balance AS "currentBalance", credit_limit AS "creditLimit" FROM parties WHERE is_active = true ORDER BY name ASC`),
       pool.query(`SELECT id, seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", available_bags AS "availableBags", available_loose_kg AS "availableLooseKg", total_weight_kg AS "totalWeightKg", total_man AS "totalMan", last_purchase_rate AS "lastPurchaseRate" FROM stock_ledger ORDER BY variety_name ASC`),
-      pool.query(`SELECT id, bill_no AS "billNo", purchase_date AS "purchaseDate", purchase_type AS "purchaseType", party_id AS "partyId", party_name AS "partyName", firm_name AS "firmName", village, mobile, truck_no AS "truckNo", items_sub_total AS "itemsSubTotal", majuri_amount AS "majuriAmount", market_commission AS "marketCommission", firm_commission AS "firmCommission", total_expenses AS "totalExpenses", net_total AS "netTotal", paid_amount AS "paidAmount", due_amount AS "dueAmount", payment_mode AS "paymentMode", remarks, created_by AS "createdBy", created_at AS "createdAt" FROM purchases ORDER BY purchase_date DESC, created_at DESC LIMIT 100`),
+      pool.query(`SELECT id, bill_no AS "billNo", TO_CHAR(purchase_date, 'YYYY-MM-DD') AS "purchaseDate", purchase_type AS "purchaseType", party_id AS "partyId", party_name AS "partyName", firm_name AS "firmName", village, mobile, truck_no AS "truckNo", items_sub_total AS "itemsSubTotal", majuri_amount AS "majuriAmount", market_commission AS "marketCommission", firm_commission AS "firmCommission", total_expenses AS "totalExpenses", net_total AS "netTotal", paid_amount AS "paidAmount", due_amount AS "dueAmount", payment_mode AS "paymentMode", remarks, created_by AS "createdBy", created_at AS "createdAt" FROM purchases ORDER BY purchase_date DESC, created_at DESC LIMIT 100`),
       pool.query(`SELECT id, purchase_id AS "purchaseId", seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", bags, last_bag_kg AS "lastBagKg", net_weight_kg AS "netWeightKg", total_man AS "totalMan", rate_per_man AS "ratePerMan", rate_per_kg AS "ratePerKg", item_total AS "itemTotal" FROM purchase_items`),
-      pool.query(`SELECT id, bill_no AS "billNo", bill_date AS "billDate", party_id AS "partyId", farmer_name AS "farmerName", farmer_mobile AS "farmerMobile", farmer_village AS "farmerVillage", sub_total AS "subTotal", majuri_amount AS "majuriAmount", discount, net_amount AS "netAmount", paid_amount AS "paidAmount", due_amount AS "dueAmount", payment_mode AS "paymentMode", remarks, created_by AS "createdBy", created_at AS "createdAt" FROM sales ORDER BY bill_date DESC, created_at DESC LIMIT 100`),
+      pool.query(`SELECT id, bill_no AS "billNo", TO_CHAR(bill_date, 'YYYY-MM-DD') AS "billDate", party_id AS "partyId", farmer_name AS "farmerName", farmer_mobile AS "farmerMobile", farmer_village AS "farmerVillage", sub_total AS "subTotal", majuri_amount AS "majuriAmount", discount, net_amount AS "netAmount", paid_amount AS "paidAmount", due_amount AS "dueAmount", payment_mode AS "paymentMode", remarks, created_by AS "createdBy", created_at AS "createdAt" FROM sales ORDER BY bill_date DESC, created_at DESC LIMIT 100`),
       pool.query(`SELECT id, sale_id AS "saleId", seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", bags, loose_kg AS "looseKg", total_weight_kg AS "totalWeightKg", total_man AS "totalMan", rate_unit AS "rateUnit", rate, item_total AS "itemTotal" FROM sale_items`),
-      pool.query(`SELECT id, date, time, party_id AS "partyId", party_name AS "partyName", party_type AS "partyType", voucher_no AS "voucherNo", voucher_type AS "voucherType", particulars, variety_name AS "varietyName", bags, weight_kg AS "weightKg", total_man AS "totalMan", rate_per_man AS "ratePerMan", debit, credit, running_balance AS "runningBalance", payment_mode AS "paymentMode", remarks, bill_id AS "billId" FROM party_transactions ORDER BY date DESC, created_at DESC LIMIT 200`),
-      pool.query(`SELECT id, date, time, voucher_no AS "voucherNo", voucher_type AS "voucherType", party_name AS "partyName", particulars, variety_name AS "varietyName", bags, weight_kg AS "weightKg", total_man AS "totalMan", account, debit, credit, payment_mode AS "paymentMode", remarks FROM rojmel ORDER BY date DESC, created_at DESC LIMIT 200`)
+      pool.query(`SELECT id, TO_CHAR(date, 'YYYY-MM-DD') AS date, time, party_id AS "partyId", party_name AS "partyName", party_type AS "partyType", voucher_no AS "voucherNo", voucher_type AS "voucherType", particulars, variety_name AS "varietyName", bags, weight_kg AS "weightKg", total_man AS "totalMan", rate_per_man AS "ratePerMan", debit, credit, running_balance AS "runningBalance", payment_mode AS "paymentMode", remarks, bill_id AS "billId" FROM party_transactions ORDER BY date DESC, created_at DESC LIMIT 200`),
+      pool.query(`SELECT id, TO_CHAR(date, 'YYYY-MM-DD') AS date, time, voucher_no AS "voucherNo", voucher_type AS "voucherType", party_name AS "partyName", particulars, variety_name AS "varietyName", bags, weight_kg AS "weightKg", total_man AS "totalMan", account, debit, credit, payment_mode AS "paymentMode", remarks FROM rojmel ORDER BY date DESC, created_at DESC LIMIT 200`)
     ]);
 
     const purchasesWithItems = purchasesRes.rows.map(p => ({
@@ -382,6 +382,8 @@ app.post('/api/purchases', async (req, res) => {
     const purBags = purchaseData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0;
     const purKg = purchaseData.items?.reduce((s, it) => s + parseFloat(it.netWeightKg || 0), 0) || 0;
     const purMan = purchaseData.items?.reduce((s, it) => s + parseFloat(it.totalMan || (purKg / 20)), 0) || 0;
+    const purNetTotal = parseFloat(purchaseData.netTotal || 0);
+    const purPaid = parseFloat(purchaseData.paidAmount || 0);
 
     await client.query(
       `INSERT INTO rojmel (
@@ -400,9 +402,9 @@ app.post('/api/purchases', async (req, res) => {
         purKg,
         purMan,
         'purchase',
-        parseFloat(purchaseData.paidAmount || 0),
-        0,
-        purchaseData.paymentMode || 'credit'
+        purPaid > 0 ? purPaid : 0,
+        purPaid > 0 ? 0 : purNetTotal,
+        normalizedMode
       ]
     );
 
@@ -573,6 +575,8 @@ app.post('/api/sales', async (req, res) => {
     const rojBags = saleData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0;
     const rojKg = saleData.items?.reduce((s, it) => s + parseFloat(it.totalWeightKg || 0), 0) || 0;
     const rojMan = saleData.items?.reduce((s, it) => s + parseFloat(it.totalMan || (rojKg / 20)), 0) || 0;
+    const saleNetTotal = parseFloat(saleData.netAmount || 0);
+    const salePaidAmount = parseFloat(saleData.paidAmount || 0);
 
     await client.query(
       `INSERT INTO rojmel (
@@ -592,8 +596,8 @@ app.post('/api/sales', async (req, res) => {
         rojMan,
         'sale',
         0,
-        parseFloat(saleData.paidAmount || 0),
-        saleData.paymentMode || 'cash'
+        salePaidAmount > 0 ? salePaidAmount : saleNetTotal,
+        normalizedSaleMode
       ]
     );
 

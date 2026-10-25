@@ -100,8 +100,9 @@ export const KhataBook = () => {
     if (!selectedParty) return [];
     return partyTransactions.filter(tx => {
       if (tx.partyId !== selectedParty.id) return false;
-      if (startDate && tx.date < startDate) return false;
-      if (endDate && tx.date > endDate) return false;
+      const txDate = (tx.date || '').slice(0, 10);
+      if (startDate && txDate < startDate) return false;
+      if (endDate && txDate > endDate) return false;
       if (voucherTypeFilter !== 'all' && tx.voucherType !== voucherTypeFilter) return false;
       if (varietyFilter !== 'all' && !tx.varietyName.includes(varietyFilter)) return false;
       return true;
@@ -144,8 +145,10 @@ export const KhataBook = () => {
 
   // Daily Rojmel Transactions
   const filteredRojmel = useMemo(() => {
-    return rojmel.filter(r => r.date === rojmelDate)
-                 .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    return rojmel.filter(r => {
+      const rDate = (r.date || '').slice(0, 10);
+      return rDate === rojmelDate;
+    }).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   }, [rojmel, rojmelDate]);
 
   const rojmelTotalCredit = filteredRojmel.reduce((s, r) => s + (parseFloat(r.credit) || 0), 0);

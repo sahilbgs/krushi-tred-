@@ -8,7 +8,10 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, '../.env.database') });
 
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+// Return PostgreSQL DATE (OID 1082) directly as clean 'YYYY-MM-DD' string
+types.setTypeParser(1082, (val) => val);
 
 export const pool = new Pool({
   host: process.env.DB_HOST || '127.0.0.1',

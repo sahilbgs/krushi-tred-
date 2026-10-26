@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
 export const Dashboard = ({ setActiveTab, onOpenBill }) => {
-  const { sales, purchases, stock, farmers, seeds } = useData();
+  const { sales, purchases, stock, farmers, seeds, deleteSale } = useData();
   const { hasPermission } = useAuth();
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -144,13 +144,25 @@ export const Dashboard = ({ setActiveTab, onOpenBill }) => {
                     <td style={{ color: (sale.dueAmount || 0) > 0 ? '#dc2626' : '#64748b', fontWeight: (sale.dueAmount || 0) > 0 ? '700' : 'normal' }}>
                       ₹{(sale.dueAmount || 0).toLocaleString('en-IN')}
                     </td>
-                    <td>
+                    <td style={{ display: 'flex', gap: '6px' }}>
                       <button 
                         type="button"
                         className="secondary" 
                         style={{ padding: '4px 8px', fontSize: '0.8rem' }}
                         onClick={() => onOpenBill(sale)}>
                         બિલ
+                      </button>
+                      <button 
+                        type="button"
+                        className="secondary" 
+                        style={{ padding: '4px 8px', fontSize: '0.8rem', color: '#dc2626', borderColor: '#fca5a5' }}
+                        title="વેચાણ બિલ ડિલીટ કરો"
+                        onClick={async () => {
+                          if (window.confirm(`શું તમે વેચાણ બિલ "${sale.billNo}" (${sale.farmerName}) રદ/ડીલીટ કરવા માંગો છો? આનાથી સ્ટોક અને ખાતા બેલેન્સ રિવર્સ થશે.`)) {
+                            await deleteSale(sale.billNo);
+                          }
+                        }}>
+                        🗑️
                       </button>
                     </td>
                   </tr>

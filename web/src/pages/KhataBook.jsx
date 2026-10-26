@@ -104,7 +104,7 @@ export const KhataBook = () => {
       if (startDate && txDate < startDate) return false;
       if (endDate && txDate > endDate) return false;
       if (voucherTypeFilter !== 'all' && tx.voucherType !== voucherTypeFilter) return false;
-      if (varietyFilter !== 'all' && !tx.varietyName.includes(varietyFilter)) return false;
+      if (varietyFilter !== 'all' && !(tx.varietyName || '').includes(varietyFilter)) return false;
       return true;
     }).sort((a, b) => new Date(a.date) - new Date(b.date)); // chronological order for ledger
   }, [partyTransactions, selectedParty, startDate, endDate, voucherTypeFilter, varietyFilter]);
@@ -155,33 +155,37 @@ export const KhataBook = () => {
   const rojmelTotalDebit = filteredRojmel.reduce((s, r) => s + (parseFloat(r.debit) || 0), 0);
 
   // Handle Voucher Save
-  const handleSaveVoucher = (e) => {
+  const handleSaveVoucher = async (e) => {
     e.preventDefault();
     if (!voucherForm.amount || parseFloat(voucherForm.amount) <= 0) return;
 
-    recordVoucher({
-      type: voucherType,
-      partyId: selectedParty.id,
-      partyName: selectedParty.name,
-      amount: parseFloat(voucherForm.amount),
-      paymentMode: voucherForm.paymentMode,
-      remarks: voucherForm.remarks || (voucherType === 'receipt' ? 'રોકડ/બેંક રકમ જમા' : 'ચુકવણી વાઉચર'),
-      varietyName: voucherForm.varietyName || '—',
-      bags: parseInt(voucherForm.bags || 0),
-      weightKg: parseFloat(voucherForm.weightKg || 0),
-      ratePerMan: parseFloat(voucherForm.ratePerMan || 0)
-    });
+    try {
+      await recordVoucher({
+        type: voucherType,
+        partyId: selectedParty.id,
+        partyName: selectedParty.name,
+        amount: parseFloat(voucherForm.amount),
+        paymentMode: voucherForm.paymentMode,
+        remarks: voucherForm.remarks || (voucherType === 'receipt' ? 'રોકડ/બેંક રકમ જમા' : 'ચુકવણી વાઉચર (ઉધાર)'),
+        varietyName: voucherForm.varietyName || '—',
+        bags: parseInt(voucherForm.bags || 0),
+        weightKg: parseFloat(voucherForm.weightKg || 0),
+        ratePerMan: parseFloat(voucherForm.ratePerMan || 0)
+      });
 
-    setShowVoucherModal(false);
-    setVoucherForm({
-      amount: '',
-      paymentMode: 'cash',
-      remarks: '',
-      varietyName: '',
-      bags: '',
-      weightKg: '',
-      ratePerMan: ''
-    });
+      setShowVoucherModal(false);
+      setVoucherForm({
+        amount: '',
+        paymentMode: 'cash',
+        remarks: '',
+        varietyName: '',
+        bags: '',
+        weightKg: '',
+        ratePerMan: ''
+      });
+    } catch (err) {
+      alert('વાઉચર સાચવવામાં ક્ષતિ આવી: ' + (err.message || 'Error'));
+    }
   };
 
   // Quick Party Save
@@ -393,8 +397,11 @@ export const KhataBook = () => {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem' }}>
                       <span>{p.village || '—'}</span>
-                      <span style={{ fontWeight: '700', color: p.currentBalance > 0 ? (isFarmer ? '#dc2626' : '#ea580c') : '#16a34a' }}>
-                        ₹{(p.currentBalance || 0).toLocaleString('en-IN')} {p.balanceType?.toUpperCase() || ''}
+                      <span style={{
+                        fontWeight: '700',
+                        color: (p.currentBalance || 0) === 0 ? '#16a34a' : (p.balanceType === 'cr' ? '#2563eb' : '#dc2626')
+                      }}>
+                        ₹{(p.currentBalance || 0).toLocaleString('en-IN')} {p.balanceType ? p.balanceType.toUpperCase() : ''}
                       </span>
                     </div>
                   </div>
@@ -448,10 +455,14 @@ export const KhataBook = () => {
                       <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>
                         ચોખ્ખું બાકી બેલેન્સ
                       </div>
-                      <div style={{ fontSize: '1.35rem', fontWeight: '900', color: (selectedParty.currentBalance || 0) > 0 ? '#b91c1c' : '#15803d' }}>
+                      <div style={{
+                        fontSize: '1.35rem',
+                        fontWeight: '900',
+                        color: (selectedParty.currentBalance || 0) === 0 ? '#16a34a' : (selectedParty.balanceType === 'cr' ? '#2563eb' : '#dc2626')
+                      }}>
                         ₹{(selectedParty.currentBalance || 0).toLocaleString('en-IN')}
                         <span style={{ fontSize: '0.85rem', marginLeft: '0.3rem', color: '#64748b' }}>
-                          {selectedParty.balanceType?.toUpperCase() || ''}
+                          {selectedParty.balanceType ? (selectedParty.balanceType.toUpperCase() === 'CR' ? 'CR (જમા - આપવાના)' : 'DR (ઉધાર - લેવાના)') : ''}
                         </span>
                       </div>
                     </div>

@@ -198,7 +198,28 @@ app.post('/api/purchases', async (req, res) => {
 
     const timestamp = new Date();
     const purchaseId = purchaseData.id || ('pur_' + Date.now());
-    const billNumber = purchaseData.billNo || `SN-PUR-${timestamp.getFullYear()}-${Date.now().toString().slice(-4)}`;
+    let billNumber = purchaseData.billNo;
+    if (!billNumber) {
+      billNumber = `SN-PUR-${timestamp.getFullYear()}-${Date.now().toString().slice(-4)}`;
+    }
+
+    // Ensure billNumber is unique in purchases table
+    const checkPurBill = await client.query('SELECT 1 FROM purchases WHERE bill_no = $1', [billNumber]);
+    if (checkPurBill.rows.length > 0) {
+      const maxRes = await client.query(
+        `SELECT bill_no FROM purchases WHERE bill_no LIKE $1 ORDER BY bill_no DESC LIMIT 1`,
+        [`SN-PUR-${timestamp.getFullYear()}-%`]
+      );
+      let nextNum = Date.now().toString().slice(-4);
+      if (maxRes.rows.length > 0) {
+        const m = maxRes.rows[0].bill_no.match(/SN-PUR-\d{4}-(\d+)/);
+        if (m) {
+          nextNum = (parseInt(m[1], 10) + 1).toString().padStart(4, '0');
+        }
+      }
+      billNumber = `SN-PUR-${timestamp.getFullYear()}-${nextNum}`;
+    }
+
     const isFarmer = purchaseData.purchaseType === 'farmer';
 
     // 1. Ensure Party exists in parties table
@@ -213,7 +234,7 @@ app.post('/api/purchases', async (req, res) => {
           [
             finalPartyId,
             isFarmer ? 'farmer' : 'firm',
-            `P-${Date.now().toString().slice(-4)}`,
+            `P-${Date.now().toString(36).toUpperCase()}`,
             purchaseData.partyName || 'ખાતેદાર',
             purchaseData.mobile || null,
             purchaseData.village || null
@@ -228,7 +249,7 @@ app.post('/api/purchases', async (req, res) => {
         [
           finalPartyId,
           isFarmer ? 'farmer' : 'firm',
-          `P-${Date.now().toString().slice(-4)}`,
+          `P-${Date.now().toString(36).toUpperCase()}`,
           purchaseData.partyName.trim(),
           purchaseData.mobile || null,
           purchaseData.village || null
@@ -249,7 +270,13 @@ app.post('/api/purchases', async (req, res) => {
         firm_commission, bardan_expense, total_expenses, net_total, paid_amount,
         due_amount, payment_mode, remarks, created_by
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
-      ON CONFLICT (bill_no) DO NOTHING`,
+      ON CONFLICT (id) DO UPDATE SET
+        bill_no = EXCLUDED.bill_no,
+        purchase_date = EXCLUDED.purchase_date,
+        party_id = EXCLUDED.party_id,
+        party_name = EXCLUDED.party_name,
+        net_total = EXCLUDED.net_total,
+        due_amount = EXCLUDED.due_amount`,
       [
         purchaseId,
         isFarmer ? 'farmer' : 'market',
@@ -338,13 +365,13 @@ app.post('/api/purchases', async (req, res) => {
     const dueAmount = parseFloat(purchaseData.dueAmount || 0);
     if (purchaseData.partyId && dueAmount > 0) {
       await client.query(
-        `UPDATE parties SET current_balance = current_balance + $1 WHERE id = $2`,
+        `UPDATE parties SET current_balance = current_balance + $1, balance_type = 'cr' WHERE id = $2`,
         [dueAmount, purchaseData.partyId]
       );
     }
 
     // 4. Insert Party Ledger Transaction
-    if (purchaseData.partyId) {
+    if (finalPartyId) {
       const totalBags = purchaseData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0;
       const totalKg = purchaseData.items?.reduce((s, it) => s + parseFloat(it.netWeightKg || 0), 0) || 0;
       const totalMan = purchaseData.items?.reduce((s, it) => s + parseFloat(it.totalMan || (totalKg / 20)), 0) || 0;
@@ -358,7 +385,7 @@ app.post('/api/purchases', async (req, res) => {
           'tx_' + Date.now(),
           purchaseData.purchaseDate || timestamp.toISOString().split('T')[0],
           timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          purchaseData.partyId,
+          finalPartyId,
           purchaseData.partyName,
           isFarmer ? 'farmer' : 'firm',
           billNumber,
@@ -429,7 +456,27 @@ app.post('/api/sales', async (req, res) => {
 
     const timestamp = new Date();
     const saleId = saleData.id || ('sale_' + Date.now());
-    const billNumber = saleData.billNo || `SN-SALE-${timestamp.getFullYear()}-${Date.now().toString().slice(-4)}`;
+    let billNumber = saleData.billNo;
+    if (!billNumber) {
+      billNumber = `KT-S-${timestamp.getFullYear()}-${Date.now().toString().slice(-4)}`;
+    }
+
+    // Ensure billNumber is unique in sales table
+    const checkSaleBill = await client.query('SELECT 1 FROM sales WHERE bill_no = $1', [billNumber]);
+    if (checkSaleBill.rows.length > 0) {
+      const maxRes = await client.query(
+        `SELECT bill_no FROM sales WHERE bill_no LIKE $1 ORDER BY bill_no DESC LIMIT 1`,
+        [`KT-S-${timestamp.getFullYear()}-%`]
+      );
+      let nextNum = Date.now().toString().slice(-4);
+      if (maxRes.rows.length > 0) {
+        const m = maxRes.rows[0].bill_no.match(/KT-S-\d{4}-(\d+)/);
+        if (m) {
+          nextNum = (parseInt(m[1], 10) + 1).toString().padStart(4, '0');
+        }
+      }
+      billNumber = `KT-S-${timestamp.getFullYear()}-${nextNum}`;
+    }
 
     // 1. Ensure Party exists in parties table
     let finalSalePartyId = saleData.farmerId || saleData.partyId || null;
@@ -442,7 +489,7 @@ app.post('/api/sales', async (req, res) => {
            ON CONFLICT (id) DO NOTHING`,
           [
             finalSalePartyId,
-            `KH-${Date.now().toString().slice(-4)}`,
+            `KH-${Date.now().toString(36).toUpperCase()}`,
             saleData.farmerName || 'ખેડૂત ગ્રાહક',
             saleData.farmerMobile || '',
             saleData.farmerVillage || ''
@@ -460,7 +507,13 @@ app.post('/api/sales', async (req, res) => {
         id, bill_no, bill_date, party_id, farmer_name, farmer_mobile, farmer_village,
         sub_total, majuri_amount, discount, net_amount, paid_amount, due_amount, payment_mode, remarks, created_by
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-      ON CONFLICT (bill_no) DO NOTHING`,
+      ON CONFLICT (id) DO UPDATE SET
+        bill_no = EXCLUDED.bill_no,
+        bill_date = EXCLUDED.bill_date,
+        party_id = EXCLUDED.party_id,
+        farmer_name = EXCLUDED.farmer_name,
+        net_amount = EXCLUDED.net_amount,
+        due_amount = EXCLUDED.due_amount`,
       [
         saleId,
         billNumber,
@@ -492,6 +545,8 @@ app.post('/api/sales', async (req, res) => {
         const totalMan = parseFloat(item.totalMan || (totalWeight / 20));
         const rate = parseFloat(item.rate || 0);
         const itemTotal = parseFloat(item.itemTotal || 0);
+        const rawUnit = (item.rateUnit || 'man').toString().toLowerCase();
+        const rateUnit = ['man', 'kg', 'bag'].includes(rawUnit) ? rawUnit : 'man';
 
         await client.query(
           `INSERT INTO sale_items (
@@ -507,7 +562,7 @@ app.post('/api/sales', async (req, res) => {
             looseKg,
             totalWeight,
             totalMan,
-            item.rateUnit || 'man',
+            rateUnit,
             rate,
             itemTotal
           ]
@@ -528,16 +583,15 @@ app.post('/api/sales', async (req, res) => {
 
     // 3. Update Party Balance
     const dueAmount = parseFloat(saleData.dueAmount || 0);
-    const partyId = saleData.farmerId || saleData.partyId;
-    if (partyId && dueAmount > 0) {
+    if (finalSalePartyId && dueAmount > 0) {
       await client.query(
-        `UPDATE parties SET current_balance = current_balance + $1 WHERE id = $2`,
-        [dueAmount, partyId]
+        `UPDATE parties SET current_balance = current_balance + $1, balance_type = 'dr' WHERE id = $2`,
+        [dueAmount, finalSalePartyId]
       );
     }
 
     // 4. Insert Party Ledger Transaction
-    if (partyId) {
+    if (finalSalePartyId) {
       const saleBags = saleData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0;
       const saleKg = saleData.items?.reduce((s, it) => s + parseFloat(it.totalWeightKg || 0), 0) || 0;
       const saleMan = saleData.items?.reduce((s, it) => s + parseFloat(it.totalMan || (saleKg / 20)), 0) || 0;
@@ -551,13 +605,13 @@ app.post('/api/sales', async (req, res) => {
           'tx_' + Date.now(),
           saleData.billDate || timestamp.toISOString().split('T')[0],
           timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          partyId,
-          saleData.farmerName,
+          finalSalePartyId,
+          saleData.farmerName || 'ખેડૂત ગ્રાહક',
           'farmer',
           billNumber,
           'sale',
           `બિયારણ વેચાણ બિલ (${saleData.items?.map(it => it.varietyName).join(', ')})`,
-          saleData.items?.map(it => it.varietyName).join(', '),
+          saleData.items?.map(it => it.varietyName).join(', ') || '—',
           saleBags,
           saleKg,
           saleMan,
@@ -624,7 +678,12 @@ app.post('/api/vouchers', async (req, res) => {
     const vId = v.id || ('vch_' + Date.now());
     const amount = parseFloat(v.amount || 0);
     const prefix = v.type === 'receipt' ? 'REC' : 'PAY';
-    const voucherNumber = v.voucherNo || `${prefix}-${Date.now().toString().slice(-6)}`;
+    let voucherNumber = v.voucherNo || `${prefix}-${Date.now().toString().slice(-6)}`;
+    const checkVch = await client.query('SELECT 1 FROM payments WHERE receipt_no = $1', [voucherNumber]);
+    if (checkVch.rows.length > 0) {
+      voucherNumber = `${prefix}-${Date.now().toString().slice(-6)}`;
+    }
+
     const isReceipt = v.type === 'receipt';
     const rawVMode = (v.paymentMode || 'cash').toString().toLowerCase().trim();
     const normalizedVMode = ['cash', 'bank', 'upi', 'cheque', 'credit'].includes(rawVMode) ? rawVMode : 'cash';
@@ -634,7 +693,10 @@ app.post('/api/vouchers', async (req, res) => {
       `INSERT INTO payments (
         id, receipt_no, date, party_id, party_name, party_type, type, amount, payment_mode, reference_no, remarks, recorded_by
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      ON CONFLICT (receipt_no) DO NOTHING`,
+      ON CONFLICT (id) DO UPDATE SET
+        receipt_no = EXCLUDED.receipt_no,
+        amount = EXCLUDED.amount,
+        payment_mode = EXCLUDED.payment_mode`,
       [
         vId,
         voucherNumber,
@@ -671,8 +733,8 @@ app.post('/api/vouchers', async (req, res) => {
     if (v.partyId) {
       await client.query(
         `INSERT INTO party_transactions (
-          id, date, time, party_id, party_name, party_type, voucher_no, voucher_type, particulars, debit, credit, running_balance, payment_mode, remarks
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+          id, date, time, party_id, party_name, party_type, voucher_no, voucher_type, particulars, variety_name, debit, credit, running_balance, payment_mode, remarks
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [
           'tx_' + Date.now(),
           v.date || timestamp.toISOString().split('T')[0],
@@ -683,10 +745,11 @@ app.post('/api/vouchers', async (req, res) => {
           voucherNumber,
           v.type || 'receipt',
           v.remarks || (isReceipt ? 'રોકડ/બેંક રકમ જમા થઈ' : 'રકમ ચૂકવણી કરવામાં આવી'),
+          v.varietyName || '—',
           isReceipt ? 0 : amount,
           isReceipt ? amount : 0,
           0,
-          v.paymentMode || 'cash',
+          normalizedVMode,
           v.remarks || ''
         ]
       );
@@ -769,6 +832,138 @@ app.delete('/api/vouchers/:voucherNo', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error deleting voucher from PostgreSQL:', err);
+    res.status(500).json({ success: false, error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// 8b. Delete Purchase
+app.delete('/api/purchases/:billNo', async (req, res) => {
+  const { billNo } = req.params;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Find purchase
+    const purRes = await client.query(
+      `SELECT id, party_id, due_amount, net_total FROM purchases WHERE bill_no = $1 LIMIT 1`,
+      [billNo]
+    );
+
+    if (purRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: 'ખરીદી બિલ મળ્યું નથી' });
+    }
+
+    const pur = purRes.rows[0];
+
+    // 2. Revert Stock Ledger
+    const itemsRes = await client.query(
+      `SELECT seed_id, bags, net_weight_kg, total_man FROM purchase_items WHERE purchase_id = $1`,
+      [pur.id]
+    );
+
+    for (const it of itemsRes.rows) {
+      if (it.seed_id) {
+        await client.query(
+          `UPDATE stock_ledger
+           SET available_bags = GREATEST(0, available_bags - $1)
+           WHERE seed_id = $2`,
+          [it.bags || 0, it.seed_id]
+        );
+      }
+    }
+
+    // 3. Revert Party Balance
+    const dueAmount = parseFloat(pur.due_amount || 0);
+    if (pur.party_id && dueAmount > 0) {
+      await client.query(
+        `UPDATE parties 
+         SET current_balance = GREATEST(0, current_balance - $1)
+         WHERE id = $2`,
+        [dueAmount, pur.party_id]
+      );
+    }
+
+    // 4. Delete items, purchase, transactions, rojmel
+    await client.query(`DELETE FROM purchase_items WHERE purchase_id = $1`, [pur.id]);
+    await client.query(`DELETE FROM purchases WHERE id = $1`, [pur.id]);
+    await client.query(`DELETE FROM party_transactions WHERE voucher_no = $1 OR bill_id = $2`, [billNo, pur.id]);
+    await client.query(`DELETE FROM rojmel WHERE voucher_no = $1`, [billNo]);
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: `ખરીદી બિલ ${billNo} સફળતાપૂર્વક રદ/ડીલીટ થયું.` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting purchase from PostgreSQL:', err);
+    res.status(500).json({ success: false, error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// 8c. Delete Sale
+app.delete('/api/sales/:billNo', async (req, res) => {
+  const { billNo } = req.params;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const saleRes = await client.query(
+      `SELECT id, party_id, due_amount, net_amount FROM sales WHERE bill_no = $1 LIMIT 1`,
+      [billNo]
+    );
+
+    if (saleRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: 'વેચાણ બિલ મળ્યું નથી' });
+    }
+
+    const sale = saleRes.rows[0];
+
+    // Revert Stock Ledger
+    const itemsRes = await client.query(
+      `SELECT seed_id, bags, loose_kg FROM sale_items WHERE sale_id = $1`,
+      [sale.id]
+    );
+
+    for (const it of itemsRes.rows) {
+      if (it.seed_id) {
+        await client.query(
+          `UPDATE stock_ledger
+           SET available_bags = available_bags + $1,
+               available_loose_kg = available_loose_kg + $2
+           WHERE seed_id = $3`,
+          [it.bags || 0, it.loose_kg || 0, it.seed_id]
+        );
+      }
+    }
+
+    // Revert Party Balance
+    const dueAmount = parseFloat(sale.due_amount || 0);
+    if (sale.party_id && dueAmount > 0) {
+      await client.query(
+        `UPDATE parties 
+         SET current_balance = GREATEST(0, current_balance - $1)
+         WHERE id = $2`,
+        [dueAmount, sale.party_id]
+      );
+    }
+
+    // Delete items, sale, transactions, rojmel
+    await client.query(`DELETE FROM sale_items WHERE sale_id = $1`, [sale.id]);
+    await client.query(`DELETE FROM sales WHERE id = $1`, [sale.id]);
+    await client.query(`DELETE FROM party_transactions WHERE voucher_no = $1 OR bill_id = $2`, [billNo, sale.id]);
+    await client.query(`DELETE FROM rojmel WHERE voucher_no = $1`, [billNo]);
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: `વેચાણ બિલ ${billNo} સફળતાપૂર્વક રદ/ડીલીટ થયું.` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting sale from PostgreSQL:', err);
     res.status(500).json({ success: false, error: err.message });
   } finally {
     client.release();

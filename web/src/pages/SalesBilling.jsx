@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData, BAG_STD_KG, MAN_STD_KG } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -6,9 +6,20 @@ export const SalesBilling = ({ onBillCreated }) => {
   const { farmers, seeds, stock, sales, recordSale, addFarmer } = useData();
   const { userProfile } = useAuth();
 
+  const getNextSaleBillNo = () => {
+    let maxNum = 100;
+    (sales || []).forEach(s => {
+      const match = (s.billNo || '').match(/KT-S-\d{4}-(\d+)/);
+      if (match) {
+        const val = parseInt(match[1], 10);
+        if (val > maxNum) maxNum = val;
+      }
+    });
+    return `KT-S-${new Date().getFullYear()}-${(maxNum + 1).toString().padStart(4, '0')}`;
+  };
+
   // Common Header State
-  const autoBillNo = `KT-S-${new Date().getFullYear()}-${(sales.length + 101).toString().padStart(4, '0')}`;
-  const [billNo, setBillNo] = useState(autoBillNo);
+  const [billNo, setBillNo] = useState(getNextSaleBillNo);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [farmerId, setFarmerId] = useState('');
   const [farmerName, setFarmerName] = useState('');
@@ -18,6 +29,10 @@ export const SalesBilling = ({ onBillCreated }) => {
   const [paymentReference, setPaymentReference] = useState('');
   const [paid, setPaid] = useState('0');
   const [note, setNote] = useState('');
+
+  useEffect(() => {
+    setBillNo(getNextSaleBillNo());
+  }, [sales]);
 
   // Additional Charges
   const [labour, setLabour] = useState('0');
@@ -31,6 +46,7 @@ export const SalesBilling = ({ onBillCreated }) => {
   // Notice & Preview Modal
   const [notice, setNotice] = useState('');
   const [lastInvoice, setLastInvoice] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const money = n => '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN');
   const num = v => Math.max(0, Number(v || 0));
@@ -81,16 +97,20 @@ export const SalesBilling = ({ onBillCreated }) => {
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setNotice('');
 
     if (!farmerName.trim()) {
+      setIsSubmitting(false);
       setNotice('કૃપા કરીને ખેડૂત / ગ્રાહકનું નામ દાખલ કરો.');
       return;
     }
 
     if (items.length === 0) {
+      setIsSubmitting(false);
       setNotice('ઓછામાં ઓછી એક બિયારણની જાત ઉમેરો.');
       return;
     }
@@ -102,7 +122,6 @@ export const SalesBilling = ({ onBillCreated }) => {
       const rowKg = Math.max(0, num(row.bags) - 1) * BAG_STD_KG + num(row.lastBagKg);
       if (st && st.totalWeightKg < rowKg) {
         setNotice(`ચેતવણી: ${seed?.varietyName || 'બિયારણ'} નો સ્ટોક ઓછો છે (હાજર: ${st.totalWeightKg} KG, માંગ: ${rowKg} KG).`);
-        // We still allow if admin permits, but alert user
       }
     }
 
@@ -123,7 +142,7 @@ export const SalesBilling = ({ onBillCreated }) => {
         looseKg: lastKg,
         totalWeightKg: kg,
         totalMan: man,
-        rateUnit: 'MAN20KG',
+        rateUnit: 'man',
         rate: ratePerMan,
         ratePerMan: ratePerMan,
         amount: amount
@@ -151,9 +170,9 @@ export const SalesBilling = ({ onBillCreated }) => {
     };
 
     try {
-      const savedSale = recordSale(salePayload);
+      const savedSale = await recordSale(salePayload);
       const invoiceData = {
-        invoiceNo: billNo,
+        invoiceNo: savedSale.billNo || billNo,
         kind: 'sale',
         partyName: farmerName,
         partyMobile,
@@ -172,11 +191,11 @@ export const SalesBilling = ({ onBillCreated }) => {
       };
 
       setLastInvoice(invoiceData);
-      setNotice('વેચાણ બિલ, સ્ટોક અને ખાતાવહી સફળતાપૂર્વક સેવ થયા.');
+      setNotice(`વેચાણ બિલ "${savedSale.billNo || billNo}" સફળતાપૂર્વક સેવ થયું અને ખાતાવહીમાં એન્ટ્રી નોંધાઈ ગઈ.`);
       if (onBillCreated) onBillCreated(savedSale);
 
       // Reset form
-      setBillNo(`KT-S-${new Date().getFullYear()}-${(sales.length + 102).toString().padStart(4, '0')}`);
+      setBillNo(getNextSaleBillNo());
       setFarmerId('');
       setFarmerName('');
       setFarmerMobile('');
@@ -185,7 +204,10 @@ export const SalesBilling = ({ onBillCreated }) => {
       setNote('');
       setItems([{ seedId: seeds[0]?.id || '', bags: '1', lastBagKg: '35', rate: '2500' }]);
     } catch (err) {
+      console.error('Error in sales submit:', err);
       setNotice('વેચાણ એન્ટ્રી સેવ કરવામાં ભૂલ આવી: ' + (err.message || 'Error'));
+    } finally {
+      setTimeout(() => setIsSubmitting(false), 500);
     }
   };
 
@@ -522,8 +544,8 @@ export const SalesBilling = ({ onBillCreated }) => {
           </div>
         </div>
 
-        <button type="submit" className="primary-action">
-          વેચાણ સેવ કરો અને બિલ બનાવો
+        <button type="submit" className="primary-action" disabled={isSubmitting} style={{ opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}>
+          {isSubmitting ? '⏳ વેચાણ સેવ થઈ રહ્યું છે...' : 'વેચાણ સેવ કરો અને બિલ બનાવો'}
         </button>
         <p className="muted">
           ભાવ પ્રતિ મણ (20 KG). 1 બોરી = 35 KG. સેવ કરવાથી સ્ટોકમાંથી માલ બાદ થશે અને ગ્રાહકના ખાતામાં એન્ટ્રી જમા-ઉધાર થશે.

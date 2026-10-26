@@ -155,7 +155,7 @@ const initialPartyTransactions = [];
 const initialRojmel = [];
 
 // Auto-reset demo localStorage in users' browsers
-const APP_STORAGE_VERSION = 'krushi_clean_tx_keep_khedut_v8_20261025';
+const APP_STORAGE_VERSION = 'krushi_clean_tx_keep_khedut_v9_20261025';
 if (typeof window !== 'undefined' && localStorage.getItem('krushi_data_version') !== APP_STORAGE_VERSION) {
   // 1. KEEP sn_seeds (5 varieties kept)
   if (!localStorage.getItem('sn_seeds')) {
@@ -163,7 +163,6 @@ if (typeof window !== 'undefined' && localStorage.getItem('krushi_data_version')
   }
 
   // 2. KEEP sn_parties (All Farmer and party master data kept intact)
-  // Reset currentBalance to openingBalance so deleted purchases/sales leave clean balance
   try {
     const savedParties = JSON.parse(localStorage.getItem('sn_parties') || '[]');
     if (Array.isArray(savedParties) && savedParties.length > 0) {
@@ -177,7 +176,7 @@ if (typeof window !== 'undefined' && localStorage.getItem('krushi_data_version')
     console.error(e);
   }
 
-  // 3. DELETE purchases, sales, transactions, rojmel
+  // 3. DELETE purchases, sales, transactions, rojmel cache
   localStorage.removeItem('sn_purchases');
   localStorage.removeItem('sn_sales');
   localStorage.removeItem('sn_party_transactions');
@@ -188,6 +187,48 @@ if (typeof window !== 'undefined' && localStorage.getItem('krushi_data_version')
 
   localStorage.setItem('krushi_data_version', APP_STORAGE_VERSION);
 }
+
+// Deduplication helpers to prevent duplicate entries
+const dedupeById = (items) => {
+  if (!Array.isArray(items)) return [];
+  const seen = new Set();
+  return items.filter(it => {
+    if (!it || !it.id || seen.has(it.id)) return false;
+    seen.add(it.id);
+    return true;
+  });
+};
+
+const dedupeTransactions = (items) => {
+  if (!Array.isArray(items)) return [];
+  const seenIds = new Set();
+  const seenVouchers = new Set();
+  return items.filter(it => {
+    if (!it) return false;
+    if (it.id && seenIds.has(it.id)) return false;
+    if (it.voucherNo && it.voucherType && it.partyId) {
+      const vKey = `${it.voucherNo}_${it.voucherType}_${it.partyId}`;
+      if (seenVouchers.has(vKey)) return false;
+      seenVouchers.add(vKey);
+    }
+    if (it.id) seenIds.add(it.id);
+    return true;
+  });
+};
+
+const dedupePurchases = (items) => {
+  if (!Array.isArray(items)) return [];
+  const seenIds = new Set();
+  const seenBills = new Set();
+  return items.filter(it => {
+    if (!it) return false;
+    if (it.id && seenIds.has(it.id)) return false;
+    if (it.billNo && seenBills.has(it.billNo)) return false;
+    if (it.id) seenIds.add(it.id);
+    if (it.billNo) seenBills.add(it.billNo);
+    return true;
+  });
+};
 
 export const DataProvider = ({ children }) => {
   const [seeds, setSeeds] = useState(() => {
@@ -289,13 +330,13 @@ export const DataProvider = ({ children }) => {
           rojmel: apiRojmel
         } = json.data;
 
-        if (Array.isArray(apiSeeds) && apiSeeds.length > 0) setSeeds(apiSeeds);
-        if (Array.isArray(apiParties)) setParties(apiParties);
-        if (Array.isArray(apiStock) && apiStock.length > 0) setStock(apiStock);
-        if (Array.isArray(apiPurchases)) setPurchases(apiPurchases);
-        if (Array.isArray(apiSales)) setSales(apiSales);
-        if (Array.isArray(apiTransactions)) setPartyTransactions(apiTransactions);
-        if (Array.isArray(apiRojmel)) setRojmel(apiRojmel);
+        if (Array.isArray(apiSeeds) && apiSeeds.length > 0) setSeeds(dedupeById(apiSeeds));
+        if (Array.isArray(apiParties)) setParties(dedupeById(apiParties));
+        if (Array.isArray(apiStock) && apiStock.length > 0) setStock(dedupeById(apiStock));
+        if (Array.isArray(apiPurchases)) setPurchases(dedupePurchases(apiPurchases));
+        if (Array.isArray(apiSales)) setSales(dedupeById(apiSales));
+        if (Array.isArray(apiTransactions)) setPartyTransactions(dedupeTransactions(apiTransactions));
+        if (Array.isArray(apiRojmel)) setRojmel(dedupeTransactions(apiRojmel));
 
         setDbStatus('connected');
       }
@@ -415,7 +456,7 @@ export const DataProvider = ({ children }) => {
 
   // ૩. નવી ખરીદી એન્ટ્રી (Purchase Entry) – ખેડૂત / માર્કેટ પેઢી
   // Formula: Total KG = ((N - 1) * 35) + L, Total Man = Total KG / 20, Rate = ₹/મણ
-  const recordPurchase = (purchaseData) => {
+  const recordPurchase = async (purchaseData) => {
     const timestamp = new Date();
     const purchaseId = "pur_" + Date.now();
     const billNumber = purchaseData.billNo || `SN-PUR-${timestamp.getFullYear()}-${(purchases.length + 1).toString().padStart(4, '0')}`;
@@ -565,19 +606,30 @@ export const DataProvider = ({ children }) => {
     setRojmel(prev => [rojmelEntry, ...prev]);
 
     // Send to PostgreSQL Backend
-    fetch('/api/purchases', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(purchaseRecord)
-    }).then(res => res.json()).then(res => {
-      if (res.success) loadFromBackend(true);
-    }).catch(err => console.error('Error saving purchase to PostgreSQL:', err));
-
-    return purchaseRecord;
+    try {
+      const res = await fetch('/api/purchases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(purchaseRecord)
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'ખરીદી સેવ કરવામાં ભૂલ આવી.');
+      }
+      if (data.billNo) {
+        purchaseRecord.billNo = data.billNo;
+      }
+      await loadFromBackend(true);
+      return purchaseRecord;
+    } catch (err) {
+      console.error('Error saving purchase to PostgreSQL:', err);
+      await loadFromBackend(true);
+      throw err;
+    }
   };
 
   // ૪. વેચાણ બિલિંગ (Sales Billing)
-  const recordSale = (saleData) => {
+  const recordSale = async (saleData) => {
     const timestamp = new Date();
     const saleId = "sale_" + Date.now();
     const billNumber = saleData.billNo || `SN-BILL-${timestamp.getFullYear()}-${(sales.length + 102).toString().padStart(5, '0')}`;
@@ -665,7 +717,7 @@ export const DataProvider = ({ children }) => {
     if (dueAmount > 0 && farmerId) {
       setParties(prev => prev.map(p => {
         if (p.id === farmerId) {
-          return { ...p, currentBalance: (p.currentBalance || 0) + dueAmount };
+          return { ...p, currentBalance: (p.currentBalance || 0) + dueAmount, balanceType: 'dr' };
         }
         return p;
       }));
@@ -677,19 +729,30 @@ export const DataProvider = ({ children }) => {
     setRojmel(prev => [rojmelEntry, ...prev]);
 
     // Send to PostgreSQL Backend
-    fetch('/api/sales', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(saleRecord)
-    }).then(res => res.json()).then(res => {
-      if (res.success) loadFromBackend(true);
-    }).catch(err => console.error('Error saving sale to PostgreSQL:', err));
-
-    return saleRecord;
+    try {
+      const res = await fetch('/api/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saleRecord)
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'વેચાણ બિલ સેવ કરવામાં ભૂલ આવી.');
+      }
+      if (data.billNo) {
+        saleRecord.billNo = data.billNo;
+      }
+      await loadFromBackend(true);
+      return saleRecord;
+    } catch (err) {
+      console.error('Error saving sale to PostgreSQL:', err);
+      await loadFromBackend(true);
+      throw err;
+    }
   };
 
   // ૫. જમા-ઉધાર વાઉચર એન્ટ્રી (Receipt, Payment, Journal, Return, Expense)
-  const recordVoucher = (voucherData) => {
+  const recordVoucher = async (voucherData) => {
     const timestamp = new Date();
     const vId = "vch_" + Date.now();
     const amount = parseFloat(voucherData.amount || 0);
@@ -781,20 +844,31 @@ export const DataProvider = ({ children }) => {
     setRojmel(prev => [rojEntry, ...prev]);
 
     // Send to PostgreSQL Backend
-    fetch('/api/vouchers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(vRecord)
-    }).then(res => res.json()).then(res => {
-      if (res.success) loadFromBackend(true);
-    }).catch(err => console.error('Error saving voucher to PostgreSQL:', err));
-
-    return vRecord;
+    try {
+      const res = await fetch('/api/vouchers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(vRecord)
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'વાઉચર સેવ કરવામાં ભૂલ આવી.');
+      }
+      if (data.voucherNo) {
+        vRecord.voucherNo = data.voucherNo;
+      }
+      await loadFromBackend(true);
+      return vRecord;
+    } catch (err) {
+      console.error('Error saving voucher to PostgreSQL:', err);
+      await loadFromBackend(true);
+      throw err;
+    }
   };
 
   // Backward compatibility alias for payments
-  const recordPayment = (paymentData) => {
-    return recordVoucher({
+  const recordPayment = async (paymentData) => {
+    return await recordVoucher({
       type: paymentData.type || 'receipt',
       partyId: paymentData.partyId,
       partyName: paymentData.partyName,
@@ -842,6 +916,56 @@ export const DataProvider = ({ children }) => {
       }).then(res => res.json()).then(res => {
         if (res.success) loadFromBackend(true);
       }).catch(err => console.error('Error deleting voucher from PostgreSQL:', err));
+    }
+  };
+
+  // ૬b. ખરીદી બિલ ડિલીટ કરવું (Delete Purchase)
+  const deletePurchase = async (billNo) => {
+    if (!billNo) return false;
+    try {
+      const res = await fetch(`/api/purchases/${encodeURIComponent(billNo)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPurchases(prev => prev.filter(p => p.billNo !== billNo));
+        setPartyTransactions(prev => prev.filter(tx => tx.voucherNo !== billNo));
+        setRojmel(prev => prev.filter(r => r.voucherNo !== billNo));
+        await loadFromBackend(true);
+        return true;
+      } else {
+        alert(data.error || 'ખરીદી બિલ ડિલીટ કરવામાં ભૂલ આવી.');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error deleting purchase:', err);
+      alert('સર્વર સાથે કનેક્ટ થઈ શક્યું નથી.');
+      return false;
+    }
+  };
+
+  // ૬c. વેચાણ બિલ ડિલીટ કરવું (Delete Sale)
+  const deleteSale = async (billNo) => {
+    if (!billNo) return false;
+    try {
+      const res = await fetch(`/api/sales/${encodeURIComponent(billNo)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSales(prev => prev.filter(s => s.billNo !== billNo));
+        setPartyTransactions(prev => prev.filter(tx => tx.voucherNo !== billNo));
+        setRojmel(prev => prev.filter(r => r.voucherNo !== billNo));
+        await loadFromBackend(true);
+        return true;
+      } else {
+        alert(data.error || 'વેચાણ બિલ ડિલીટ કરવામાં ભૂલ આવી.');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error deleting sale:', err);
+      alert('સર્વર સાથે કનેક્ટ થઈ શક્યું નથી.');
+      return false;
     }
   };
 
@@ -935,6 +1059,8 @@ export const DataProvider = ({ children }) => {
       recordVoucher,
       recordPayment,
       deleteVoucher,
+      deletePurchase,
+      deleteSale,
       adjustStock,
       createSubUser,
       updateSubUserPermissions,

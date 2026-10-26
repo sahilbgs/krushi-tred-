@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData, BAG_STD_KG, MAN_STD_KG } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -8,15 +8,35 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     parties, 
     purchases, 
     recordPurchase,
-    addParty
+    addParty,
+    deletePurchase
   } = useData();
   const { userProfile } = useAuth();
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Helper to compute next bill no
+  const getNextBillNo = () => {
+    let maxNum = 0;
+    (purchases || []).forEach(p => {
+      const match = (p.billNo || '').match(/SN-PUR-\d{4}-(\d+)/);
+      if (match) {
+        const val = parseInt(match[1], 10);
+        if (val > maxNum) maxNum = val;
+      }
+    });
+    return `SN-PUR-${new Date().getFullYear()}-${(maxNum + 1).toString().padStart(4, '0')}`;
+  };
 
   // Mode: 'farmer' (સીધા ખેડૂત પાસેથી) or 'market' (માર્કેટમાંથી વેપારી પાસેથી)
   const [sourceType, setSourceType] = useState('farmer');
 
   // Common Header State
-  const [billNo, setBillNo] = useState(`SN-PUR-${new Date().getFullYear()}-${(purchases.length + 1).toString().padStart(4, '0')}`);
+  const [billNo, setBillNo] = useState(getNextBillNo);
+
+  useEffect(() => {
+    setBillNo(getNextBillNo());
+  }, [purchases]);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [partyId, setPartyId] = useState('');
   const [partyName, setPartyName] = useState('');
@@ -93,8 +113,9 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setNotice('');
 
     if (!partyName) {
@@ -177,40 +198,48 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       createdBy: userProfile?.displayName || 'Ravi Chaudhary (Main Admin)'
     };
 
-    const saved = recordPurchase(payload);
+    try {
+      setIsSubmitting(true);
+      const saved = await recordPurchase(payload);
 
-    setLastInvoice({
-      invoiceNo: saved.billNo,
-      date,
-      partyName,
-      partyMobile,
-      village,
-      purchaseSource: sourceType,
-      pethiName,
-      truckNumber,
-      truckOwnerName,
-      items: normalizedItems,
-      goodsTotal: totals.goods,
-      totalAmount: netTotal,
-      charges: {
-        labour: num(labour),
-        marketCommission: num(marketCommission),
-        pethiCommission: num(pethiCommission),
-        bardana: num(bardana)
-      },
-      paid: num(paid),
-      balance,
-      note
-    });
+      setLastInvoice({
+        invoiceNo: saved.billNo,
+        date,
+        partyName,
+        partyMobile,
+        village,
+        purchaseSource: sourceType,
+        pethiName,
+        truckNumber,
+        truckOwnerName,
+        items: normalizedItems,
+        goodsTotal: totals.goods,
+        totalAmount: netTotal,
+        charges: {
+          labour: num(labour),
+          marketCommission: num(marketCommission),
+          pethiCommission: num(pethiCommission),
+          bardana: num(bardana)
+        },
+        paid: num(paid),
+        balance,
+        note
+      });
 
-    setNotice('ખરીદી, સ્ટોક અને ખાતાવહીમાં સફળતાપૂર્વક એન્ટ્રી થઈ ગઈ છે.');
+      setNotice(`ખરીદી બિલ "${saved.billNo}" સફળતાપૂર્વક સેવ થઈ ગયું છે અને સ્ટોક અપડેટ થયો.`);
 
-    // Reset Form
-    setBillNo(`SN-PUR-${new Date().getFullYear()}-${(purchases.length + 2).toString().padStart(4, '0')}`);
-    setPaid('0');
-    setPaymentReference('');
-    setNote('');
-    setItems([{ productId: seeds[0]?.id || '', bags: '10', lastBagKg: '35', rate: '2400' }]);
+      // Reset Form
+      setBillNo(getNextBillNo());
+      setPaid('0');
+      setPaymentReference('');
+      setNote('');
+      setItems([{ productId: seeds[0]?.id || '', bags: '10', lastBagKg: '35', rate: '2400' }]);
+    } catch (err) {
+      console.error('Error saving purchase:', err);
+      setNotice('ખરીદી સાચવવામાં ક્ષતિ આવી: ' + (err.message || 'Error'));
+    } finally {
+      setTimeout(() => setIsSubmitting(false), 500);
+    }
   };
 
   return (
@@ -673,8 +702,8 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
           </div>
         </div>
 
-        <button type="submit" className="primary-action">
-          ખરીદી સેવ કરો અને સ્ટોક અપડેટ કરો
+        <button type="submit" className="primary-action" disabled={isSubmitting} style={{ opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}>
+          {isSubmitting ? '⏳ ખરીદી સેવ થઈ રહી છે...' : 'ખરીદી સેવ કરો અને સ્ટોક અપડેટ કરો'}
         </button>
 
         <p className="muted" style={{ marginTop: '10px', textAlign: 'center' }}>
@@ -699,6 +728,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
               <th>કુલ રકમ</th>
               <th>ચૂકવેલ</th>
               <th>બાકી</th>
+              <th style={{ textAlign: 'center' }}>એક્શન</th>
             </tr>
           </thead>
           <tbody>
@@ -722,6 +752,20 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
                 <td style={{ color: '#166534' }}>{money(r.paidAmount || r.paid)}</td>
                 <td style={{ color: (r.dueAmount || r.balance) > 0 ? '#b91c1c' : '#166534', fontWeight: '700' }}>
                   {money(r.dueAmount || r.balance)}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  <button
+                    type="button"
+                    className="secondary"
+                    style={{ padding: '3px 8px', fontSize: '0.75rem', color: '#dc2626', borderColor: '#fca5a5' }}
+                    onClick={async () => {
+                      const bill = r.billNo || r.invoiceNo;
+                      if (window.confirm(`શું તમે ખરીદી બિલ "${bill}" (${r.partyName}) રદ/ડીલીટ કરવા માંગો છો? આનાથી સ્ટોક અને ખાતેદાર બેલેન્સ પણ રિવર્સ થશે.`)) {
+                        await deletePurchase(bill);
+                      }
+                    }}>
+                    🗑️ ડીલીટ
+                  </button>
                 </td>
               </tr>
             ))}

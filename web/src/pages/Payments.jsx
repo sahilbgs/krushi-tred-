@@ -17,30 +17,35 @@ export const Payments = () => {
 
   const currentParty = parties.find(p => p.id === partyId);
 
-  const handleSavePayment = (e) => {
+  const handleSavePayment = async (e) => {
     e.preventDefault();
     if (!partyId || !amount || parseFloat(amount) <= 0) return;
 
-    const partyName = currentParty?.name || currentParty?.firmName || currentParty?.companyName || 'ખાતેદાર';
+    try {
+      const partyName = currentParty?.name || currentParty?.firmName || currentParty?.companyName || 'ખાતેદાર';
 
-    recordVoucher({
-      partyType: currentParty?.partyType || 'farmer',
-      partyId,
-      partyName,
-      type: voucherType,
-      amount: parseFloat(amount),
-      paymentMode,
-      referenceNo,
-      remarks: remarks || (voucherType === 'receipt' ? 'રોકડ/બેંક રકમ જમા થઈ' : 'રકમ ચૂકવણી કરવામાં આવી'),
-      recordedBy: userProfile?.displayName || 'સ્ટાફ'
-    });
+      await recordVoucher({
+        partyType: currentParty?.partyType || 'farmer',
+        partyId,
+        partyName,
+        type: voucherType,
+        amount: parseFloat(amount),
+        paymentMode,
+        referenceNo,
+        remarks: remarks || (voucherType === 'receipt' ? 'રોકડ/બેંક રકમ જમા થઈ' : 'રકમ ચૂકવણી કરવામાં આવી'),
+        recordedBy: userProfile?.displayName || 'સ્ટાફ'
+      });
 
-    setNotice(`₹${Number(amount).toLocaleString('en-IN')} ની ${voucherType === 'receipt' ? 'જમા' : 'ઉધાર'} એન્ટ્રી સફળતાપૂર્વક સાચવવામાં આવી.`);
-    setShowAddForm(false);
-    setPartyId('');
-    setAmount('');
-    setReferenceNo('');
-    setRemarks('');
+      setNotice(`₹${Number(amount).toLocaleString('en-IN')} ની ${voucherType === 'receipt' ? 'જમા' : 'ઉધાર'} એન્ટ્રી સફળતાપૂર્વક સાચવવામાં આવી.`);
+      setShowAddForm(false);
+      setPartyId('');
+      setAmount('');
+      setReferenceNo('');
+      setRemarks('');
+    } catch (err) {
+      console.error('Error saving payment voucher:', err);
+      setNotice('વાઉચર સાચવવામાં ભૂલ આવી: ' + (err.message || 'Error'));
+    }
   };
 
   const handleDeleteVoucher = (tx) => {

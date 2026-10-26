@@ -315,7 +315,7 @@ export const SalesBilling = ({ onBillCreated }) => {
               <option value="">માસ્ટરમાંથી પસંદ કરો (વૈકલ્પિક)</option>
               {farmers.map(f => (
                 <option key={f.id} value={f.id}>
-                  {f.name} {f.village ? `(${f.village})` : ''} — બાકી: ₹{(f.currentBalance || 0).toLocaleString('en-IN')}
+                  {f.name} {f.village ? `(${f.village})` : ''} — બાકી: ₹{(parseFloat(f.currentBalance) || 0).toLocaleString('en-IN')} {(f.balanceType || '').toUpperCase()}
                 </option>
               ))}
             </select>

@@ -176,8 +176,13 @@ export const FarmerMaster = () => {
                 <td><b>{f.name}</b></td>
                 <td>{f.mobile || '—'}</td>
                 <td>{f.village || '—'}{f.taluka ? `, ${f.taluka}` : ''}</td>
-                <td style={{ fontWeight: '700', color: (f.currentBalance || 0) > 0 ? '#b91c1c' : '#15803d' }}>
-                  ₹{(f.currentBalance || 0).toLocaleString('en-IN')}
+                <td style={{
+                  fontWeight: '700',
+                  color: (parseFloat(f.currentBalance) || 0) === 0 ? '#16a34a' : ((f.balanceType || '').toLowerCase() === 'cr' ? '#2563eb' : '#dc2626')
+                }}>
+                  {(parseFloat(f.currentBalance) || 0) === 0 
+                    ? '₹0 (સરભર)' 
+                    : `₹${(parseFloat(f.currentBalance) || 0).toLocaleString('en-IN')} ${((f.balanceType || '').toLowerCase() === 'cr' ? 'CR (જમા)' : 'DR (ઉધાર)')}`}
                 </td>
                 <td>
                   {f.mobile ? (

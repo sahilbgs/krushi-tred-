@@ -102,7 +102,7 @@ export const Payments = () => {
                 <optgroup label="🌱 ખેડૂત મિત્રો (Farmers)">
                   {farmers.map(f => (
                     <option key={f.id} value={f.id}>
-                      {f.name} {f.village ? `(${f.village})` : ''} — બાકી: ₹{(f.currentBalance || 0).toLocaleString('en-IN')}
+                      {f.name} {f.village ? `(${f.village})` : ''} — બાકી: ₹{(f.currentBalance || 0).toLocaleString('en-IN')} {(f.balanceType || '').toUpperCase()}
                     </option>
                   ))}
                 </optgroup>
@@ -111,7 +111,7 @@ export const Payments = () => {
                 <optgroup label="🏢 પેઢી / વેપારી / પાર્ટીઓ (Firms / Traders)">
                   {parties.filter(p => p.partyType !== 'farmer').map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.firmName || s.name || s.companyName} {s.village || s.taluka || s.city ? `(${s.village || s.taluka || s.city})` : ''} — બાકી: ₹{(s.currentBalance || 0).toLocaleString('en-IN')}
+                      {s.firmName || s.name || s.companyName} {s.village || s.taluka || s.city ? `(${s.village || s.taluka || s.city})` : ''} — બાકી: ₹{(s.currentBalance || 0).toLocaleString('en-IN')} {(s.balanceType || '').toUpperCase()}
                     </option>
                   ))}
                 </optgroup>

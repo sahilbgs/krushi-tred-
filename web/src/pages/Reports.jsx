@@ -35,10 +35,10 @@ export const Reports = ({ onOpenBill }) => {
   const totalPurchaseExpenses = filteredPurchases.reduce((s, p) => s + (parseFloat(p.totalExpenses) || 0), 0);
 
   // 2. Outstanding Receivables & Payables
-  const receivables = parties.filter(p => p.balanceType === 'dr' && p.currentBalance > 0);
-  const payables = parties.filter(p => p.balanceType === 'cr' && p.currentBalance > 0);
-  const totalReceivable = receivables.reduce((s, p) => s + (p.currentBalance || 0), 0);
-  const totalPayable = payables.reduce((s, p) => s + (p.currentBalance || 0), 0);
+  const receivables = parties.filter(p => (p.balanceType || '').toLowerCase() === 'dr' && parseFloat(p.currentBalance || 0) > 0);
+  const payables = parties.filter(p => (p.balanceType || '').toLowerCase() === 'cr' && parseFloat(p.currentBalance || 0) > 0);
+  const totalReceivable = receivables.reduce((s, p) => s + (parseFloat(p.currentBalance) || 0), 0);
+  const totalPayable = payables.reduce((s, p) => s + (parseFloat(p.currentBalance) || 0), 0);
 
   // 3. Sales Report
   const filteredSales = sales.filter(s => {
@@ -388,7 +388,7 @@ export const Reports = ({ onOpenBill }) => {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontWeight: '800', color: '#b91c1c', fontSize: '0.95rem' }}>
-                        ₹{r.currentBalance.toLocaleString('en-IN')}
+                        ₹{(parseFloat(r.currentBalance) || 0).toLocaleString('en-IN')}
                       </div>
                       <span className="badge badge-danger" style={{ fontSize: '0.65rem' }}>ઉધાર</span>
                     </div>
@@ -425,7 +425,7 @@ export const Reports = ({ onOpenBill }) => {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontWeight: '800', color: '#ea580c', fontSize: '0.95rem' }}>
-                        ₹{p.currentBalance.toLocaleString('en-IN')}
+                        ₹{(parseFloat(p.currentBalance) || 0).toLocaleString('en-IN')}
                       </div>
                       <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>જમા</span>
                     </div>

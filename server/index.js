@@ -8,6 +8,56 @@ const PORT = process.env.PORT || 5005;
 app.use(cors());
 app.use(express.json());
 
+// Centralized party balance calculation based on ledger transactions & opening balance
+export async function recalculatePartyBalance(clientOrPool, partyId) {
+  if (!partyId) return null;
+  const partyRes = await clientOrPool.query(
+    `SELECT id, opening_balance, COALESCE(opening_balance_type, balance_type, 'dr') AS opening_balance_type FROM parties WHERE id = $1`,
+    [partyId]
+  );
+  if (partyRes.rows.length === 0) return null;
+  const party = partyRes.rows[0];
+
+  const openingAmount = parseFloat(party.opening_balance || 0);
+  const openingDr = (party.opening_balance_type || 'dr').toLowerCase() === 'dr' ? openingAmount : 0;
+  const openingCr = (party.opening_balance_type || 'dr').toLowerCase() === 'cr' ? openingAmount : 0;
+
+  const txRes = await clientOrPool.query(
+    `SELECT 
+       COALESCE(SUM(debit), 0) AS total_debit,
+       COALESCE(SUM(credit), 0) AS total_credit
+     FROM party_transactions 
+     WHERE party_id = $1`,
+    [partyId]
+  );
+
+  const totalDebit = parseFloat(txRes.rows[0]?.total_debit || 0);
+  const totalCredit = parseFloat(txRes.rows[0]?.total_credit || 0);
+
+  // netDiff > 0 means DR (Receivable / ઉધાર - લેવાના)
+  // netDiff < 0 means CR (Payable / જમા - આપવાના)
+  const netDiff = (openingDr + totalDebit) - (openingCr + totalCredit);
+  const currentBalance = Math.abs(netDiff);
+  const balanceType = netDiff < 0 ? 'cr' : 'dr';
+
+  await clientOrPool.query(
+    `UPDATE parties 
+     SET current_balance = $1, balance_type = $2 
+     WHERE id = $3`,
+    [currentBalance, balanceType, partyId]
+  );
+
+  return { partyId, totalDebit, totalCredit, netDiff, currentBalance, balanceType };
+}
+
+export async function recalculateAllParties() {
+  const partiesRes = await pool.query('SELECT id FROM parties');
+  for (const row of partiesRes.rows) {
+    await recalculatePartyBalance(pool, row.id);
+  }
+  console.log(`✅ Recalculated balances for ${partiesRes.rows.length} parties.`);
+}
+
 // 1. Health Check
 app.get('/api/health', async (req, res) => {
   try {
@@ -33,7 +83,7 @@ app.get('/api/initial-data', async (req, res) => {
       rojmelRes
     ] = await Promise.all([
       pool.query(`SELECT id, variety_name AS "varietyName", crop_type AS "cropType", company, bag_weight_kg AS "bagWeightKg", default_purchase_rate_per_man AS "defaultPurchaseRatePerMan", default_sale_rate_per_man AS "defaultSaleRatePerMan", default_sale_rate_per_bag AS "defaultSaleRatePerBag", default_sale_rate_per_kg AS "defaultSaleRatePerKg", min_stock_alert_bags AS "minStockAlertBags" FROM seed_varieties WHERE is_active = true ORDER BY created_at ASC`),
-      pool.query(`SELECT id, party_type AS "partyType", code, name, firm_name AS "firmName", mobile, village, taluka, opening_balance AS "openingBalance", balance_type AS "balanceType", current_balance AS "currentBalance", credit_limit AS "creditLimit" FROM parties WHERE is_active = true ORDER BY name ASC`),
+      pool.query(`SELECT id, party_type AS "partyType", code, name, firm_name AS "firmName", mobile, village, taluka, opening_balance AS "openingBalance", COALESCE(opening_balance_type, balance_type, 'dr') AS "openingBalanceType", balance_type AS "balanceType", current_balance AS "currentBalance", credit_limit AS "creditLimit" FROM parties WHERE is_active = true ORDER BY name ASC`),
       pool.query(`SELECT id, seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", available_bags AS "availableBags", available_loose_kg AS "availableLooseKg", total_weight_kg AS "totalWeightKg", total_man AS "totalMan", last_purchase_rate AS "lastPurchaseRate" FROM stock_ledger ORDER BY variety_name ASC`),
       pool.query(`SELECT id, bill_no AS "billNo", TO_CHAR(purchase_date, 'YYYY-MM-DD') AS "purchaseDate", purchase_type AS "purchaseType", party_id AS "partyId", party_name AS "partyName", firm_name AS "firmName", village, mobile, truck_no AS "truckNo", items_sub_total AS "itemsSubTotal", majuri_amount AS "majuriAmount", market_commission AS "marketCommission", firm_commission AS "firmCommission", total_expenses AS "totalExpenses", net_total AS "netTotal", paid_amount AS "paidAmount", due_amount AS "dueAmount", payment_mode AS "paymentMode", remarks, created_by AS "createdBy", created_at AS "createdAt" FROM purchases ORDER BY purchase_date DESC, created_at DESC LIMIT 100`),
       pool.query(`SELECT id, purchase_id AS "purchaseId", seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", bags, last_bag_kg AS "lastBagKg", net_weight_kg AS "netWeightKg", total_man AS "totalMan", rate_per_man AS "ratePerMan", rate_per_kg AS "ratePerKg", item_total AS "itemTotal" FROM purchase_items`),
@@ -119,18 +169,21 @@ app.post('/api/parties', async (req, res) => {
   const code = p.code || (partyType === 'farmer' ? `FAR-${Date.now().toString().slice(-4)}` : `FIRM-${Date.now().toString().slice(-4)}`);
   const openingBal = parseFloat(p.openingBalance || 0);
 
+  const opType = (p.openingBalanceType || p.balanceType || (partyType === 'farmer' ? 'dr' : 'cr')).toLowerCase();
+
   try {
-    const result = await pool.query(
-      `INSERT INTO parties (id, party_type, code, name, firm_name, mobile, village, taluka, opening_balance, balance_type, current_balance, credit_limit)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    await pool.query(
+      `INSERT INTO parties (id, party_type, code, name, firm_name, mobile, village, taluka, opening_balance, opening_balance_type, balance_type, current_balance, credit_limit)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        ON CONFLICT (id) DO UPDATE SET
          name = EXCLUDED.name,
          firm_name = EXCLUDED.firm_name,
          mobile = EXCLUDED.mobile,
          village = EXCLUDED.village,
          taluka = EXCLUDED.taluka,
-         current_balance = EXCLUDED.current_balance
-       RETURNING id, party_type AS "partyType", code, name, firm_name AS "firmName", mobile, village, taluka, opening_balance AS "openingBalance", balance_type AS "balanceType", current_balance AS "currentBalance", credit_limit AS "creditLimit"`,
+         opening_balance = EXCLUDED.opening_balance,
+         opening_balance_type = EXCLUDED.opening_balance_type,
+         balance_type = EXCLUDED.balance_type`,
       [
         id, 
         partyType, 
@@ -141,14 +194,32 @@ app.post('/api/parties', async (req, res) => {
         p.village || p.city || '', 
         p.taluka || '', 
         openingBal, 
-        p.balanceType || 'dr', 
+        opType,
+        opType, 
         openingBal, 
         parseFloat(p.creditLimit || 50000)
       ]
     );
+
+    await recalculatePartyBalance(pool, id);
+
+    const result = await pool.query(
+      `SELECT id, party_type AS "partyType", code, name, firm_name AS "firmName", mobile, village, taluka, opening_balance AS "openingBalance", COALESCE(opening_balance_type, balance_type, 'dr') AS "openingBalanceType", balance_type AS "balanceType", current_balance AS "currentBalance", credit_limit AS "creditLimit" FROM parties WHERE id = $1`,
+      [id]
+    );
+
     res.json({ success: true, party: result.rows[0] });
   } catch (err) {
     console.error('Error creating party in PostgreSQL:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/parties/recalculate', async (req, res) => {
+  try {
+    await recalculateAllParties();
+    res.json({ success: true, message: 'All parties recalculated successfully' });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -361,16 +432,9 @@ app.post('/api/purchases', async (req, res) => {
       }
     }
 
-    // 3. Update Party Balance
     const dueAmount = parseFloat(purchaseData.dueAmount || 0);
-    if (purchaseData.partyId && dueAmount > 0) {
-      await client.query(
-        `UPDATE parties SET current_balance = current_balance + $1, balance_type = 'cr' WHERE id = $2`,
-        [dueAmount, purchaseData.partyId]
-      );
-    }
 
-    // 4. Insert Party Ledger Transaction
+    // 3. Insert Party Ledger Transaction
     if (finalPartyId) {
       const totalBags = purchaseData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0;
       const totalKg = purchaseData.items?.reduce((s, it) => s + parseFloat(it.netWeightKg || 0), 0) || 0;
@@ -396,13 +460,16 @@ app.post('/api/purchases', async (req, res) => {
           totalKg,
           totalMan,
           ratePerMan,
-          0,
+          parseFloat(purchaseData.paidAmount || 0),
           parseFloat(purchaseData.netTotal || 0),
           dueAmount,
           purchaseData.paymentMode || 'credit',
           purchaseId
         ]
       );
+
+      // Recalculate true balance from ledger transactions
+      await recalculatePartyBalance(client, finalPartyId);
     }
 
     // 5. Insert Daily Rojmel
@@ -581,16 +648,9 @@ app.post('/api/sales', async (req, res) => {
       }
     }
 
-    // 3. Update Party Balance
     const dueAmount = parseFloat(saleData.dueAmount || 0);
-    if (finalSalePartyId && dueAmount > 0) {
-      await client.query(
-        `UPDATE parties SET current_balance = current_balance + $1, balance_type = 'dr' WHERE id = $2`,
-        [dueAmount, finalSalePartyId]
-      );
-    }
 
-    // 4. Insert Party Ledger Transaction
+    // 3. Insert Party Ledger Transaction
     if (finalSalePartyId) {
       const saleBags = saleData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0;
       const saleKg = saleData.items?.reduce((s, it) => s + parseFloat(it.totalWeightKg || 0), 0) || 0;
@@ -623,6 +683,9 @@ app.post('/api/sales', async (req, res) => {
           saleId
         ]
       );
+
+      // Recalculate true balance from ledger transactions
+      await recalculatePartyBalance(client, finalSalePartyId);
     }
 
     // 5. Insert Daily Rojmel
@@ -713,23 +776,7 @@ app.post('/api/vouchers', async (req, res) => {
       ]
     );
 
-    // 2. Update Party Balance
-    if (v.partyId) {
-      const isFarmer = v.partyType === 'farmer';
-      let balanceDiff = 0;
-      if (isReceipt) {
-        balanceDiff = -amount;
-      } else {
-        balanceDiff = isFarmer ? amount : -amount;
-      }
-
-      await client.query(
-        `UPDATE parties SET current_balance = current_balance + $1 WHERE id = $2`,
-        [balanceDiff, v.partyId]
-      );
-    }
-
-    // 3. Insert Party Ledger Transaction
+    // 2. Insert Party Ledger Transaction
     if (v.partyId) {
       await client.query(
         `INSERT INTO party_transactions (
@@ -753,6 +800,9 @@ app.post('/api/vouchers', async (req, res) => {
           v.remarks || ''
         ]
       );
+
+      // Recalculate true balance from ledger transactions
+      await recalculatePartyBalance(client, v.partyId);
     }
 
     // 4. Insert Daily Rojmel
@@ -795,37 +845,22 @@ app.delete('/api/vouchers/:voucherNo', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // 1. Find transaction to reverse balance
+    // 1. Find party_id to recalculate balance after deletion
     const txRes = await client.query(
-      `SELECT party_id, party_type, voucher_type, debit, credit FROM party_transactions WHERE voucher_no = $1 LIMIT 1`,
+      `SELECT party_id FROM party_transactions WHERE voucher_no = $1 LIMIT 1`,
       [voucherNo]
     );
-
-    if (txRes.rows.length > 0) {
-      const tx = txRes.rows[0];
-      const amount = parseFloat(tx.credit || tx.debit || 0);
-      const isReceipt = tx.voucher_type === 'receipt';
-      const isFarmer = tx.party_type === 'farmer';
-
-      let balanceDiff = 0;
-      if (isReceipt) {
-        balanceDiff = amount;
-      } else {
-        balanceDiff = isFarmer ? -amount : amount;
-      }
-
-      if (tx.party_id) {
-        await client.query(
-          `UPDATE parties SET current_balance = current_balance + $1 WHERE id = $2`,
-          [balanceDiff, tx.party_id]
-        );
-      }
-    }
+    const partyId = txRes.rows[0]?.party_id;
 
     // 2. Delete from tables
     await client.query(`DELETE FROM payments WHERE receipt_no = $1`, [voucherNo]);
     await client.query(`DELETE FROM party_transactions WHERE voucher_no = $1`, [voucherNo]);
     await client.query(`DELETE FROM rojmel WHERE voucher_no = $1`, [voucherNo]);
+
+    // 3. Recalculate true balance from remaining ledger transactions
+    if (partyId) {
+      await recalculatePartyBalance(client, partyId);
+    }
 
     await client.query('COMMIT');
     res.json({ success: true, message: `Voucher ${voucherNo} deleted successfully` });
@@ -876,22 +911,16 @@ app.delete('/api/purchases/:billNo', async (req, res) => {
       }
     }
 
-    // 3. Revert Party Balance
-    const dueAmount = parseFloat(pur.due_amount || 0);
-    if (pur.party_id && dueAmount > 0) {
-      await client.query(
-        `UPDATE parties 
-         SET current_balance = GREATEST(0, current_balance - $1)
-         WHERE id = $2`,
-        [dueAmount, pur.party_id]
-      );
-    }
-
-    // 4. Delete items, purchase, transactions, rojmel
+    // 3. Delete items, purchase, transactions, rojmel
     await client.query(`DELETE FROM purchase_items WHERE purchase_id = $1`, [pur.id]);
     await client.query(`DELETE FROM purchases WHERE id = $1`, [pur.id]);
     await client.query(`DELETE FROM party_transactions WHERE voucher_no = $1 OR bill_id = $2`, [billNo, pur.id]);
     await client.query(`DELETE FROM rojmel WHERE voucher_no = $1`, [billNo]);
+
+    // 4. Recalculate true balance from remaining ledger transactions
+    if (pur.party_id) {
+      await recalculatePartyBalance(client, pur.party_id);
+    }
 
     await client.query('COMMIT');
     res.json({ success: true, message: `ખરીદી બિલ ${billNo} સફળતાપૂર્વક રદ/ડીલીટ થયું.` });
@@ -942,22 +971,16 @@ app.delete('/api/sales/:billNo', async (req, res) => {
       }
     }
 
-    // Revert Party Balance
-    const dueAmount = parseFloat(sale.due_amount || 0);
-    if (sale.party_id && dueAmount > 0) {
-      await client.query(
-        `UPDATE parties 
-         SET current_balance = GREATEST(0, current_balance - $1)
-         WHERE id = $2`,
-        [dueAmount, sale.party_id]
-      );
-    }
-
     // Delete items, sale, transactions, rojmel
     await client.query(`DELETE FROM sale_items WHERE sale_id = $1`, [sale.id]);
     await client.query(`DELETE FROM sales WHERE id = $1`, [sale.id]);
     await client.query(`DELETE FROM party_transactions WHERE voucher_no = $1 OR bill_id = $2`, [billNo, sale.id]);
     await client.query(`DELETE FROM rojmel WHERE voucher_no = $1`, [billNo]);
+
+    // Recalculate true balance from remaining ledger transactions
+    if (sale.party_id) {
+      await recalculatePartyBalance(client, sale.party_id);
+    }
 
     await client.query('COMMIT');
     res.json({ success: true, message: `વેચાણ બિલ ${billNo} સફળતાપૂર્વક રદ/ડીલીટ થયું.` });
@@ -989,6 +1012,11 @@ app.post('/api/stock/adjust', async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Krushi Trade PostgreSQL API running dynamically on port ${PORT}`);
+  try {
+    await recalculateAllParties();
+  } catch (err) {
+    console.error('Error recalculating party balances on startup:', err);
+  }
 });

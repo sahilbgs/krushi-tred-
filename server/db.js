@@ -12,6 +12,8 @@ const { Pool, types } = pg;
 
 // Return PostgreSQL DATE (OID 1082) directly as clean 'YYYY-MM-DD' string
 types.setTypeParser(1082, (val) => val);
+// Return PostgreSQL NUMERIC (OID 1700) directly as JavaScript float
+types.setTypeParser(1700, (val) => val === null ? 0 : parseFloat(val));
 
 export const pool = new Pool({
   host: process.env.DB_HOST || '127.0.0.1',

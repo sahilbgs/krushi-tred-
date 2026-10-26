@@ -141,8 +141,13 @@ export const SupplierMaster = () => {
                 <td>{sup.contactPerson || '—'}</td>
                 <td>{sup.mobile || '—'}</td>
                 <td>{sup.city || '—'}</td>
-                <td style={{ fontWeight: '700', color: (sup.currentBalance || 0) > 0 ? '#b91c1c' : '#15803d' }}>
-                  ₹{(sup.currentBalance || 0).toLocaleString('en-IN')}
+                <td style={{
+                  fontWeight: '700',
+                  color: (parseFloat(sup.currentBalance) || 0) === 0 ? '#16a34a' : ((sup.balanceType || '').toLowerCase() === 'cr' ? '#2563eb' : '#dc2626')
+                }}>
+                  {(parseFloat(sup.currentBalance) || 0) === 0 
+                    ? '₹0 (સરભર)' 
+                    : `₹${(parseFloat(sup.currentBalance) || 0).toLocaleString('en-IN')} ${((sup.balanceType || '').toLowerCase() === 'cr' ? 'CR (આપવાના)' : 'DR (લેવાના)')}`}
                 </td>
               </tr>
             ))}

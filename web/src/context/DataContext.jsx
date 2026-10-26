@@ -229,6 +229,26 @@ const dedupePurchases = (items) => {
     return true;
   });
 };
+// Compute exact net balance: (Opening DR - Opening CR) + Total Debit - Total Credit
+export const computePartyBalance = (party, allTransactions = []) => {
+  if (!party) return { currentBalance: 0, balanceType: 'dr' };
+  const opAmt = parseFloat(party.openingBalance || 0);
+  const opType = (party.openingBalanceType || party.balanceType || 'dr').toLowerCase();
+  const opDr = opType === 'dr' ? opAmt : 0;
+  const opCr = opType === 'cr' ? opAmt : 0;
+  let net = opDr - opCr;
+
+  allTransactions.forEach(tx => {
+    if (tx.partyId === party.id) {
+      net += (parseFloat(tx.debit || 0) - parseFloat(tx.credit || 0));
+    }
+  });
+
+  return {
+    currentBalance: Math.abs(net),
+    balanceType: net < 0 ? 'cr' : 'dr'
+  };
+};
 
 export const DataProvider = ({ children }) => {
   const [seeds, setSeeds] = useState(() => {
@@ -568,13 +588,12 @@ export const DataProvider = ({ children }) => {
     // C. Update Party balance in Party Master
     setParties(prev => prev.map(p => {
       if (p.id === partyId) {
-        // If farmer supplies seeds, we owe them (due amount increases credit/decreases debit)
-        const netChange = dueAmount; 
-        const newBalance = (p.currentBalance || 0) + netChange;
+        const nextTxList = [...newTxList, ...partyTransactions];
+        const res = computePartyBalance(p, nextTxList);
         return {
           ...p,
-          currentBalance: newBalance,
-          balanceType: newBalance >= 0 ? (p.balanceType || 'cr') : 'dr'
+          currentBalance: res.currentBalance,
+          balanceType: res.balanceType
         };
       }
       return p;
@@ -714,10 +733,16 @@ export const DataProvider = ({ children }) => {
     };
 
     // Update Party current balance
-    if (dueAmount > 0 && farmerId) {
+    if (farmerId) {
       setParties(prev => prev.map(p => {
         if (p.id === farmerId) {
-          return { ...p, currentBalance: (p.currentBalance || 0) + dueAmount, balanceType: 'dr' };
+          const nextTxList = [saleLedgerEntry, ...partyTransactions];
+          const res = computePartyBalance(p, nextTxList);
+          return {
+            ...p,
+            currentBalance: res.currentBalance,
+            balanceType: res.balanceType
+          };
         }
         return p;
       }));
@@ -778,26 +803,6 @@ export const DataProvider = ({ children }) => {
       const isReceipt = voucherData.type === 'receipt';
       const isPayment = voucherData.type === 'payment';
 
-      setParties(prev => prev.map(p => {
-        if (p.id === voucherData.partyId) {
-          let updatedBal = p.currentBalance || 0;
-          const isFarmer = p.partyType === 'farmer';
-          if (isReceipt) {
-            // જમા: ખેડૂત ચૂકવે તો લેણું ઘટે
-            updatedBal = updatedBal - amount;
-          } else if (isPayment) {
-            // ઉધાર: ખેડૂતને ચૂકવીએ તો લેણું વધે, પેઢીને ચૂકવીએ તો દેવું ઘટે
-            if (isFarmer) {
-              updatedBal = updatedBal + amount;
-            } else {
-              updatedBal = updatedBal - amount;
-            }
-          }
-          return { ...p, currentBalance: updatedBal };
-        }
-        return p;
-      }));
-
       // Ledger record
       const ledgerEntry = {
         id: "tx_" + Date.now(),
@@ -819,6 +824,20 @@ export const DataProvider = ({ children }) => {
         paymentMode: voucherData.paymentMode || 'cash',
         remarks: voucherData.remarks || ''
       };
+
+      setParties(prev => prev.map(p => {
+        if (p.id === voucherData.partyId) {
+          const nextTxList = [ledgerEntry, ...partyTransactions];
+          const res = computePartyBalance(p, nextTxList);
+          return {
+            ...p,
+            currentBalance: res.currentBalance,
+            balanceType: res.balanceType
+          };
+        }
+        return p;
+      }));
+
       setPartyTransactions(prev => [ledgerEntry, ...prev]);
     }
 
@@ -889,18 +908,13 @@ export const DataProvider = ({ children }) => {
 
       setParties(prev => prev.map(p => {
         if (p.id === targetTx.partyId) {
-          let updatedBal = p.currentBalance || 0;
-          const isFarmer = p.partyType === 'farmer';
-          if (isReceipt) {
-            updatedBal = updatedBal + amount;
-          } else if (isPayment) {
-            if (isFarmer) {
-              updatedBal = updatedBal - amount;
-            } else {
-              updatedBal = updatedBal + amount;
-            }
-          }
-          return { ...p, currentBalance: updatedBal };
+          const remainingTx = partyTransactions.filter(tx => (voucherNo ? tx.voucherNo !== voucherNo : true) && (txId ? tx.id !== txId : true));
+          const res = computePartyBalance(p, remainingTx);
+          return {
+            ...p,
+            currentBalance: res.currentBalance,
+            balanceType: res.balanceType
+          };
         }
         return p;
       }));

@@ -95,53 +95,116 @@ export const KhataBook = () => {
 
   const selectedParty = parties.find(p => p.id === selectedPartyId) || parties[0];
 
-  // Transactions for selected Party
+  // Real-time map of all party balances computed strictly from opening balance + ledger transactions
+  const partyBalanceMap = useMemo(() => {
+    const map = {};
+    parties.forEach(p => {
+      const opAmt = parseFloat(p.openingBalance || 0);
+      const opType = (p.openingBalanceType || p.balanceType || 'dr').toLowerCase();
+      const opDr = opType === 'dr' ? opAmt : 0;
+      const opCr = opType === 'cr' ? opAmt : 0;
+      map[p.id] = { net: opDr - opCr };
+    });
+
+    partyTransactions.forEach(tx => {
+      if (tx.partyId && map[tx.partyId]) {
+        map[tx.partyId].net += (parseFloat(tx.debit || 0) - parseFloat(tx.credit || 0));
+      }
+    });
+
+    const result = {};
+    Object.keys(map).forEach(id => {
+      const net = map[id].net;
+      result[id] = {
+        amount: Math.abs(net),
+        type: net < 0 ? 'cr' : (net > 0 ? 'dr' : '—')
+      };
+    });
+    return result;
+  }, [parties, partyTransactions]);
+
+  // All chronological transactions for selected Party with accurate running balance
+  const {
+    allTransactionsWithRunningBalance,
+    currentPartyBalance,
+    currentPartyBalanceType,
+    openingAmount,
+    openingDr,
+    openingCr,
+    openingBalType
+  } = useMemo(() => {
+    if (!selectedParty) {
+      return {
+        allTransactionsWithRunningBalance: [],
+        currentPartyBalance: 0,
+        currentPartyBalanceType: '—',
+        openingAmount: 0,
+        openingDr: 0,
+        openingCr: 0,
+        openingBalType: 'dr'
+      };
+    }
+
+    const opAmt = parseFloat(selectedParty.openingBalance || 0);
+    const opType = (selectedParty.openingBalanceType || selectedParty.balanceType || 'dr').toLowerCase();
+    const opDr = opType === 'dr' ? opAmt : 0;
+    const opCr = opType === 'cr' ? opAmt : 0;
+
+    let runningNet = opDr - opCr;
+
+    // Sort strictly chronological for accurate running ledger calculations
+    const sortedAll = partyTransactions
+      .filter(tx => tx.partyId === selectedParty.id)
+      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0) || (a.time || '').localeCompare(b.time || ''));
+
+    const list = sortedAll.map(tx => {
+      const dr = parseFloat(tx.debit || 0);
+      const cr = parseFloat(tx.credit || 0);
+      runningNet = runningNet + dr - cr;
+      return {
+        ...tx,
+        runningBalance: Math.abs(runningNet),
+        runningBalanceType: runningNet > 0 ? 'DR' : runningNet < 0 ? 'CR' : '—'
+      };
+    });
+
+    const finalBal = Math.abs(runningNet);
+    const finalType = runningNet < 0 ? 'CR' : (runningNet > 0 ? 'DR' : '—');
+
+    return {
+      allTransactionsWithRunningBalance: list,
+      currentPartyBalance: finalBal,
+      currentPartyBalanceType: finalType,
+      openingAmount: opAmt,
+      openingDr: opDr,
+      openingCr: opCr,
+      openingBalType: opType
+    };
+  }, [partyTransactions, selectedParty]);
+
+  // Filtered transactions for display
   const partyLedgerTransactions = useMemo(() => {
-    if (!selectedParty) return [];
-    return partyTransactions.filter(tx => {
-      if (tx.partyId !== selectedParty.id) return false;
+    return allTransactionsWithRunningBalance.filter(tx => {
       const txDate = (tx.date || '').slice(0, 10);
       if (startDate && txDate < startDate) return false;
       if (endDate && txDate > endDate) return false;
       if (voucherTypeFilter !== 'all' && tx.voucherType !== voucherTypeFilter) return false;
       if (varietyFilter !== 'all' && !(tx.varietyName || '').includes(varietyFilter)) return false;
       return true;
-    }).sort((a, b) => new Date(a.date) - new Date(b.date)); // chronological order for ledger
-  }, [partyTransactions, selectedParty, startDate, endDate, voucherTypeFilter, varietyFilter]);
-
-  // Compute Running Balance for selected party
-  // Debit increases customer dues (for farmers), Credit decreases dues / pays
-  // For suppliers/firms: Credit increases what we owe them, Debit decreases it
-  const transactionsWithRunningBalance = useMemo(() => {
-    if (!selectedParty) return [];
-    let current = selectedParty.openingBalance || 0;
-    const isSupplierOrFirm = selectedParty.partyType === 'firm' || selectedParty.partyType === 'trader';
-
-    return partyLedgerTransactions.map(tx => {
-      const dr = parseFloat(tx.debit || 0);
-      const cr = parseFloat(tx.credit || 0);
-
-      if (isSupplierOrFirm) {
-        // Firm: Credit = goods inward (payable increases), Debit = money paid to firm (payable decreases)
-        current = current + cr - dr;
-      } else {
-        // Farmer / Customer: Debit = goods sold (receivable increases), Credit = payment received / purchase from farmer
-        current = current + dr - cr;
-      }
-
-      return {
-        ...tx,
-        runningBalance: Math.abs(current),
-        runningBalanceType: current >= 0 ? (isSupplierOrFirm ? 'Cr' : 'Dr') : (isSupplierOrFirm ? 'Dr' : 'Cr')
-      };
     });
-  }, [partyLedgerTransactions, selectedParty]);
+  }, [allTransactionsWithRunningBalance, startDate, endDate, voucherTypeFilter, varietyFilter]);
 
-  // Ledger Summary Totals
+  const transactionsWithRunningBalance = partyLedgerTransactions;
+
+  // Ledger Summary Totals for displayed transactions
   const totalDebit = partyLedgerTransactions.reduce((s, tx) => s + (parseFloat(tx.debit) || 0), 0);
   const totalCredit = partyLedgerTransactions.reduce((s, tx) => s + (parseFloat(tx.credit) || 0), 0);
   const totalBagsTransacted = partyLedgerTransactions.reduce((s, tx) => s + (parseInt(tx.bags) || 0), 0);
   const totalWeightTransacted = partyLedgerTransactions.reduce((s, tx) => s + (parseFloat(tx.weightKg) || 0), 0);
+
+  // Full Totals including Opening Balance (Total Jama - Total Udhar)
+  const finalTotalDebit = openingDr + totalDebit;
+  const finalTotalCredit = openingCr + totalCredit;
 
   // Daily Rojmel Transactions
   const filteredRojmel = useMemo(() => {
@@ -237,9 +300,10 @@ export const KhataBook = () => {
       `ખાતેદાર: ${selectedParty.name}%0A` +
       `ગામ: ${selectedParty.village || '—'}%0A` +
       `--------------------------------%0A` +
-      `કુલ ઉધાર (Debit): ₹${totalDebit.toLocaleString('en-IN')}%0A` +
-      `કુલ જમા (Credit): ₹${totalCredit.toLocaleString('en-IN')}%0A` +
-      `*👉 ચોખ્ખું બેલેન્સ: ₹${(selectedParty.currentBalance || 0).toLocaleString('en-IN')} ${selectedParty.balanceType?.toUpperCase() || ''}*%0A` +
+      `કુલ જમા (Credit): ₹${finalTotalCredit.toLocaleString('en-IN')}%0A` +
+      `કુલ ઉધાર (Debit): ₹${finalTotalDebit.toLocaleString('en-IN')}%0A` +
+      `--------------------------------%0A` +
+      `*👉 ચોખ્ખું બાકી બેલેન્સ: ₹${currentPartyBalance.toLocaleString('en-IN')} ${currentPartyBalance === 0 ? 'NIL (હિસાબ પૂર્ણ)' : currentPartyBalanceType === 'CR' ? 'CR (જમા - આપવાના)' : 'DR (ઉધાર - લેવાના)'}*%0A` +
       `--------------------------------%0A` +
       `આભાર! 🙏`;
 
@@ -399,9 +463,11 @@ export const KhataBook = () => {
                       <span>{p.village || '—'}</span>
                       <span style={{
                         fontWeight: '700',
-                        color: (p.currentBalance || 0) === 0 ? '#16a34a' : (p.balanceType === 'cr' ? '#2563eb' : '#dc2626')
+                        color: (partyBalanceMap[p.id]?.amount ?? p.currentBalance ?? 0) === 0 ? '#16a34a' : ((partyBalanceMap[p.id]?.type ?? p.balanceType) === 'cr' ? '#2563eb' : '#dc2626')
                       }}>
-                        ₹{(p.currentBalance || 0).toLocaleString('en-IN')} {p.balanceType ? p.balanceType.toUpperCase() : ''}
+                        {(partyBalanceMap[p.id]?.amount ?? p.currentBalance ?? 0) === 0
+                          ? '₹0 (સરભર)'
+                          : `₹${(partyBalanceMap[p.id]?.amount ?? p.currentBalance ?? 0).toLocaleString('en-IN')} ${((partyBalanceMap[p.id]?.type ?? p.balanceType ?? '') === 'cr' ? 'CR (આપવાના)' : 'DR (લેવાના)')}`}
                       </span>
                     </div>
                   </div>
@@ -458,11 +524,11 @@ export const KhataBook = () => {
                       <div style={{
                         fontSize: '1.35rem',
                         fontWeight: '900',
-                        color: (selectedParty.currentBalance || 0) === 0 ? '#16a34a' : (selectedParty.balanceType === 'cr' ? '#2563eb' : '#dc2626')
+                        color: currentPartyBalance === 0 ? '#16a34a' : (currentPartyBalanceType === 'CR' ? '#2563eb' : '#dc2626')
                       }}>
-                        ₹{(selectedParty.currentBalance || 0).toLocaleString('en-IN')}
+                        ₹{currentPartyBalance.toLocaleString('en-IN')}
                         <span style={{ fontSize: '0.85rem', marginLeft: '0.3rem', color: '#64748b' }}>
-                          {selectedParty.balanceType ? (selectedParty.balanceType.toUpperCase() === 'CR' ? 'CR (જમા - આપવાના)' : 'DR (ઉધાર - લેવાના)') : ''}
+                          {currentPartyBalance === 0 ? '(હિસાબ પૂર્ણ)' : (currentPartyBalanceType === 'CR' ? 'CR (જમા - આપવાના)' : 'DR (ઉધાર - લેવાના)')}
                         </span>
                       </div>
                     </div>
@@ -593,7 +659,7 @@ export const KhataBook = () => {
                   </thead>
                   <tbody>
                     {/* Opening Balance Row */}
-                    {selectedParty?.openingBalance > 0 && (
+                    {openingAmount > 0 && (
                       <tr style={{ backgroundColor: '#f8fafc', fontSize: '0.85rem', fontStyle: 'italic', borderBottom: '1px solid #e2e8f0' }}>
                         <td style={{ padding: '0.7rem' }}>—</td>
                         <td style={{ padding: '0.7rem' }}>OPN-BAL</td>
@@ -603,19 +669,19 @@ export const KhataBook = () => {
                         <td style={{ padding: '0.7rem', textAlign: 'right' }}>—</td>
                         <td style={{ padding: '0.7rem', textAlign: 'right' }}>—</td>
                         <td style={{ padding: '0.7rem', textAlign: 'right' }}>—</td>
-                        <td style={{ padding: '0.7rem', textAlign: 'right' }}>
-                          {selectedParty.balanceType === 'dr' ? `₹${selectedParty.openingBalance.toLocaleString('en-IN')}` : '—'}
+                        <td style={{ padding: '0.7rem', textAlign: 'right', fontWeight: '700', color: openingDr > 0 ? '#b91c1c' : '#94a3b8' }}>
+                          {openingDr > 0 ? `₹${openingDr.toLocaleString('en-IN')}` : '—'}
                         </td>
-                        <td style={{ padding: '0.7rem', textAlign: 'right' }}>
-                          {selectedParty.balanceType === 'cr' ? `₹${selectedParty.openingBalance.toLocaleString('en-IN')}` : '—'}
+                        <td style={{ padding: '0.7rem', textAlign: 'right', fontWeight: '700', color: openingCr > 0 ? '#15803d' : '#94a3b8' }}>
+                          {openingCr > 0 ? `₹${openingCr.toLocaleString('en-IN')}` : '—'}
                         </td>
                         <td style={{ padding: '0.7rem', textAlign: 'right', fontWeight: '800' }}>
-                          ₹{selectedParty.openingBalance.toLocaleString('en-IN')} {selectedParty.balanceType?.toUpperCase()}
+                          ₹{openingAmount.toLocaleString('en-IN')} {openingBalType.toUpperCase()}
                         </td>
                       </tr>
                     )}
 
-                    {transactionsWithRunningBalance.length === 0 ? (
+                    {transactionsWithRunningBalance.length === 0 && openingAmount === 0 ? (
                       <tr>
                         <td colSpan={11} style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.9rem' }}>
                           આ ખાતેદારના ખાતામાં પસંદ કરેલા સમયગાળામાં કોઈ વ્યવહાર નથી.
@@ -675,13 +741,39 @@ export const KhataBook = () => {
                       <td style={{ padding: '0.8rem', textAlign: 'right' }}>{(totalWeightTransacted / 20).toFixed(2)} મણ</td>
                       <td></td>
                       <td style={{ padding: '0.8rem', textAlign: 'right', color: '#b91c1c' }}>
-                        ₹{totalDebit.toLocaleString('en-IN')}
+                        ₹{finalTotalDebit.toLocaleString('en-IN')}
                       </td>
                       <td style={{ padding: '0.8rem', textAlign: 'right', color: '#15803d' }}>
-                        ₹{totalCredit.toLocaleString('en-IN')}
+                        ₹{finalTotalCredit.toLocaleString('en-IN')}
                       </td>
-                      <td style={{ padding: '0.8rem', textAlign: 'right' }}>
-                        ₹{(selectedParty?.currentBalance || 0).toLocaleString('en-IN')} {selectedParty?.balanceType?.toUpperCase()}
+                      <td style={{ padding: '0.8rem', textAlign: 'right', fontWeight: '900', color: currentPartyBalance === 0 ? '#16a34a' : currentPartyBalanceType === 'CR' ? '#2563eb' : '#dc2626' }}>
+                        ₹{currentPartyBalance.toLocaleString('en-IN')} {currentPartyBalanceType}
+                      </td>
+                    </tr>
+                    <tr style={{ backgroundColor: '#f0fdf4', borderTop: '2px solid #059669', fontSize: '0.88rem', color: '#064e3b' }}>
+                      <td colSpan={8} style={{ padding: '0.75rem 0.8rem', fontWeight: '700' }}>
+                        {currentPartyBalanceType === 'CR' && currentPartyBalance > 0 ? (
+                          <span>
+                            ગણતરી: કુલ જમા (₹{finalTotalCredit.toLocaleString('en-IN')}) − કુલ ઉધાર (₹{finalTotalDebit.toLocaleString('en-IN')}) = 
+                            <span style={{ color: '#2563eb', fontWeight: '900', marginLeft: '6px' }}>
+                              ચોખ્ખા આપવાના બાકી ₹{currentPartyBalance.toLocaleString('en-IN')} CR
+                            </span>
+                          </span>
+                        ) : currentPartyBalanceType === 'DR' && currentPartyBalance > 0 ? (
+                          <span>
+                            ગણતરી: કુલ ઉધાર (₹{finalTotalDebit.toLocaleString('en-IN')}) − કુલ જમા (₹{finalTotalCredit.toLocaleString('en-IN')}) = 
+                            <span style={{ color: '#dc2626', fontWeight: '900', marginLeft: '6px' }}>
+                              ચોખ્ખા લેવાના બાકી ₹{currentPartyBalance.toLocaleString('en-IN')} DR
+                            </span>
+                          </span>
+                        ) : (
+                          <span style={{ color: '#16a34a', fontWeight: '800' }}>
+                            ✓ હિસાબ પૂર્ણ (Zero Balance / હિસાબ સરભર થઈ ગયો છે)
+                          </span>
+                        )}
+                      </td>
+                      <td colSpan={3} style={{ padding: '0.75rem 0.8rem', textAlign: 'right', fontWeight: '900', fontSize: '0.95rem', color: currentPartyBalance === 0 ? '#16a34a' : currentPartyBalanceType === 'CR' ? '#2563eb' : '#dc2626' }}>
+                        બાકી રકમ: ₹{currentPartyBalance.toLocaleString('en-IN')} {currentPartyBalanceType === 'CR' ? 'CR (આપવાના)' : currentPartyBalanceType === 'DR' ? 'DR (લેવાના)' : ''}
                       </td>
                     </tr>
                   </tfoot>
@@ -864,7 +956,7 @@ export const KhataBook = () => {
             <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.88rem' }}>
               <div>ખાતેદારનું નામ: <b>{selectedParty.name}</b></div>
               <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.2rem' }}>
-                હાલનું બાકી બેલેન્સ: <b>₹{(selectedParty.currentBalance || 0).toLocaleString('en-IN')} {selectedParty.balanceType?.toUpperCase()}</b>
+                હાલનું બાકી બેલેન્સ: <b>₹{currentPartyBalance.toLocaleString('en-IN')} {currentPartyBalance === 0 ? 'NIL' : (currentPartyBalanceType === 'CR' ? 'CR (જમા - આપવાના)' : 'DR (ઉધાર - લેવાના)')}</b>
               </div>
             </div>
 

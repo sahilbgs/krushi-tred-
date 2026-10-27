@@ -116,7 +116,7 @@ class FirebaseRepository {
                             "availableBags", newBags,
                             "availableLooseKg", newLoose.coerceAtLeast(0.0),
                             "totalWeightKg", newTotalKg,
-                            "lastPurchaseRate", item.purchaseRate
+                            "lastPurchaseRate", if (item.purchaseRate > 0) item.purchaseRate else item.ratePerMan
                         )
                     } else {
                         val newStock = StockItem(
@@ -127,7 +127,7 @@ class FirebaseRepository {
                             availableBags = item.bags,
                             availableLooseKg = 0.0,
                             totalWeightKg = item.netWeightKg,
-                            lastPurchaseRate = item.purchaseRate
+                            lastPurchaseRate = if (item.purchaseRate > 0) item.purchaseRate else item.ratePerMan
                         )
                         transaction.set(stockRef, newStock)
                     }

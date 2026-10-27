@@ -83,6 +83,33 @@ export const Login = () => {
           </button>
         </div>
       </div>
+
+      <div style={{ marginTop: '16px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#166534', marginBottom: '4px' }}>
+          📱 સ્ટાફ / સબ યુઝર એન્ડ્રોઇડ એપ
+        </div>
+        <p style={{ fontSize: '0.75rem', color: '#15803d', margin: '0 0 8px 0' }}>
+          મોબાઇલમાંથી બિલ બનાવવા અને સ્ટોક જોવા APK ઇન્સ્ટોલ કરો.
+        </p>
+        <a 
+          href="/api/download/subuser-apk"
+          download="krushi-trade-subuser.apk"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            backgroundColor: '#059669',
+            color: '#ffffff',
+            padding: '7px 14px',
+            borderRadius: '6px',
+            textDecoration: 'none',
+            fontSize: '0.8rem',
+            fontWeight: '600'
+          }}
+        >
+          ⬇️ સબ યુઝર એપ ડાઉનલોડ કરો (.apk)
+        </a>
+      </div>
     </main>
   );
 };

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Sprout, User, ShieldCheck, LogOut, ArrowRightLeft } from 'lucide-react';
+import { Sprout, User, ShieldCheck, LogOut, ArrowRightLeft, Smartphone, Download } from 'lucide-react';
 
 export const Navbar = () => {
   const { userProfile, logout, loginAsDemo } = useAuth();
@@ -40,6 +40,30 @@ export const Navbar = () => {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
+        {/* APK Download Button for Sub User */}
+        <a 
+          href="/api/download/subuser-apk"
+          download="krushi-trade-subuser.apk"
+          title="સબ યુઝર એન્ડ્રોઇડ એપ ડાઉનલોડ કરો (APK)"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            backgroundColor: '#059669',
+            color: '#ffffff',
+            padding: '0.45rem 0.85rem',
+            borderRadius: '8px',
+            textDecoration: 'none',
+            fontSize: '0.8rem',
+            fontWeight: '600',
+            boxShadow: '0 2px 4px rgba(5,150,105,0.25)',
+            transition: 'all 0.2s'
+          }}
+        >
+          <Smartphone size={16} />
+          <span>સબ યુઝર એપ (APK)</span>
+          <Download size={14} />
+        </a>
         {/* Role Switcher for easy testing / demo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: '#f8fafc', padding: '0.3rem 0.6rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>રોલ ટેસ્ટ:</span>

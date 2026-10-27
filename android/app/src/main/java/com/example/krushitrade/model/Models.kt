@@ -34,6 +34,7 @@ data class Party(
     val firmId: String = "",
     val mobile: String = "",
     val village: String = "",
+    val creditLimit: Double = 50000.0,
     val openingBalance: Double = 0.0,
     val currentBalance: Double = 0.0,
     val balanceType: String = "dr" // dr (લેવાના) | cr (આપવાના)
@@ -102,11 +103,13 @@ data class SaleInvoice(
 data class PurchaseItem(
     val seedId: String = "",
     val varietyName: String = "",
+    val bagWeightKg: Double = BAG_STD_KG,
     val bags: Int = 0,
     val lastBagKg: Double = BAG_STD_KG, // 0 to 35 KG
     val netWeightKg: Double = 0.0, // ((bags - 1) * 35) + lastBagKg
     val totalMan: Double = 0.0, // netWeightKg / 20
     val ratePerMan: Double = 0.0, // ₹ પ્રતિ મણ (₹/મણ)
+    val purchaseRate: Double = 0.0, // ₹ પ્રતિ મણ
     val itemTotal: Double = 0.0 // totalMan * ratePerMan
 )
 

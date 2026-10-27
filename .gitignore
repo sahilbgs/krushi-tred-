@@ -18,3 +18,5 @@ android/app/*.iml
 .DS_Store
 Thumbs.db
 *.log
+.gradle/
+android-sdk/

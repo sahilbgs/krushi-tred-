@@ -1,12 +1,31 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { pool } from './db.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5005;
 
 app.use(cors());
 app.use(express.json());
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
+// APK Download endpoint for Sub User Android App
+app.get('/api/download/subuser-apk', (req, res) => {
+  const apkPath = path.join(__dirname, 'public', 'krushi-trade-subuser.apk');
+  res.download(apkPath, 'krushi-trade-subuser.apk', (err) => {
+    if (err) {
+      console.error('Error downloading APK:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'APK download failed' });
+      }
+    }
+  });
+});
 
 // Centralized party balance calculation based on ledger transactions & opening balance
 export async function recalculatePartyBalance(clientOrPool, partyId) {

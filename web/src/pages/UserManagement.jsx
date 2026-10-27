@@ -90,6 +90,48 @@ export const UserManagement = () => {
         </div>
       )}
 
+      {/* Sub User Mobile App Download Card */}
+      <div style={{
+        backgroundColor: '#f0fdf4',
+        border: '1px solid #86efac',
+        borderRadius: '10px',
+        padding: '14px 18px',
+        marginBottom: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div>
+          <h4 style={{ margin: '0 0 4px 0', color: '#166534', fontSize: '0.95rem' }}>
+            📱 સબ યુઝર (સ્ટાફ) એન્ડ્રોઇડ એપ (Android APK)
+          </h4>
+          <p style={{ margin: 0, fontSize: '0.82rem', color: '#15803d' }}>
+            તમારા સ્ટાફ અને સબ-યુઝરના મોબાઇલ ફોનમાં આ APK ઇન્સ્ટોલ કરાવો જેથી તેઓ મોબાઇલમાંથી બિલ અને સ્ટોક ઓપરેટ કરી શકે.
+          </p>
+        </div>
+        <a 
+          href="/api/download/subuser-apk"
+          download="krushi-trade-subuser.apk"
+          style={{
+            backgroundColor: '#059669',
+            color: '#ffffff',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            textDecoration: 'none',
+            fontSize: '0.84rem',
+            fontWeight: 'bold',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: '0 2px 4px rgba(5,150,105,0.2)'
+          }}
+        >
+          ⬇️ સબ યુઝર APK ડાઉનલોડ કરો
+        </a>
+      </div>
+
       {/* Header & Toggle */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <button 

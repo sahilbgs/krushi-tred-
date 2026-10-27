@@ -59,6 +59,29 @@ export const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
         })}
       </nav>
 
+      <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid #e2e8f0' }}>
+        <a 
+          href="/api/download/subuser-apk"
+          download="krushi-trade-subuser.apk"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.4rem',
+            backgroundColor: '#059669',
+            color: '#ffffff',
+            padding: '0.55rem 0.8rem',
+            borderRadius: '8px',
+            textDecoration: 'none',
+            fontSize: '0.8rem',
+            fontWeight: '600',
+            textAlign: 'center'
+          }}
+        >
+          <span>📱 સબ યુઝર એપ (APK)</span>
+        </a>
+      </div>
+
       <div className="sidebar-footer">
         <button 
           className="nav logout" 

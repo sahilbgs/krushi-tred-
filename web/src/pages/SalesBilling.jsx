@@ -3,7 +3,7 @@ import { useData, BAG_STD_KG, MAN_STD_KG } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
 export const SalesBilling = ({ onBillCreated }) => {
-  const { farmers, seeds, stock, sales, recordSale, addFarmer } = useData();
+  const { parties, farmers, seeds, stock, sales, recordSale, addFarmer, getPartyTagInfo } = useData();
   const { userProfile } = useAuth();
 
   const getNextSaleBillNo = () => {
@@ -73,11 +73,11 @@ export const SalesBilling = ({ onBillCreated }) => {
 
   const handleFarmerChange = (fId) => {
     setFarmerId(fId);
-    const f = farmers.find(x => x.id === fId);
+    const f = (parties || farmers).find(x => x.id === fId);
     if (f) {
-      setFarmerName(f.name);
+      setFarmerName(f.name || f.firmName || '');
       setFarmerMobile(f.mobile || '');
-      setVillage(f.village || '');
+      setVillage(f.village || f.city || '');
     }
   };
 
@@ -310,14 +310,19 @@ export const SalesBilling = ({ onBillCreated }) => {
           </label>
 
           <label>
-            ખેડૂત / ગ્રાહક પસંદ કરો
+            ગ્રાહક / ખાતેદાર પસંદ કરો (ખેડૂત, પેઢી, સપ્લાયર, વેપારી)
             <select value={farmerId} onChange={e => handleFarmerChange(e.target.value)}>
               <option value="">માસ્ટરમાંથી પસંદ કરો (વૈકલ્પિક)</option>
-              {farmers.map(f => (
-                <option key={f.id} value={f.id}>
-                  {f.name} {f.village ? `(${f.village})` : ''} — બાકી: ₹{(parseFloat(f.currentBalance) || 0).toLocaleString('en-IN')} {(f.balanceType || '').toUpperCase()}
-                </option>
-              ))}
+              {parties.map(p => {
+                const tagInfo = getPartyTagInfo ? getPartyTagInfo(p.partyType) : { badge: 'પાર્ટી' };
+                const bal = (parseFloat(p.currentBalance) || 0).toLocaleString('en-IN');
+                const balType = (p.balanceType || '').toUpperCase();
+                return (
+                  <option key={p.id} value={p.id}>
+                    [{tagInfo.badge}] {p.name} {p.firmName && p.firmName !== p.name ? `— ${p.firmName}` : ''} {p.village ? `(${p.village})` : ''} — બાકી: ₹{bal} {balType}
+                  </option>
+                );
+              })}
             </select>
           </label>
 

@@ -23,7 +23,7 @@ const tabTitles = {
   sales: 'વેચાણ / સાદું બિલ (Sales Billing)',
   stock: 'વર્તમાન સ્ટોક લેજર (Stock Ledger)',
   khatabook: 'પાર્ટી ખાતાવહી & દૈનિક રોજમેળ',
-  farmers: 'ખેડૂત / ગ્રાહક માસ્ટર (Farmers)',
+  farmers: 'ગ્રાહક / પાર્ટી માસ્ટર (ખેડૂત, પેઢી, સપ્લાયર, વેપારી)',
   suppliers: 'પેઢી / સપ્લાયર્સ માસ્ટર (Suppliers)',
   seeds: 'બીજની જાતો માસ્ટર (Seed Varieties)',
   payments: 'જમા-ઉધાર વાઉચર એન્ટ્રી (Payments)',

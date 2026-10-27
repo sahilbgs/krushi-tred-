@@ -16,6 +16,27 @@ const DataContext = createContext(null);
 export const BAG_STD_KG = 35; // 1 Bag = 35 KG
 export const MAN_STD_KG = 20; // 1 Man (મણ) = 20 KG
 
+// Party Categories / Tags (ખેડૂત, પેઢી, સપ્લાયર, અન્ય વેપારી/વ્યક્તિ)
+export const PARTY_TAGS = [
+  { id: 'farmer', value: 'farmer', label: 'ખેડૂત', fullLabel: '🌾 ખેડૂત (Farmer)', badge: '🌾 ખેડૂત', color: '#15803d', bg: '#dcfce7', border: '#86efac' },
+  { id: 'firm', value: 'firm', label: 'પેઢી', fullLabel: '🏢 પેઢી (Pedhi / Firm)', badge: '🏢 પેઢી', color: '#1e40af', bg: '#dbeafe', border: '#93c5fd' },
+  { id: 'supplier', value: 'supplier', label: 'સપ્લાયર', fullLabel: '🚚 સપ્લાયર (Supplier)', badge: '🚚 સપ્લાયર', color: '#7e22ce', bg: '#f3e8ff', border: '#d8b4fe' },
+  { id: 'trader', value: 'trader', label: 'અન્ય વેપારી / વ્યક્તિ', fullLabel: '👤 અન્ય વેપારી / વ્યક્તિ (Trader / Person)', badge: '👤 અન્ય વેપારી', color: '#b45309', bg: '#fef3c7', border: '#fcd34d' }
+];
+
+export const getPartyTagInfo = (partyType) => {
+  const normalized = (partyType || 'farmer').toLowerCase();
+  const found = PARTY_TAGS.find(t => t.value === normalized);
+  if (found) return found;
+  if (normalized === 'transporter') {
+    return { id: 'transporter', value: 'transporter', label: 'ટ્રાન્સપોર્ટર', fullLabel: '🚛 ટ્રાન્સપોર્ટર', badge: '🚛 ટ્રાન્સપોર્ટર', color: '#475569', bg: '#f1f5f9', border: '#cbd5e1' };
+  }
+  if (normalized === 'other') {
+    return PARTY_TAGS[3];
+  }
+  return PARTY_TAGS[0];
+};
+
 // Seed Variety Master (35 KG Standard Bag Weight - Only Number/Code)
 const initialSeeds = [
   {
@@ -328,7 +349,7 @@ export const DataProvider = ({ children }) => {
 
   // Backward compatibility alias for legacy components
   const farmers = parties.filter(p => p.partyType === 'farmer');
-  const suppliers = parties.filter(p => p.partyType === 'firm' || p.partyType === 'trader');
+  const suppliers = parties.filter(p => p.partyType === 'firm' || p.partyType === 'supplier' || p.partyType === 'trader');
 
   // Database Live Status ('connected' | 'syncing' | 'offline')
   const [dbStatus, setDbStatus] = useState('syncing');
@@ -402,19 +423,27 @@ export const DataProvider = ({ children }) => {
 
   // ૧. નવો ખાતેદાર (Party) ઉમેરવો
   const addParty = (partyData) => {
-    const prefix = partyData.partyType === 'farmer' ? 'KH' : 
-                   partyData.partyType === 'firm' ? 'FIRM' : 
-                   partyData.partyType === 'trader' ? 'TRD' : 
-                   partyData.partyType === 'truck_owner' ? 'TRK' : 'PTY';
-    const count = parties.filter(p => p.partyType === partyData.partyType).length + 1;
+    const rawType = (partyData.partyType || 'farmer').toLowerCase();
+    const partyType = ['farmer', 'firm', 'supplier', 'trader', 'transporter', 'other'].includes(rawType) ? rawType : 'farmer';
+    const prefixMap = {
+      farmer: 'KH',
+      firm: 'PDH',
+      supplier: 'SUP',
+      trader: 'TRD',
+      transporter: 'TRK',
+      other: 'PER'
+    };
+    const prefix = prefixMap[partyType] || 'PTY';
+    const count = parties.filter(p => p.partyType === partyType).length + 1;
     const newParty = {
       id: partyData.id || ("pty_" + Date.now()),
       code: partyData.code || `${prefix}-${count.toString().padStart(3, '0')}`,
       openingBalance: parseFloat(partyData.openingBalance || 0),
       currentBalance: parseFloat(partyData.openingBalance || 0),
-      balanceType: partyData.balanceType || (partyData.partyType === 'farmer' ? 'dr' : 'cr'),
+      balanceType: partyData.balanceType || (partyType === 'farmer' ? 'dr' : 'cr'),
       createdAt: new Date().toISOString(),
-      ...partyData
+      ...partyData,
+      partyType
     };
 
     setParties(prev => [newParty, ...prev]);
@@ -1050,6 +1079,8 @@ export const DataProvider = ({ children }) => {
       companyName: "SHREE NANDINI SEEDS",
       BAG_STD_KG,
       MAN_STD_KG,
+      PARTY_TAGS,
+      getPartyTagInfo,
       seeds,
       stock,
       parties,

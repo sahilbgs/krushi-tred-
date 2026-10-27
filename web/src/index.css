@@ -1184,3 +1184,102 @@ pre {
 .printable-bill {
   background: white;
 }
+
+/* Party Tag Badges & Buttons */
+.party-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.party-tag-farmer {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+.party-tag-firm {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+}
+.party-tag-supplier {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border-color: #d8b4fe;
+}
+.party-tag-trader, .party-tag-other {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fcd34d;
+}
+
+.tag-filter-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.tag-pill-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tag-pill-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.tag-pill-btn.active {
+  background: #15803d;
+  color: #ffffff;
+  border-color: #15803d;
+}
+
+.tag-selector-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+.tag-select-option {
+  flex: 1;
+  min-width: 130px;
+  padding: 10px 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  background: #ffffff;
+  color: #334155;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.tag-select-option:hover {
+  border-color: #86efac;
+}
+.tag-select-option.selected {
+  border-color: #15803d;
+  background: #f0fdf4;
+  color: #15803d;
+  box-shadow: 0 2px 8px rgba(21, 128, 61, 0.15);
+}

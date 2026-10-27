@@ -98,20 +98,38 @@ export const Payments = () => {
             ખાતેદાર (ખેડૂત / પાર્ટી) પસંદ કરો*
             <select required value={partyId} onChange={e => setPartyId(e.target.value)}>
               <option value="">ખેડૂત અથવા પાર્ટી પસંદ કરો</option>
-              {farmers.length > 0 && (
-                <optgroup label="🌱 ખેડૂત મિત્રો (Farmers)">
-                  {farmers.map(f => (
+              {parties.filter(p => p.partyType === 'farmer').length > 0 && (
+                <optgroup label="🌾 ખેડૂત મિત્રો (Farmers)">
+                  {parties.filter(p => p.partyType === 'farmer').map(f => (
                     <option key={f.id} value={f.id}>
                       {f.name} {f.village ? `(${f.village})` : ''} — બાકી: ₹{(f.currentBalance || 0).toLocaleString('en-IN')} {(f.balanceType || '').toUpperCase()}
                     </option>
                   ))}
                 </optgroup>
               )}
-              {parties.filter(p => p.partyType !== 'farmer').length > 0 && (
-                <optgroup label="🏢 પેઢી / વેપારી / પાર્ટીઓ (Firms / Traders)">
-                  {parties.filter(p => p.partyType !== 'farmer').map(s => (
+              {parties.filter(p => p.partyType === 'firm').length > 0 && (
+                <optgroup label="🏢 પેઢીઓ (Firms / Pedhis)">
+                  {parties.filter(p => p.partyType === 'firm').map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.firmName || s.name || s.companyName} {s.village || s.taluka || s.city ? `(${s.village || s.taluka || s.city})` : ''} — બાકી: ₹{(s.currentBalance || 0).toLocaleString('en-IN')} {(s.balanceType || '').toUpperCase()}
+                      {s.firmName || s.name} {s.village || s.city ? `(${s.village || s.city})` : ''} — બાકી: ₹{(s.currentBalance || 0).toLocaleString('en-IN')} {(s.balanceType || '').toUpperCase()}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {parties.filter(p => p.partyType === 'supplier').length > 0 && (
+                <optgroup label="🚚 સપ્લાયર્સ (Suppliers)">
+                  {parties.filter(p => p.partyType === 'supplier').map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name || s.firmName} {s.village || s.city ? `(${s.village || s.city})` : ''} — બાકી: ₹{(s.currentBalance || 0).toLocaleString('en-IN')} {(s.balanceType || '').toUpperCase()}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {parties.filter(p => ['trader', 'other'].includes(p.partyType)).length > 0 && (
+                <optgroup label="👤 અન્ય વેપારી / વ્યક્તિઓ (Traders / Persons)">
+                  {parties.filter(p => ['trader', 'other'].includes(p.partyType)).map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} {s.village || s.city ? `(${s.village || s.city})` : ''} — બાકી: ₹{(s.currentBalance || 0).toLocaleString('en-IN')} {(s.balanceType || '').toUpperCase()}
                     </option>
                   ))}
                 </optgroup>

@@ -10,7 +10,7 @@ export const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
     { id: 'sales', label: 'વેચાણ / બિલિંગ', allowed: hasPermission('salesBilling') },
     { id: 'stock', label: 'સ્ટોક (Stock)', allowed: hasPermission('stockManagement') },
     { id: 'khatabook', label: 'ખાતાવહી & રોજમેળ', allowed: true },
-    { id: 'farmers', label: 'ખેડૂત / ગ્રાહક', allowed: hasPermission('farmerMaster') },
+    { id: 'farmers', label: 'ગ્રાહક & પાર્ટી માસ્ટર', allowed: hasPermission('farmerMaster') },
     { id: 'suppliers', label: 'પેઢી / સપ્લાયર્સ', allowed: hasPermission('supplierMaster') },
     { id: 'seeds', label: 'બીજની જાતો', allowed: hasPermission('seedMaster') },
     { id: 'payments', label: 'જમા-ઉધાર વાઉચર', allowed: hasPermission('payments') },

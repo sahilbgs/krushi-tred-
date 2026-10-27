@@ -396,9 +396,10 @@ export const KhataBook = () => {
             <div style={{ display: 'flex', gap: '0.25rem', overflowX: 'auto', marginBottom: '0.75rem' }}>
               {[
                 { id: 'all', label: 'બધા' },
-                { id: 'farmer', label: 'ખેડૂત' },
-                { id: 'firm', label: 'પેઢી' },
-                { id: 'trader', label: 'વેપારી' }
+                { id: 'farmer', label: '🌾 ખેડૂત' },
+                { id: 'firm', label: '🏢 પેઢી' },
+                { id: 'supplier', label: '🚚 સપ્લાયર' },
+                { id: 'trader', label: '👤 વેપારી' }
               ].map(t => (
                 <button
                   key={t.id}
@@ -1043,11 +1044,10 @@ export const KhataBook = () => {
                   className="form-control"
                   value={newPartyForm.partyType}
                   onChange={(e) => setNewPartyForm(prev => ({ ...prev, partyType: e.target.value, balanceType: e.target.value === 'farmer' ? 'dr' : 'cr' }))}>
-                  <option value="farmer">ખેડૂત (Farmer)</option>
-                  <option value="firm">માર્કેટ પેઢી (Firm / Pethi)</option>
-                  <option value="trader">વેપારી (Trader)</option>
-                  <option value="truck_owner">ટ્રક માલિક (Truck Owner)</option>
-                  <option value="other">અન્ય (Other)</option>
+                  <option value="farmer">🌾 ખેડૂત (Farmer)</option>
+                  <option value="firm">🏢 પેઢી (Pedhi / Firm)</option>
+                  <option value="supplier">🚚 સપ્લાયર (Supplier)</option>
+                  <option value="trader">👤 અન્ય વેપારી / વ્યક્તિ (Trader / Person)</option>
                 </select>
               </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useData, BAG_STD_KG, MAN_STD_KG } from '../context/DataContext';
+import { useData, BAG_STD_KG, MAN_STD_KG, PARTY_TAGS, getPartyTagInfo } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
 export const PurchaseEntry = ({ onPurchaseCompleted }) => {
@@ -28,8 +28,8 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     return `SN-PUR-${new Date().getFullYear()}-${(maxNum + 1).toString().padStart(4, '0')}`;
   };
 
-  // Mode: 'farmer' (સીધા ખેડૂત પાસેથી) or 'market' (માર્કેટમાંથી વેપારી પાસેથી)
-  const [sourceType, setSourceType] = useState('farmer');
+  // Filter tag for the customer selector: 'all' | 'farmer' | 'firm' | 'supplier' | 'trader'
+  const [selectedTagFilter, setSelectedTagFilter] = useState('all');
 
   // Common Header State
   const [billNo, setBillNo] = useState(getNextBillNo);
@@ -37,8 +37,10 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
   useEffect(() => {
     setBillNo(getNextBillNo());
   }, [purchases]);
+
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [partyId, setPartyId] = useState('');
+  const [partyType, setPartyType] = useState('farmer'); // 'farmer' | 'firm' | 'supplier' | 'trader'
   const [partyName, setPartyName] = useState('');
   const [partyMobile, setPartyMobile] = useState('');
   const [village, setVillage] = useState('');
@@ -47,14 +49,15 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
   const [paid, setPaid] = useState('0');
   const [note, setNote] = useState('');
 
-  // Mode: Market / Trader Specific Fields
+  // Transport & Commission Fields
+  const [showTransportDetails, setShowTransportDetails] = useState(false);
   const [pethiName, setPethiName] = useState('');
   const [truckNumber, setTruckNumber] = useState('');
   const [truckOwnerName, setTruckOwnerName] = useState('');
   const [marketCommission, setMarketCommission] = useState('0');
   const [pethiCommission, setPethiCommission] = useState('0');
   const [bardana, setBardana] = useState('0');
-  const [labour, setLabour] = useState(sourceType === 'farmer' ? '10' : '0'); // per bag if farmer, total if market
+  const [labour, setLabour] = useState('10'); // per bag labour (default 10)
 
   // Multi-item rows
   const [items, setItems] = useState([
@@ -65,15 +68,52 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
   const [notice, setNotice] = useState('');
   const [lastInvoice, setLastInvoice] = useState(null);
 
-  // Filtered Parties based on Source Type
+  // Quick Add Party Modal
+  const [showAddPartyModal, setShowAddPartyModal] = useState(false);
+  const [newPartyForm, setNewPartyForm] = useState({
+    partyType: 'farmer',
+    name: '',
+    firmName: '',
+    mobile: '',
+    village: '',
+    openingBalance: '0',
+    balanceType: 'cr'
+  });
+
+  // Filtered Parties based on Tag selection (defaults to all)
   const activeParties = parties.filter(p => {
-    if (sourceType === 'farmer') return p.partyType === 'farmer';
-    if (sourceType === 'market') return p.partyType === 'firm' || p.partyType === 'trader';
+    if (selectedTagFilter === 'all') return true;
+    if (selectedTagFilter === 'farmer') return p.partyType === 'farmer';
+    if (selectedTagFilter === 'firm') return p.partyType === 'firm';
+    if (selectedTagFilter === 'supplier') return p.partyType === 'supplier';
+    if (selectedTagFilter === 'trader') return p.partyType === 'trader' || p.partyType === 'other';
     return true;
   });
 
   const money = n => '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN');
   const num = v => Math.max(0, Number(v || 0));
+
+  // Handle party select from dropdown
+  const handlePartySelect = (id) => {
+    setPartyId(id);
+    const p = parties.find(x => x.id === id);
+    if (p) {
+      setPartyName(p.name || p.firmName || '');
+      setPartyType(p.partyType || 'farmer');
+      if (p.mobile) setPartyMobile(p.mobile);
+      if (p.village || p.city) setVillage(p.village || p.city || '');
+      if (p.firmName) {
+        setPethiName(p.firmName);
+      } else if (['firm', 'supplier'].includes(p.partyType)) {
+        setPethiName(p.name);
+      }
+
+      // If supplier or firm, expand transport/commission details automatically
+      if (['firm', 'supplier'].includes(p.partyType)) {
+        setShowTransportDetails(true);
+      }
+    }
+  };
 
   // Dynamic Line & Totals calculation: 1 bag = 35 KG, 1 man = 20 KG
   const totals = items.reduce((sum, row) => {
@@ -91,11 +131,9 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     };
   }, { kg: 0, man: 0, goods: 0, bags: 0 });
 
-  // Charges calculation
-  const chargesTotal = sourceType === 'farmer'
-    ? num(labour) * totals.bags
-    : num(marketCommission) + num(pethiCommission) + num(bardana) + num(labour);
-
+  // Charges calculation: labour per bag + optional commissions/bardana
+  const labourTotal = num(labour) * totals.bags;
+  const chargesTotal = labourTotal + num(marketCommission) + num(pethiCommission) + num(bardana);
   const netTotal = totals.goods + chargesTotal;
   const balance = Math.max(0, netTotal - num(paid));
 
@@ -118,7 +156,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     if (isSubmitting) return;
     setNotice('');
 
-    if (!partyName) {
+    if (!partyName.trim()) {
       setNotice('કૃપા કરીને ખાતેદાર / પાર્ટીનું નામ દાખલ કરો.');
       return;
     }
@@ -170,24 +208,28 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       };
     });
 
+    // Determine purchaseType for backend backward-compatibility
+    const legacyPurchaseType = ['firm', 'supplier', 'trader'].includes(partyType) ? 'market' : 'farmer';
+
     const payload = {
-      purchaseType: sourceType,
+      purchaseType: legacyPurchaseType,
+      partyType,
       billNo: billNo || `SN-PUR-${Date.now().toString().slice(-6)}`,
       purchaseDate: date,
       partyId,
-      partyName,
+      partyName: partyName.trim(),
       partyMobile,
       village,
-      pethiName: sourceType === 'market' ? pethiName : '',
-      truckNumber: sourceType === 'market' ? truckNumber : '',
-      truckOwnerName: sourceType === 'market' ? truckOwnerName : '',
+      pethiName: pethiName || '',
+      truckNumber: truckNumber || '',
+      truckOwnerName: truckOwnerName || '',
       items: normalizedItems,
       itemsSubTotal: totals.goods,
-      majuriRatePerBag: sourceType === 'farmer' ? num(labour) : 0,
-      majuriAmount: sourceType === 'farmer' ? num(labour) * totals.bags : num(labour),
-      marketCommission: sourceType === 'market' ? num(marketCommission) : 0,
-      firmCommission: sourceType === 'market' ? num(pethiCommission) : 0,
-      bardanExpense: sourceType === 'market' ? num(bardana) : 0,
+      majuriRatePerBag: num(labour),
+      majuriAmount: labourTotal,
+      marketCommission: num(marketCommission),
+      firmCommission: num(pethiCommission),
+      bardanExpense: num(bardana),
       totalExpenses: chargesTotal,
       netTotal,
       paidAmount: num(paid),
@@ -205,10 +247,11 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       setLastInvoice({
         invoiceNo: saved.billNo,
         date,
-        partyName,
+        partyName: partyName.trim(),
         partyMobile,
         village,
-        purchaseSource: sourceType,
+        partyTag: partyType,
+        purchaseSource: legacyPurchaseType,
         pethiName,
         truckNumber,
         truckOwnerName,
@@ -216,7 +259,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
         goodsTotal: totals.goods,
         totalAmount: netTotal,
         charges: {
-          labour: num(labour),
+          labour: labourTotal,
           marketCommission: num(marketCommission),
           pethiCommission: num(pethiCommission),
           bardana: num(bardana)
@@ -241,6 +284,8 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       setTimeout(() => setIsSubmitting(false), 500);
     }
   };
+
+  const selectedPartyObj = parties.find(p => p.id === partyId);
 
   return (
     <div>
@@ -267,7 +312,14 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
             <div className="invoice-head">
               <div>
                 <h1>🌱 Shree Nandini Seeds</h1>
-                <p>બિયારણ ખરીદી વાઉચર / પાવતી ({lastInvoice.purchaseSource === 'farmer' ? 'સીધા ખેડૂત પાસેથી' : 'માર્કેટ પેઢી પાસેથી'})</p>
+                <p>
+                  બિયારણ ખરીદી વાઉચર / પાવતી 
+                  {lastInvoice.partyTag && (
+                    <span style={{ marginLeft: '8px' }} className={`party-tag-badge party-tag-${lastInvoice.partyTag}`}>
+                      {getPartyTagInfo(lastInvoice.partyTag).badge}
+                    </span>
+                  )}
+                </p>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <b style={{ fontSize: '18px', color: '#176343' }}>{lastInvoice.invoiceNo}</b>
@@ -277,15 +329,20 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
 
             <p>
               <b>પાર્ટી:</b> {lastInvoice.partyName || '—'} 
-              {lastInvoice.village ? ` | ગામ: ${lastInvoice.village}` : ''} 
+              {lastInvoice.partyTag && (
+                <span style={{ marginLeft: '6px' }} className={`party-tag-badge party-tag-${lastInvoice.partyTag}`}>
+                  {getPartyTagInfo(lastInvoice.partyTag).label}
+                </span>
+              )}
+              {lastInvoice.village ? ` | ગામ/શહેર: ${lastInvoice.village}` : ''} 
               {lastInvoice.partyMobile ? ` | મોબાઇલ: ${lastInvoice.partyMobile}` : ''}
             </p>
 
-            {lastInvoice.purchaseSource === 'market' && (
+            {lastInvoice.pethiName && (
               <p>
-                <b>પેઢી:</b> {lastInvoice.pethiName || '—'} | 
-                <b>ટ્રક નં:</b> {lastInvoice.truckNumber || '—'} | 
-                <b>ટ્રક માલિક:</b> {lastInvoice.truckOwnerName || '—'}
+                <b>પેઢી/સપ્લાયર:</b> {lastInvoice.pethiName}
+                {lastInvoice.truckNumber ? ` | ટ્રક નં: ${lastInvoice.truckNumber}` : ''}
+                {lastInvoice.truckOwnerName ? ` | ટ્રાન્સપોર્ટ: ${lastInvoice.truckOwnerName}` : ''}
               </p>
             )}
 
@@ -319,17 +376,14 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
               {lastInvoice.charges && Object.entries(lastInvoice.charges).map(([k, v]) => {
                 if (Number(v) <= 0) return null;
                 const labelMap = {
-                  labour: lastInvoice.purchaseSource === 'farmer' ? 'મજૂરી ખર્ચ' : 'મજૂરી',
+                  labour: 'મજૂરી ખર્ચ',
                   marketCommission: 'માર્કેટ કમિશન',
                   pethiCommission: 'પેઢીનું કમિશન',
                   bardana: 'બારદાન ખર્ચ'
                 };
-                const totalCharge = lastInvoice.purchaseSource === 'farmer' && k === 'labour'
-                  ? v * lastInvoice.items.reduce((a, x) => a + x.bags, 0)
-                  : v;
                 return (
                   <p key={k}>
-                    {labelMap[k] || k}: <b>{money(totalCharge)}</b>
+                    {labelMap[k] || k}: <b>{money(v)}</b>
                   </p>
                 );
               })}
@@ -350,66 +404,297 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
         </div>
       )}
 
-      {/* Main Purchase Form Panel (v2) */}
-      <form className="panel purchase-form" onSubmit={handleSubmit}>
-        <h2>નવી બિયારણ ખરીદી એન્ટ્રી</h2>
+      {/* Quick Add Party Modal */}
+      {showAddPartyModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <h2 style={{ margin: 0, color: '#166534', fontSize: '1.25rem' }}>
+                🌱 નવો ખાતેદાર ઉમેરો
+              </h2>
+              <button
+                type="button"
+                className="secondary"
+                style={{ padding: '2px 8px', fontSize: '1.1rem' }}
+                onClick={() => setShowAddPartyModal(false)}
+              >
+                ✕
+              </button>
+            </div>
 
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newPartyForm.name.trim()) return;
+                const created = addParty({
+                  partyType: newPartyForm.partyType,
+                  name: newPartyForm.name.trim(),
+                  firmName: newPartyForm.firmName.trim() || (['firm', 'supplier'].includes(newPartyForm.partyType) ? newPartyForm.name.trim() : ''),
+                  mobile: newPartyForm.mobile.trim(),
+                  village: newPartyForm.village.trim(),
+                  openingBalance: parseFloat(newPartyForm.openingBalance) || 0,
+                  balanceType: newPartyForm.balanceType || (newPartyForm.partyType === 'farmer' ? 'dr' : 'cr')
+                });
+                setPartyId(created.id);
+                setPartyName(created.name);
+                setPartyType(created.partyType);
+                if (created.mobile) setPartyMobile(created.mobile);
+                if (created.village) setVillage(created.village);
+                if (created.firmName) setPethiName(created.firmName);
+                setShowAddPartyModal(false);
+                setNotice(`ખાતેદાર "${created.name}" [${getPartyTagInfo(created.partyType).label}] સફળતાપૂર્વક ઉમેરાયા અને પસંદ થયા.`);
+                setNewPartyForm({
+                  partyType: 'farmer',
+                  name: '',
+                  firmName: '',
+                  mobile: '',
+                  village: '',
+                  openingBalance: '0',
+                  balanceType: 'cr'
+                });
+              }}
+              style={{ padding: '1.25rem' }}
+            >
+              <div style={{ marginBottom: '14px' }}>
+                <span style={{ fontSize: '0.88rem', fontWeight: '700', color: '#14532d', display: 'block', marginBottom: '6px' }}>
+                  પાર્ટી ટેગ (વર્ગીકરણ) પસંદ કરો:*
+                </span>
+                <div className="tag-selector-row">
+                  {[
+                    { type: 'farmer', icon: '🌾', label: 'ખેડૂત', sub: 'Farmer' },
+                    { type: 'firm', icon: '🏢', label: 'પેઢી', sub: 'Pedhi / Firm' },
+                    { type: 'supplier', icon: '🚚', label: 'સપ્લાયર', sub: 'Supplier' },
+                    { type: 'trader', icon: '👤', label: 'અન્ય વેપારી / વ્યક્તિ', sub: 'Trader / Person' }
+                  ].map(t => (
+                    <div
+                      key={t.type}
+                      className={`tag-select-option ${newPartyForm.partyType === t.type ? 'selected' : ''}`}
+                      onClick={() => setNewPartyForm(prev => ({
+                        ...prev,
+                        partyType: t.type,
+                        balanceType: t.type === 'farmer' ? 'dr' : 'cr'
+                      }))}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>{t.icon}</span>
+                      <span>{t.label}</span>
+                      <small style={{ fontSize: '0.72rem', color: '#64748b' }}>{t.sub}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="formgrid">
+                <label>
+                  {['firm', 'supplier'].includes(newPartyForm.partyType) ? 'કંપની / પેઢીનું નામ*' : 'પૂરું નામ*'}
+                  <input
+                    required
+                    value={newPartyForm.name}
+                    onChange={e => setNewPartyForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder={['firm', 'supplier'].includes(newPartyForm.partyType) ? 'દા.ત. શ્રી ગણેશ ટ્રેડિંગ કંપની' : 'દા.ત. રમેશભાઈ પટેલ'}
+                  />
+                </label>
+
+                {['firm', 'supplier'].includes(newPartyForm.partyType) && (
+                  <label>
+                    સંપર્ક વ્યક્તિ (Contact Person)
+                    <input
+                      value={newPartyForm.firmName}
+                      onChange={e => setNewPartyForm(prev => ({ ...prev, firmName: e.target.value }))}
+                      placeholder="માલિક / વેપારીનું નામ"
+                    />
+                  </label>
+                )}
+
+                <label>
+                  મોબાઇલ નંબર
+                  <input
+                    value={newPartyForm.mobile}
+                    onChange={e => setNewPartyForm(prev => ({ ...prev, mobile: e.target.value }))}
+                    placeholder="૧૦ આંકડાનો મોબાઇલ"
+                  />
+                </label>
+
+                <label>
+                  ગામ / શહેર / યાર્ડ
+                  <input
+                    value={newPartyForm.village}
+                    onChange={e => setNewPartyForm(prev => ({ ...prev, village: e.target.value }))}
+                    placeholder="દા.ત. ગોંડલ, રાજકોટ"
+                  />
+                </label>
+
+                <label>
+                  શરૂઆતની બાકી (Opening Balance ₹)
+                  <input
+                    type="number"
+                    min="0"
+                    value={newPartyForm.openingBalance}
+                    onChange={e => setNewPartyForm(prev => ({ ...prev, openingBalance: e.target.value }))}
+                  />
+                </label>
+
+                <label>
+                  બેલેન્સ પ્રકાર
+                  <select
+                    value={newPartyForm.balanceType}
+                    onChange={e => setNewPartyForm(prev => ({ ...prev, balanceType: e.target.value }))}
+                  >
+                    <option value="cr">CR (જમા - આપણે ચૂકવવાના)</option>
+                    <option value="dr">DR (ઉધાર - આપણે લેવાના)</option>
+                  </select>
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setShowAddPartyModal(false)}
+                >
+                  રદ કરો
+                </button>
+                <button
+                  type="submit"
+                  className="primary-action"
+                  style={{ width: 'auto', padding: '9px 20px' }}
+                >
+                  સેવ કરો અને ખરીદીમાં પસંદ કરો
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Main Purchase Form Panel */}
+      <form className="panel purchase-form" onSubmit={handleSubmit}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+          <h2 style={{ margin: 0 }}>નવી બિયારણ ખરીદી એન્ટ્રી</h2>
+          <button
+            type="button"
+            className="primary-action"
+            style={{ width: 'auto', padding: '7px 14px', fontSize: '0.84rem' }}
+            onClick={() => setShowAddPartyModal(true)}
+          >
+            ＋ નવો ખાતેદાર ઉમેરો (ખેડૂત / પેઢી / સપ્લાયર)
+          </button>
+        </div>
+
+        {/* 1. Unified Customer Selection with Tag Filters */}
+        <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#166534' }}>
+              ખાતેદાર પ્રકાર / ટેગ ફિલ્ટર:
+            </span>
+            <div className="tag-filter-pills" style={{ margin: 0 }}>
+              <button
+                type="button"
+                className={`tag-pill-btn ${selectedTagFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setSelectedTagFilter('all')}
+              >
+                બધા ખાતેદારો ({parties.length})
+              </button>
+              <button
+                type="button"
+                className={`tag-pill-btn ${selectedTagFilter === 'farmer' ? 'active' : ''}`}
+                onClick={() => setSelectedTagFilter('farmer')}
+              >
+                🌾 ખેડૂત ({parties.filter(p => p.partyType === 'farmer').length})
+              </button>
+              <button
+                type="button"
+                className={`tag-pill-btn ${selectedTagFilter === 'firm' ? 'active' : ''}`}
+                onClick={() => setSelectedTagFilter('firm')}
+              >
+                🏢 પેઢી ({parties.filter(p => p.partyType === 'firm').length})
+              </button>
+              <button
+                type="button"
+                className={`tag-pill-btn ${selectedTagFilter === 'supplier' ? 'active' : ''}`}
+                onClick={() => setSelectedTagFilter('supplier')}
+              >
+                🚚 સપ્લાયર ({parties.filter(p => p.partyType === 'supplier').length})
+              </button>
+              <button
+                type="button"
+                className={`tag-pill-btn ${selectedTagFilter === 'trader' ? 'active' : ''}`}
+                onClick={() => setSelectedTagFilter('trader')}
+              >
+                👤 અન્ય વેપારી ({parties.filter(p => ['trader', 'other'].includes(p.partyType)).length})
+              </button>
+            </div>
+          </div>
+
+          <div className="formgrid" style={{ marginBottom: 0 }}>
+            <label className="full" style={{ marginBottom: 0 }}>
+              ખાતેદાર / ગ્રાહક પસંદ કરો (ખેડૂત, પેઢી, સપ્લાયર, અન્ય વેપારી એક જ લિસ્ટમાં)
+              <select
+                value={partyId}
+                onChange={e => handlePartySelect(e.target.value)}
+                style={{ fontSize: '0.95rem', fontWeight: '600' }}
+              >
+                <option value="">-- માસ્ટરમાંથી ખાતેદાર / પાર્ટી પસંદ કરો --</option>
+                {activeParties.map(p => {
+                  const tagInfo = getPartyTagInfo(p.partyType);
+                  const bal = (parseFloat(p.currentBalance) || 0).toLocaleString('en-IN');
+                  const balType = (p.balanceType || '').toUpperCase();
+                  return (
+                    <option key={p.id} value={p.id}>
+                      [{tagInfo.badge}] {p.name} {p.firmName && p.firmName !== p.name ? `— ${p.firmName}` : ''} {p.village ? `(${p.village})` : ''} — બાકી: ₹{bal} {balType}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+          </div>
+
+          {/* Selected Party Summary Card */}
+          {selectedPartyObj && (
+            <div style={{ marginTop: '10px', padding: '8px 12px', background: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className={`party-tag-badge party-tag-${selectedPartyObj.partyType || 'farmer'}`}>
+                  {getPartyTagInfo(selectedPartyObj.partyType).badge}
+                </span>
+                <b>{selectedPartyObj.name}</b>
+                {selectedPartyObj.firmName && selectedPartyObj.firmName !== selectedPartyObj.name && (
+                  <span style={{ color: '#047857', fontSize: '0.85rem' }}>({selectedPartyObj.firmName})</span>
+                )}
+                {selectedPartyObj.village && (
+                  <span style={{ color: '#4b5563', fontSize: '0.85rem' }}>• {selectedPartyObj.village}</span>
+                )}
+                {selectedPartyObj.mobile && (
+                  <span style={{ color: '#4b5563', fontSize: '0.85rem' }}>• 📞 {selectedPartyObj.mobile}</span>
+                )}
+              </div>
+              <div style={{ fontWeight: '700', fontSize: '0.88rem' }}>
+                ચાલુ બાકી: <span style={{ color: (selectedPartyObj.balanceType || '').toLowerCase() === 'cr' ? '#1d4ed8' : '#b91c1c' }}>
+                  ₹{(parseFloat(selectedPartyObj.currentBalance) || 0).toLocaleString('en-IN')} {((selectedPartyObj.balanceType || '').toUpperCase())}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 2. Party Details and Header Grid */}
         <div className="formgrid">
           <label>
-            ખરીદીનો પ્રકાર
+            પાર્ટી ટેગ (વર્ગીકરણ)*
             <select
-              value={sourceType}
+              value={partyType}
               onChange={e => {
-                setSourceType(e.target.value);
-                setPartyId('');
-                setPartyName('');
-                setPartyMobile('');
-                setVillage('');
-                setPethiName('');
+                setPartyType(e.target.value);
                 setLabour(e.target.value === 'farmer' ? '10' : '0');
-              }}>
-              <option value="farmer">1. સીધા ખેડૂત પાસેથી ખરીદી</option>
-              <option value="market">2. માર્કેટમાંથી વેપારી પાસેથી ખરીદી</option>
-            </select>
-          </label>
-
-          {sourceType === 'market' && (
-            <label>
-              પેઢીનું નામ*
-              <input
-                required
-                value={pethiName}
-                onChange={e => setPethiName(e.target.value)}
-                placeholder="પેઢીનું નામ (દા.ત. શ્રી ગણેશ ટ્રેડિંગ)"
-              />
-            </label>
-          )}
-
-          <label>
-            {sourceType === 'farmer' ? 'ખેડૂતનું નામ' : 'વેપારીનું નામ'}
-            <select
-              value={partyId}
-              onChange={e => {
-                setPartyId(e.target.value);
-                const p = activeParties.find(x => x.id === e.target.value);
-                if (p) {
-                  setPartyName(p.name || '');
-                  if (p.mobile) setPartyMobile(p.mobile);
-                  if (p.village) setVillage(p.village);
-                  if (sourceType === 'market' && p.firmName) setPethiName(p.firmName);
-                }
-              }}>
-              <option value="">માસ્ટરમાંથી પસંદ કરો (વૈકલ્પિક)</option>
-              {activeParties.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name} {p.firmName ? ` — ${p.firmName}` : ''} {p.village ? `(${p.village})` : ''}
-                </option>
-              ))}
+              }}
+            >
+              <option value="farmer">🌾 ખેડૂત (Farmer)</option>
+              <option value="firm">🏢 પેઢી (Pedhi / Firm)</option>
+              <option value="supplier">🚚 સપ્લાયર (Supplier)</option>
+              <option value="trader">👤 અન્ય વેપારી / વ્યક્તિ (Trader / Person)</option>
             </select>
           </label>
 
           <label>
-            {sourceType === 'farmer' ? 'ખેડૂતનું નામ*' : 'પાર્ટીનું નામ*'}
+            ખાતેદાર / પાર્ટીનું નામ*
             <input
               required
               value={partyName}
@@ -418,46 +703,34 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
             />
           </label>
 
-          {sourceType === 'farmer' && (
+          {(partyType === 'firm' || partyType === 'supplier' || pethiName) && (
             <label>
-              મોબાઇલ નંબર
+              પેઢી / કંપનીનું નામ
               <input
-                value={partyMobile}
-                onChange={e => setPartyMobile(e.target.value)}
-                placeholder="૧૦ આંકડાનો મોબાઇલ"
+                value={pethiName}
+                onChange={e => setPethiName(e.target.value)}
+                placeholder="દા.ત. શ્રી ગણેશ ટ્રેડિંગ"
               />
             </label>
           )}
 
           <label>
-            ગામ / યાર્ડ
+            મોબાઇલ નંબર
             <input
-              value={village}
-              onChange={e => setVillage(e.target.value)}
-              placeholder="ગામ / માર્કેટ યાર્ડ"
+              value={partyMobile}
+              onChange={e => setPartyMobile(e.target.value)}
+              placeholder="૧૦ આંકડાનો મોબાઇલ"
             />
           </label>
 
-          {sourceType === 'market' && (
-            <>
-              <label>
-                ટ્રક નંબર
-                <input
-                  value={truckNumber}
-                  onChange={e => setTruckNumber(e.target.value)}
-                  placeholder="દા.ત. GJ-11-X-4589"
-                />
-              </label>
-              <label>
-                ટ્રક માલિકનું નામ
-                <input
-                  value={truckOwnerName}
-                  onChange={e => setTruckOwnerName(e.target.value)}
-                  placeholder="દા.ત. જય ખોડિયાર ટ્રાન્સપોર્ટ"
-                />
-              </label>
-            </>
-          )}
+          <label>
+            ગામ / શહેર / યાર્ડ
+            <input
+              value={village}
+              onChange={e => setVillage(e.target.value)}
+              placeholder="ગામ / શહેર / માર્કેટ યાર્ડ"
+            />
+          </label>
 
           <label>
             તારીખ*
@@ -473,13 +746,75 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
             ચુકવણી રીત
             <select
               value={paymentMode}
-              onChange={e => setPaymentMode(e.target.value)}>
+              onChange={e => setPaymentMode(e.target.value)}
+            >
               <option value="bank">બેંક ટ્રાન્સફર / NEFT / RTGS</option>
               <option value="cash">રોકડ (CASH)</option>
               <option value="credit">ઉધાર (CREDIT)</option>
-              <option value="credit">આંશિક ચુકવણી (PARTIAL)</option>
+              <option value="partial">આંશિક ચુકવણી (PARTIAL)</option>
             </select>
           </label>
+        </div>
+
+        {/* 3. Collapsible Transport & Market Details */}
+        <div style={{ marginTop: '10px', marginBottom: '16px' }}>
+          <button
+            type="button"
+            className="secondary"
+            style={{ fontSize: '0.84rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => setShowTransportDetails(prev => !prev)}
+          >
+            <span>{showTransportDetails ? '▼' : '▶'}</span>
+            <span>ટ્રાન્સપોર્ટ & માર્કેટ કમિશન વિગતો (ટ્રક નં, ટ્રાન્સપોર્ટ, કમિશન, બારદાન)</span>
+          </button>
+
+          {(showTransportDetails || partyType === 'firm' || partyType === 'supplier' || truckNumber || num(marketCommission) > 0) && (
+            <div className="panel formgrid" style={{ marginTop: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <label>
+                ટ્રક / વાહન નંબર
+                <input
+                  value={truckNumber}
+                  onChange={e => setTruckNumber(e.target.value)}
+                  placeholder="દા.ત. GJ-11-X-4589"
+                />
+              </label>
+              <label>
+                ટ્રાન્સપોર્ટ / ટ્રક માલિક
+                <input
+                  value={truckOwnerName}
+                  onChange={e => setTruckOwnerName(e.target.value)}
+                  placeholder="દા.ત. જય ખોડિયાર ટ્રાન્સપોર્ટ"
+                />
+              </label>
+              <label>
+                માર્કેટ કમિશન (₹)
+                <input
+                  type="number"
+                  min="0"
+                  value={marketCommission}
+                  onChange={e => setMarketCommission(e.target.value)}
+                />
+              </label>
+              <label>
+                પેઢીનું કમિશન (₹)
+                <input
+                  type="number"
+                  min="0"
+                  value={pethiCommission}
+                  onChange={e => setPethiCommission(e.target.value)}
+                />
+              </label>
+              <label>
+                બારદાન ખર્ચ (₹)
+                <input
+                  type="number"
+                  min="0"
+                  value={bardana}
+                  onChange={e => setBardana(e.target.value)}
+                />
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Section: Seed Varieties & Weights */}
@@ -588,59 +923,23 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
 
         {/* Charges & Expenses */}
         <div className="item-row">
-          <h3>{sourceType === 'farmer' ? 'ખેડૂત ખરીદી — મજૂરી' : 'માર્કેટ ખરીદી — કમિશન અને ખર્ચ'}</h3>
+          <h3>મજૂરી ખર્ચ</h3>
           <div className="formgrid">
-            {sourceType === 'farmer' ? (
-              <label>
-                મજૂરી પ્રતિ બેગ (₹/બેગ)
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={labour}
-                  onChange={e => setLabour(e.target.value)}
-                />
-              </label>
-            ) : (
-              <>
-                <label>
-                  માર્કેટ કમિશન (₹)
-                  <input
-                    type="number"
-                    min="0"
-                    value={marketCommission}
-                    onChange={e => setMarketCommission(e.target.value)}
-                  />
-                </label>
-                <label>
-                  પેઢીનું કમિશન (₹)
-                  <input
-                    type="number"
-                    min="0"
-                    value={pethiCommission}
-                    onChange={e => setPethiCommission(e.target.value)}
-                  />
-                </label>
-                <label>
-                  બારદાન (₹)
-                  <input
-                    type="number"
-                    min="0"
-                    value={bardana}
-                    onChange={e => setBardana(e.target.value)}
-                  />
-                </label>
-                <label>
-                  મજૂરી (₹)
-                  <input
-                    type="number"
-                    min="0"
-                    value={labour}
-                    onChange={e => setLabour(e.target.value)}
-                  />
-                </label>
-              </>
-            )}
+            <label>
+              મજૂરી પ્રતિ બેગ (₹/બેગ)
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={labour}
+                onChange={e => setLabour(e.target.value)}
+              />
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', paddingTop: '20px' }}>
+              <span style={{ fontSize: '0.9rem', color: '#4b5563' }}>
+                કુલ મજૂરી ({totals.bags} બેગ × ₹{num(labour)}): <b>{money(labourTotal)}</b>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -719,7 +1018,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
             <tr>
               <th>બિલ નંબર</th>
               <th>તારીખ</th>
-              <th>પ્રકાર</th>
+              <th>ટેગ / પ્રકાર</th>
               <th>પાર્ટી</th>
               <th>આઇટમ</th>
               <th>બેગ</th>
@@ -732,46 +1031,53 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
             </tr>
           </thead>
           <tbody>
-            {purchases.map(r => (
-              <tr key={r.id}>
-                <td><b>{r.billNo || r.invoiceNo || '—'}</b></td>
-                <td>{r.purchaseDate || r.date || '—'}</td>
-                <td>
-                  <span className={`badge ${r.purchaseType === 'farmer' ? 'badge-primary' : 'badge-warning'}`}>
-                    {r.purchaseType === 'farmer' ? 'ખેડૂત' : 'માર્કેટ'}
-                  </span>
-                </td>
-                <td><b>{r.partyName || '—'}</b></td>
-                <td>{r.items?.map(x => x.varietyName || x.productName).join(', ') || '—'}</td>
-                <td style={{ textAlign: 'center' }}>{r.items?.reduce((s, it) => s + (it.bags || 0), 0) || 0}</td>
-                <td>{Number(r.items?.reduce((s, it) => s + (it.netWeightKg || it.qtyKg || 0), 0) || r.netTotalKg || 0).toLocaleString('en-IN')} KG</td>
-                <td style={{ color: '#075b43', fontWeight: '700' }}>
-                  {Number(r.items?.reduce((s, it) => s + (it.totalMan || it.qtyMan || 0), 0) || 0).toFixed(2)}
-                </td>
-                <td><b>{money(r.netTotal || r.totalAmount)}</b></td>
-                <td style={{ color: '#166534' }}>{money(r.paidAmount || r.paid)}</td>
-                <td style={{ color: (r.dueAmount || r.balance) > 0 ? '#b91c1c' : '#166534', fontWeight: '700' }}>
-                  {money(r.dueAmount || r.balance)}
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  <button
-                    type="button"
-                    className="secondary"
-                    style={{ padding: '3px 8px', fontSize: '0.75rem', color: '#dc2626', borderColor: '#fca5a5' }}
-                    onClick={async () => {
-                      const bill = r.billNo || r.invoiceNo;
-                      if (window.confirm(`શું તમે ખરીદી બિલ "${bill}" (${r.partyName}) રદ/ડીલીટ કરવા માંગો છો? આનાથી સ્ટોક અને ખાતેદાર બેલેન્સ પણ રિવર્સ થશે.`)) {
-                        await deletePurchase(bill);
-                      }
-                    }}>
-                    🗑️ ડીલીટ
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {purchases.map(r => {
+              const p = parties.find(x => x.id === r.partyId);
+              const tag = r.partyType || p?.partyType || (r.purchaseType === 'farmer' ? 'farmer' : 'firm');
+              const tagInfo = getPartyTagInfo(tag);
+              return (
+                <tr key={r.id}>
+                  <td><b>{r.billNo || r.invoiceNo || '—'}</b></td>
+                  <td>{r.purchaseDate || r.date || '—'}</td>
+                  <td>
+                    <span className={`party-tag-badge party-tag-${tagInfo.value}`}>
+                      {tagInfo.badge}
+                    </span>
+                  </td>
+                  <td><b>{r.partyName || '—'}</b></td>
+                  <td>{r.items?.map(x => x.varietyName || x.productName).join(', ') || '—'}</td>
+                  <td style={{ textAlign: 'center' }}>{r.items?.reduce((s, it) => s + (it.bags || 0), 0) || 0}</td>
+                  <td>{Number(r.items?.reduce((s, it) => s + (it.netWeightKg || it.qtyKg || 0), 0) || r.netTotalKg || 0).toLocaleString('en-IN')} KG</td>
+                  <td style={{ color: '#075b43', fontWeight: '700' }}>
+                    {Number(r.items?.reduce((s, it) => s + (it.totalMan || it.qtyMan || 0), 0) || 0).toFixed(2)}
+                  </td>
+                  <td><b>{money(r.netTotal || r.totalAmount)}</b></td>
+                  <td style={{ color: '#166534' }}>{money(r.paidAmount || r.paid)}</td>
+                  <td style={{ color: (r.dueAmount || r.balance) > 0 ? '#b91c1c' : '#166534', fontWeight: '700' }}>
+                    {money(r.dueAmount || r.balance)}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <button
+                      type="button"
+                      className="secondary"
+                      style={{ padding: '3px 8px', fontSize: '0.75rem', color: '#dc2626', borderColor: '#fca5a5' }}
+                      onClick={async () => {
+                        const bill = r.billNo || r.invoiceNo;
+                        if (window.confirm(`શું તમે ખરીદી બિલ "${bill}" (${r.partyName}) રદ/ડીલીટ કરવા માંગો છો? આનાથી સ્ટોક અને ખાતેદાર બેલેન્સ પણ રિવર્સ થશે.`)) {
+                          await deletePurchase(bill);
+                        }
+                      }}>
+                      🗑️ ડીલીટ
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
     </div>
   );
 };
+
+export default PurchaseEntry;

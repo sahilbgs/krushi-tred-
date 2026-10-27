@@ -79,7 +79,7 @@ FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
 -- 3.3 PARTIES (ખેડૂતો, પેઢીઓ/સપ્લાયર્સ, દલાલ/વેપારીઓ, ટ્રાન્સપોર્ટરો)
 CREATE TABLE IF NOT EXISTS parties (
     id VARCHAR(50) PRIMARY KEY,
-    party_type VARCHAR(30) NOT NULL CHECK (party_type IN ('farmer', 'firm', 'trader', 'transporter')),
+    party_type VARCHAR(30) NOT NULL CHECK (party_type IN ('farmer', 'firm', 'supplier', 'trader', 'transporter', 'other')),
     code VARCHAR(50) UNIQUE,
     name VARCHAR(150) NOT NULL,
     firm_name VARCHAR(150),
@@ -135,7 +135,7 @@ FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
 -- 5.1 PURCHASES (ખરીદી વાઉચરો - ખેડૂત અથવા યાર્ડ પેઢી તરફથી)
 CREATE TABLE IF NOT EXISTS purchases (
     id VARCHAR(50) PRIMARY KEY,
-    purchase_type VARCHAR(30) NOT NULL DEFAULT 'farmer' CHECK (purchase_type IN ('farmer', 'market')),
+    purchase_type VARCHAR(30) NOT NULL DEFAULT 'farmer' CHECK (purchase_type IN ('farmer', 'market', 'firm', 'supplier', 'trader', 'other', 'direct')),
     bill_no VARCHAR(50) NOT NULL UNIQUE,
     purchase_date DATE NOT NULL DEFAULT CURRENT_DATE,
     party_id VARCHAR(50) REFERENCES parties(id) ON DELETE RESTRICT,

@@ -158,15 +158,24 @@ app.get('/api/initial-data', async (req, res) => {
   }
 });
 
-// 3. Parties (ખેડૂતો અને પેઢી/વેપારીઓ)
+// 3. Parties (ખેડૂતો, પેઢીઓ, સપ્લાયર્સ અને વેપારીઓ/વ્યક્તિઓ)
 app.post('/api/parties', async (req, res) => {
   const p = req.body;
   const id = p.id || 'party_' + Date.now();
-  let partyType = p.partyType === 'supplier' ? 'firm' : (p.partyType || 'farmer');
-  if (!['farmer', 'firm', 'trader', 'transporter'].includes(partyType)) {
+  let partyType = (p.partyType || 'farmer').toLowerCase();
+  if (!['farmer', 'firm', 'supplier', 'trader', 'transporter', 'other'].includes(partyType)) {
     partyType = 'farmer';
   }
-  const code = p.code || (partyType === 'farmer' ? `FAR-${Date.now().toString().slice(-4)}` : `FIRM-${Date.now().toString().slice(-4)}`);
+  const prefixMap = {
+    farmer: 'KH',
+    firm: 'PDH',
+    supplier: 'SUP',
+    trader: 'TRD',
+    transporter: 'TRK',
+    other: 'PER'
+  };
+  const codePrefix = prefixMap[partyType] || 'PTY';
+  const code = p.code || `${codePrefix}-${Date.now().toString().slice(-4)}`;
   const openingBal = parseFloat(p.openingBalance || 0);
 
   const opType = (p.openingBalanceType || p.balanceType || (partyType === 'farmer' ? 'dr' : 'cr')).toLowerCase();
@@ -291,12 +300,16 @@ app.post('/api/purchases', async (req, res) => {
       billNumber = `SN-PUR-${timestamp.getFullYear()}-${nextNum}`;
     }
 
-    const isFarmer = purchaseData.purchaseType === 'farmer';
+    let determinedPartyType = (purchaseData.partyType || (purchaseData.purchaseType === 'market' ? 'firm' : 'farmer')).toLowerCase();
+    if (!['farmer', 'firm', 'supplier', 'trader', 'transporter', 'other'].includes(determinedPartyType)) {
+      determinedPartyType = 'farmer';
+    }
+    const isFarmer = determinedPartyType === 'farmer';
 
     // 1. Ensure Party exists in parties table
     let finalPartyId = purchaseData.partyId || null;
     if (finalPartyId) {
-      const checkParty = await client.query('SELECT id FROM parties WHERE id = $1', [finalPartyId]);
+      const checkParty = await client.query('SELECT id, party_type FROM parties WHERE id = $1', [finalPartyId]);
       if (checkParty.rows.length === 0) {
         await client.query(
           `INSERT INTO parties (id, party_type, code, name, mobile, village, opening_balance, balance_type, current_balance, credit_limit)
@@ -304,13 +317,15 @@ app.post('/api/purchases', async (req, res) => {
            ON CONFLICT (id) DO NOTHING`,
           [
             finalPartyId,
-            isFarmer ? 'farmer' : 'firm',
+            determinedPartyType,
             `P-${Date.now().toString(36).toUpperCase()}`,
             purchaseData.partyName || 'ખાતેદાર',
             purchaseData.mobile || null,
             purchaseData.village || null
           ]
         );
+      } else if (checkParty.rows[0].party_type) {
+        determinedPartyType = checkParty.rows[0].party_type;
       }
     } else if (purchaseData.partyName && purchaseData.partyName.trim()) {
       finalPartyId = 'party_' + Date.now();
@@ -319,7 +334,7 @@ app.post('/api/purchases', async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, 0, 'dr', 0, 50000)`,
         [
           finalPartyId,
-          isFarmer ? 'farmer' : 'firm',
+          determinedPartyType,
           `P-${Date.now().toString(36).toUpperCase()}`,
           purchaseData.partyName.trim(),
           purchaseData.mobile || null,
@@ -451,10 +466,10 @@ app.post('/api/purchases', async (req, res) => {
           timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           finalPartyId,
           purchaseData.partyName,
-          isFarmer ? 'farmer' : 'firm',
+          determinedPartyType,
           billNumber,
           'purchase',
-          `${isFarmer ? 'ખેડૂત ખરીદી' : 'પેઢી ખરીદી'} (${purchaseData.items?.map(it => it.varietyName).join(', ')})`,
+          `${determinedPartyType === 'farmer' ? 'ખેડૂત ખરીદી' : determinedPartyType === 'supplier' ? 'સપ્લાયર ખરીદી' : determinedPartyType === 'firm' ? 'પેઢી ખરીદી' : 'વેપારી ખરીદી'} (${purchaseData.items?.map(it => it.varietyName).join(', ')})`,
           purchaseData.items?.map(it => it.varietyName).join(', '),
           totalBags,
           totalKg,

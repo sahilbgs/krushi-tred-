@@ -35,10 +35,11 @@ import kotlinx.coroutines.launch
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Dashboard : Screen("dashboard", "ડેશબોર્ડ", Icons.Default.Dashboard)
-    object Sales : Screen("sales", "નવું બિલ", Icons.Default.Receipt)
+    object Sales : Screen("sales", "વેચાણ", Icons.Default.Receipt)
     object Purchases : Screen("purchases", "ખરીદી", Icons.Default.ShoppingCart)
+    object Trucks : Screen("trucks", "ટ્રક ફેરા", Icons.Default.LocalShipping)
     object Stock : Screen("stock", "સ્ટોક", Icons.Default.AllInbox)
-    object Farmers : Screen("farmers", "ખેડૂત / ખાતું", Icons.Default.People)
+    object Farmers : Screen("farmers", "ખાતેદાર", Icons.Default.People)
 }
 
 class MainActivity : ComponentActivity() {
@@ -216,6 +217,7 @@ fun MainApp(repository: KrushiApiRepository) {
                     Screen.Dashboard,
                     Screen.Sales,
                     Screen.Purchases,
+                    Screen.Trucks,
                     Screen.Stock,
                     Screen.Farmers
                 )
@@ -224,7 +226,7 @@ fun MainApp(repository: KrushiApiRepository) {
                         selected = currentScreen == screen,
                         onClick = { currentScreen = screen },
                         icon = { Icon(screen.icon, contentDescription = screen.title) },
-                        label = { Text(screen.title, fontSize = 11.sp) },
+                        label = { Text(screen.title, fontSize = 10.sp) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = GreenPrimary,
                             selectedTextColor = GreenPrimary
@@ -240,7 +242,8 @@ fun MainApp(repository: KrushiApiRepository) {
                     sales = salesList,
                     stock = stockList,
                     onNavigateToSales = { currentScreen = Screen.Sales },
-                    onNavigateToStock = { currentScreen = Screen.Stock }
+                    onNavigateToStock = { currentScreen = Screen.Stock },
+                    onNavigateToTrucks = { currentScreen = Screen.Trucks }
                 )
                 Screen.Sales -> SalesBillingScreen(
                     farmers = farmersList,
@@ -370,14 +373,49 @@ fun MainApp(repository: KrushiApiRepository) {
                         }
                     }
                 )
-                Screen.Stock -> StockLedgerScreen(stock = stockList)
-                Screen.Farmers -> FarmerMasterScreen(
-                    farmers = farmersList,
-                    onAddFarmer = { newFarmer ->
+                Screen.Trucks -> TruckTransportScreen(
+                    purchases = purchasesList,
+                    transporters = transportersList,
+                    seeds = seedList,
+                    parties = partyList,
+                    onSavePurchase = { newPur ->
                         coroutineScope.launch {
                             isSaving = true
-                            savingMessage = "ખેડૂત સર્વર પર ઉમેરાઈ રહ્યો છે..."
-                            val result = repository.saveParty(newFarmer)
+                            savingMessage = "ટ્રક ફેરો અને ખરીદી સેવ થઈ રહી છે..."
+                            val result = repository.savePurchase(newPur)
+                            isSaving = false
+
+                            result.onSuccess { saved ->
+                                Toast.makeText(
+                                    context,
+                                    "✅ ટ્રક ${saved.truckNo} નો ફેરો સફળતાપૂર્વક સર્વર પર નોંધાઈ ગયો!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                loadData(showToast = false)
+                            }.onFailure { err ->
+                                Toast.makeText(
+                                    context,
+                                    "❌ ફેરો સેવ કરવામાં ભૂલ: ${err.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    },
+                    onSaveParty = { party ->
+                        coroutineScope.launch {
+                            repository.saveParty(party)
+                            loadData(showToast = false)
+                        }
+                    }
+                )
+                Screen.Stock -> StockLedgerScreen(stock = stockList)
+                Screen.Farmers -> FarmerMasterScreen(
+                    parties = partyList,
+                    onSaveParty = { newParty ->
+                        coroutineScope.launch {
+                            isSaving = true
+                            savingMessage = "${newParty.name} સર્વર પર ઉમેરાઈ રહ્યા છે..."
+                            val result = repository.saveParty(newParty)
                             isSaving = false
 
                             result.onSuccess { saved ->
@@ -390,7 +428,7 @@ fun MainApp(repository: KrushiApiRepository) {
                             }.onFailure { err ->
                                 Toast.makeText(
                                     context,
-                                    "❌ ખેડૂત ઉમેરવામાં ભૂલ: ${err.message}",
+                                    "❌ ખાતેદાર ઉમેરવામાં ભૂલ: ${err.message}",
                                     Toast.LENGTH_LONG
                                 ).show()
                             }

@@ -25,7 +25,8 @@ fun DashboardScreen(
     sales: List<SaleInvoice>,
     stock: List<StockItem>,
     onNavigateToSales: () -> Unit,
-    onNavigateToStock: () -> Unit
+    onNavigateToStock: () -> Unit,
+    onNavigateToTrucks: () -> Unit = {}
 ) {
     val totalTodaySales = sales.sumOf { it.netAmount }
     val totalBags = stock.sumOf { it.availableBags }
@@ -105,26 +106,40 @@ fun DashboardScreen(
             modifier = Modifier.padding(bottom = 10.dp)
         )
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = onNavigateToSales,
                 colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
                 shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.weight(1f).height(50.dp)
+                modifier = Modifier.weight(1f).height(48.dp),
+                contentPadding = PaddingValues(horizontal = 6.dp)
             ) {
-                Icon(Icons.Default.Receipt, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("નવું બિલ", fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("નવું બિલ", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+            }
+
+            OutlinedButton(
+                onClick = onNavigateToTrucks,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1f).height(48.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1E40AF)),
+                contentPadding = PaddingValues(horizontal = 6.dp)
+            ) {
+                Icon(Icons.Default.LocalShipping, contentDescription = null, tint = Color(0xFF1E40AF), modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("ટ્રક ફેરા", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
             }
 
             OutlinedButton(
                 onClick = onNavigateToStock,
                 shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.weight(1f).height(50.dp)
+                modifier = Modifier.weight(1f).height(48.dp),
+                contentPadding = PaddingValues(horizontal = 6.dp)
             ) {
-                Icon(Icons.Default.Inventory2, contentDescription = null, tint = GreenPrimary)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("સ્ટોક જુઓ", color = GreenPrimary, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Default.Inventory2, contentDescription = null, tint = GreenPrimary, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("સ્ટોક", color = GreenPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
             }
         }
 

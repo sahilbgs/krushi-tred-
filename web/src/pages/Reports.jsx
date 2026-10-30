@@ -9,17 +9,21 @@ import {
   Boxes, 
   ArrowDownLeft, 
   ArrowUpRight,
-  Receipt
+  Receipt,
+  Truck
 } from 'lucide-react';
 
 export const Reports = ({ onOpenBill }) => {
   const { companyName, sales, purchases, parties, stock } = useData();
 
-  // Active Report Tab: 'purchases' | 'stock' | 'outstanding' | 'sales'
+  // Active Report Tab: 'purchases' | 'stock' | 'outstanding' | 'sales' | 'trucks'
   const [activeReportTab, setActiveReportTab] = useState('purchases');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [purchaseTypeFilter, setPurchaseTypeFilter] = useState('all'); // all | farmer | market
+  const [truckSearch, setTruckSearch] = useState('');
+  const [truckViewMode, setTruckViewMode] = useState('summary'); // 'summary' | 'trips'
+  const [expandedTruck, setExpandedTruck] = useState({});
 
   // 1. Filtered Purchases Report
   const filteredPurchases = purchases.filter(p => {
@@ -47,6 +51,83 @@ export const Reports = ({ onOpenBill }) => {
     return true;
   });
   const totalSalesAmt = filteredSales.reduce((acc, curr) => acc + (curr.netAmount || 0), 0);
+
+  // 4. Truck & Transporter Trips Report Data
+  const allTruckTrips = purchases
+    .filter(p => {
+      const hasTruck = (p.truckNo && p.truckNo.trim()) || (p.truckOwner && p.truckOwner.trim());
+      if (!hasTruck) return false;
+      if (filterStartDate && p.purchaseDate < filterStartDate) return false;
+      if (filterEndDate && p.purchaseDate > filterEndDate) return false;
+      return true;
+    })
+    .map(p => {
+      const bags = p.items?.reduce((s, it) => s + (parseInt(it.bags) || 0), 0) || 0;
+      const weightKg = p.items?.reduce((s, it) => s + (parseFloat(it.netWeightKg || it.qtyKg) || 0), 0) || 0;
+      const man = p.items?.reduce((s, it) => s + (parseFloat(it.totalMan || it.qtyMan) || 0), 0) || 0;
+      const varieties = p.items?.map(it => it.varietyName || it.productName).filter(Boolean).join(', ') || '—';
+      return {
+        id: p.id,
+        billNo: p.billNo || p.invoiceNo || '—',
+        date: p.purchaseDate || p.date || '—',
+        truckNo: (p.truckNo || 'વાહન નં. વિના').trim(),
+        truckOwner: (p.truckOwner || 'ટ્રાન્સપોર્ટર વિના').trim(),
+        partyName: p.partyName || p.firmName || '—',
+        varietyName: varieties,
+        bags,
+        weightKg,
+        man,
+        netTotal: p.netTotal || 0
+      };
+    })
+    .sort((a, b) => (b.date > a.date ? 1 : -1));
+
+  const truckGroupsMap = {};
+  allTruckTrips.forEach(trip => {
+    const key = trip.truckNo.toUpperCase();
+    if (!truckGroupsMap[key]) {
+      truckGroupsMap[key] = {
+        truckNo: trip.truckNo,
+        transporterName: trip.truckOwner !== 'ટ્રાન્સપોર્ટર વિના' ? trip.truckOwner : 'સામાન્ય ટ્રાન્સપોર્ટ',
+        tripsCount: 0,
+        totalBags: 0,
+        totalKg: 0,
+        totalMan: 0,
+        latestDate: trip.date,
+        trips: []
+      };
+    }
+    truckGroupsMap[key].tripsCount += 1;
+    truckGroupsMap[key].totalBags += trip.bags;
+    truckGroupsMap[key].totalKg += trip.weightKg;
+    truckGroupsMap[key].totalMan += trip.man;
+    if (trip.date > truckGroupsMap[key].latestDate) {
+      truckGroupsMap[key].latestDate = trip.date;
+    }
+    truckGroupsMap[key].trips.push(trip);
+  });
+
+  const truckGroups = Object.values(truckGroupsMap).sort((a, b) => b.tripsCount - a.tripsCount);
+
+  const filteredTruckGroups = truckGroups.filter(g => {
+    if (!truckSearch.trim()) return true;
+    const q = truckSearch.toLowerCase();
+    return g.truckNo.toLowerCase().includes(q) || g.transporterName.toLowerCase().includes(q);
+  });
+
+  const filteredTripsList = allTruckTrips.filter(t => {
+    if (!truckSearch.trim()) return true;
+    const q = truckSearch.toLowerCase();
+    return t.truckNo.toLowerCase().includes(q) ||
+           t.truckOwner.toLowerCase().includes(q) ||
+           t.partyName.toLowerCase().includes(q) ||
+           t.varietyName.toLowerCase().includes(q);
+  });
+
+  const totalTrucksCount = truckGroups.length;
+  const totalFeraCount = allTruckTrips.length;
+  const totalTruckBags = allTruckTrips.reduce((s, t) => s + t.bags, 0);
+  const totalTruckMan = allTruckTrips.reduce((s, t) => s + t.man, 0);
 
   const handlePrint = () => {
     window.print();
@@ -144,6 +225,24 @@ export const Reports = ({ onOpenBill }) => {
           }}>
           <Receipt size={16} />
           વેચાણ બિલ રિપોર્ટ
+        </button>
+
+        <button 
+          onClick={() => setActiveReportTab('trucks')}
+          style={{
+            padding: '0.55rem 1.1rem',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontWeight: activeReportTab === 'trucks' ? '700' : '500',
+            backgroundColor: activeReportTab === 'trucks' ? '#064e3b' : '#f1f5f9',
+            color: activeReportTab === 'trucks' ? '#ffffff' : '#475569',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem'
+          }}>
+          <Truck size={16} />
+          🚚 ટ્રક & ટ્રાન્સપોર્ટર ફેરા પત્રક
         </button>
       </div>
 
@@ -475,6 +574,270 @@ export const Reports = ({ onOpenBill }) => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* 5. Truck & Transporter Trips Report */}
+      {activeReportTab === 'trucks' && (
+        <div>
+          {/* Top KPI Cards for Trucks */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div className="card" style={{ padding: '1rem', borderLeft: '4px solid #3b82f6', margin: 0 }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '600' }}>કુલ નોંધાયેલ વાહન / ટ્રક</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1e3a8a', marginTop: '0.2rem' }}>
+                {totalTrucksCount} વાહન
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>ટ્રાન્સપોર્ટરો સાથે</div>
+            </div>
+
+            <div className="card" style={{ padding: '1rem', borderLeft: '4px solid #10b981', margin: 0 }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '600' }}>કુલ ફેરા (Total Trips)</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#064e3b', marginTop: '0.2rem' }}>
+                {totalFeraCount} ફેરા
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>આવક ડિલિવરી</div>
+            </div>
+
+            <div className="card" style={{ padding: '1rem', borderLeft: '4px solid #f59e0b', margin: 0 }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '600' }}>કુલ આવેલ બોરી (Bags)</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#78350f', marginTop: '0.2rem' }}>
+                {totalTruckBags.toLocaleString('en-IN')} બોરી
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>ગુણી આવક</div>
+            </div>
+
+            <div className="card" style={{ padding: '1rem', borderLeft: '4px solid #8b5cf6', margin: 0 }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '600' }}>કુલ વજન (મણ & KG)</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#581c87', marginTop: '0.2rem' }}>
+                {Math.round(totalTruckMan).toLocaleString('en-IN')} મણ
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>({(totalTruckMan * 20).toLocaleString('en-IN')} KG)</div>
+            </div>
+          </div>
+
+          {/* Sub Controls: View Mode & Search */}
+          <div className="card no-print" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setTruckViewMode('summary')}
+                style={{
+                  padding: '0.45rem 0.9rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontWeight: truckViewMode === 'summary' ? '700' : '500',
+                  backgroundColor: truckViewMode === 'summary' ? '#064e3b' : '#ffffff',
+                  color: truckViewMode === 'summary' ? '#ffffff' : '#334155',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+              >
+                🚛 ટ્રક વાઇઝ સમરી (ફેરા & બોરી)
+              </button>
+              <button
+                type="button"
+                onClick={() => setTruckViewMode('trips')}
+                style={{
+                  padding: '0.45rem 0.9rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontWeight: truckViewMode === 'trips' ? '700' : '500',
+                  backgroundColor: truckViewMode === 'trips' ? '#064e3b' : '#ffffff',
+                  color: truckViewMode === 'trips' ? '#ffffff' : '#334155',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+              >
+                📋 તમામ ફેરા લિસ્ટ ({allTruckTrips.length})
+              </button>
+            </div>
+
+            <input
+              type="text"
+              placeholder="🔍 ટ્રક નંબર અથવા ટ્રાન્સપોર્ટર શોધો..."
+              value={truckSearch}
+              onChange={e => setTruckSearch(e.target.value)}
+              style={{ padding: '0.45rem 0.85rem', width: '280px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+            />
+          </div>
+
+          {/* View 1: Truck-Wise Summary Table */}
+          {truckViewMode === 'summary' && (
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#064e3b', color: '#ffffff', fontSize: '0.82rem', textAlign: 'left' }}>
+                      <th style={{ padding: '0.75rem' }}>ક્રમ</th>
+                      <th style={{ padding: '0.75rem' }}>ટ્રક / વાહન નંબર</th>
+                      <th style={{ padding: '0.75rem' }}>ટ્રાન્સપોર્ટર / માલિક</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>કુલ ફેરા (Trips)</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>કુલ બોરી</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>કુલ વજન (મણ)</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>છેલ્લો ફેરો</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>વિગત</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTruckGroups.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                          કોઈ ટ્રક ફેરા ડેટા મળ્યો નથી.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTruckGroups.map((g, idx) => {
+                        const isExp = expandedTruck[g.truckNo];
+                        return (
+                          <React.Fragment key={g.truckNo}>
+                            <tr style={{ borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem', backgroundColor: isExp ? '#f8fafc' : 'transparent' }}>
+                              <td style={{ padding: '0.7rem' }}>{idx + 1}</td>
+                              <td style={{ padding: '0.7rem', fontWeight: '800', color: '#1e3a8a' }}>
+                                🚛 {g.truckNo}
+                              </td>
+                              <td style={{ padding: '0.7rem', fontWeight: '600' }}>
+                                {g.transporterName}
+                              </td>
+                              <td style={{ padding: '0.7rem', textAlign: 'center' }}>
+                                <span style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '12px', fontWeight: '700', fontSize: '0.8rem' }}>
+                                  🔄 {g.tripsCount} ફેરા
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.7rem', textAlign: 'right', fontWeight: '800', color: '#78350f' }}>
+                                {g.totalBags.toLocaleString('en-IN')} બોરી
+                              </td>
+                              <td style={{ padding: '0.7rem', textAlign: 'right', fontWeight: '700', color: '#581c87' }}>
+                                {Math.round(g.totalMan).toLocaleString('en-IN')} મણ <small style={{ color: '#64748b' }}>({Math.round(g.totalKg)} kg)</small>
+                              </td>
+                              <td style={{ padding: '0.7rem', textAlign: 'center', color: '#64748b' }}>
+                                {g.latestDate}
+                              </td>
+                              <td style={{ padding: '0.7rem', textAlign: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedTruck(prev => ({ ...prev, [g.truckNo]: !isExp }))}
+                                  style={{
+                                    padding: '3px 10px',
+                                    fontSize: '0.75rem',
+                                    borderRadius: '5px',
+                                    border: '1px solid #059669',
+                                    backgroundColor: isExp ? '#059669' : '#ecfdf5',
+                                    color: isExp ? '#ffffff' : '#047857',
+                                    fontWeight: '700',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {isExp ? '▲ બંધ' : '▼ ફેરા જુઓ'}
+                                </button>
+                              </td>
+                            </tr>
+
+                            {/* Sub-table of all trips for this truck */}
+                            {isExp && (
+                              <tr>
+                                <td colSpan="8" style={{ padding: '0.5rem 1rem 1rem', backgroundColor: '#f1f5f9' }}>
+                                  <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '0.5rem' }}>
+                                    <div style={{ fontWeight: '700', color: '#064e3b', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                                      🚛 {g.truckNo} - તમામ ફેરાની તારીખવાર વિગત:
+                                    </div>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                                      <thead>
+                                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#475569' }}>
+                                          <th style={{ padding: '0.4rem 0.6rem' }}>ફેરા #</th>
+                                          <th style={{ padding: '0.4rem 0.6rem' }}>તારીખ</th>
+                                          <th style={{ padding: '0.4rem 0.6rem' }}>બિયારણ જાત</th>
+                                          <th style={{ padding: '0.4rem 0.6rem' }}>કોનો માલ આવ્યો (માલિક)</th>
+                                          <th style={{ padding: '0.4rem 0.6rem', textAlign: 'right' }}>બોરી</th>
+                                          <th style={{ padding: '0.4rem 0.6rem', textAlign: 'right' }}>મણ</th>
+                                          <th style={{ padding: '0.4rem 0.6rem' }}>બિલ નં.</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {g.trips.map((tr, tIdx) => (
+                                          <tr key={tIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                            <td style={{ padding: '0.4rem 0.6rem', fontWeight: 'bold', color: '#059669' }}>
+                                              #{g.trips.length - tIdx}
+                                            </td>
+                                            <td style={{ padding: '0.4rem 0.6rem' }}>{tr.date}</td>
+                                            <td style={{ padding: '0.4rem 0.6rem', fontWeight: '600' }}>{tr.varietyName}</td>
+                                            <td style={{ padding: '0.4rem 0.6rem' }}>{tr.partyName}</td>
+                                            <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: '700', color: '#b45309' }}>
+                                              {tr.bags} બોરી
+                                            </td>
+                                            <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right' }}>
+                                              {Math.round(tr.man)} મણ
+                                            </td>
+                                            <td style={{ padding: '0.4rem 0.6rem', color: '#64748b' }}>{tr.billNo}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* View 2: Chronological Trips Register */}
+          {truckViewMode === 'trips' && (
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#064e3b', color: '#ffffff', fontSize: '0.82rem', textAlign: 'left' }}>
+                      <th style={{ padding: '0.75rem' }}>તારીખ</th>
+                      <th style={{ padding: '0.75rem' }}>ટ્રક / વાહન નં</th>
+                      <th style={{ padding: '0.75rem' }}>ટ્રાન્સપોર્ટર</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>આવેલ બોરી</th>
+                      <th style={{ padding: '0.75rem' }}>બિયારણ જાત</th>
+                      <th style={{ padding: '0.75rem' }}>માલિક / ખેડૂત</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>કુલ વજન (મણ)</th>
+                      <th style={{ padding: '0.75rem' }}>બિલ નં</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTripsList.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                          કોઈ ફેરા એન્ટ્રી મળી નથી.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTripsList.map((tr, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
+                          <td style={{ padding: '0.7rem' }}>{tr.date}</td>
+                          <td style={{ padding: '0.7rem', fontWeight: '800', color: '#1e3a8a' }}>
+                            🚛 {tr.truckNo}
+                          </td>
+                          <td style={{ padding: '0.7rem', fontWeight: '600' }}>{tr.truckOwner}</td>
+                          <td style={{ padding: '0.7rem', textAlign: 'right' }}>
+                            <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '3px 8px', borderRadius: '6px', fontWeight: '800' }}>
+                              📦 {tr.bags} બોરી
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.7rem', fontWeight: '600' }}>{tr.varietyName}</td>
+                          <td style={{ padding: '0.7rem' }}>{tr.partyName}</td>
+                          <td style={{ padding: '0.7rem', textAlign: 'right', fontWeight: '700' }}>
+                            {Math.round(tr.man)} મણ
+                          </td>
+                          <td style={{ padding: '0.7rem', color: '#64748b' }}>{tr.billNo}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 

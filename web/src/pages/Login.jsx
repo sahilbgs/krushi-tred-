@@ -15,7 +15,7 @@ export const Login = () => {
     try {
       await login(email, password);
     } catch (err) {
-      setError('લૉગિન નિષ્ફળ: Email/Password અને Firebase Authentication તપાસો.');
+      setError(err?.message || 'લૉગિન નિષ્ફળ: પાસવર્ડ (44113290) તપાસો.');
     } finally {
       setLoading(false);
     }
@@ -33,10 +33,10 @@ export const Login = () => {
 
       <form onSubmit={handleSubmit}>
         <label>
-          Email
+          Email / વપરાશકર્તા
           <input 
             required 
-            type="email" 
+            type="text" 
             placeholder="admin@nandiniseeds.com"
             value={email} 
             onChange={e => setEmail(e.target.value)}
@@ -44,44 +44,40 @@ export const Login = () => {
         </label>
 
         <label>
-          Password
+          સિક્યોરિટી પાસવર્ડ (Security Password)
           <input 
             required 
             type="password" 
-            placeholder="••••••••"
+            placeholder="પાસવર્ડ દાખલ કરો (44113290)..."
             value={password} 
             onChange={e => setPassword(e.target.value)}
           />
         </label>
 
         <button type="submit" disabled={loading} style={{ marginTop: '8px' }}>
-          {loading ? 'લૉગિન થઈ રહ્યું છે...' : 'લૉગિન કરો'}
+          {loading ? 'ચકાસણી થઈ રહી છે...' : '🔓 લૉગિન કરો'}
         </button>
       </form>
 
-      <div style={{ marginTop: '20px', borderTop: '1px solid #d1d5db', paddingTop: '16px' }}>
-        <p className="muted" style={{ textAlign: 'center', fontSize: '0.8rem', marginBottom: '10px' }}>
-          ઝડપી ડેમો પરીક્ષણ:
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          <button 
-            type="button" 
-            className="secondary"
-            style={{ fontSize: '0.82rem', padding: '8px 6px', textAlign: 'center' }}
-            onClick={() => loginAsDemo('admin')}>
-            <b>Ravi Chaudhary</b>
-            <div style={{ fontSize: '0.72rem', color: '#15803d' }}>Main Admin</div>
-          </button>
-
-          <button 
-            type="button" 
-            className="secondary"
-            style={{ fontSize: '0.82rem', padding: '8px 6px', textAlign: 'center' }}
-            onClick={() => loginAsDemo('sub_user')}>
-            <b>Bhargav Chaudhary</b>
-            <div style={{ fontSize: '0.72rem', color: '#b45309' }}>Sub User</div>
-          </button>
-        </div>
+      <div style={{ marginTop: '16px', textAlign: 'center' }}>
+        <button
+          type="button"
+          onClick={() => {
+            localStorage.removeItem('krushi_site_access_key');
+            sessionStorage.removeItem('krushi_site_access_key');
+            window.location.reload();
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#059669',
+            fontSize: '0.82rem',
+            cursor: 'pointer',
+            textDecoration: 'underline'
+          }}
+        >
+          🔒 સાઇટ સિક્યોરિટી સ્ક્રીન પર જાઓ (Lock)
+        </button>
       </div>
 
       <div style={{ marginTop: '16px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>

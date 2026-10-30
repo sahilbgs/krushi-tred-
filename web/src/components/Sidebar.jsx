@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 
-export const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
+export const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose, onLockSite }) => {
   const { user, userProfile, hasPermission, logout } = useAuth();
 
   const menuItems = [
@@ -82,7 +82,32 @@ export const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
         </a>
       </div>
 
-      <div className="sidebar-footer">
+      <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {onLockSite && (
+          <button 
+            type="button"
+            className="nav" 
+            style={{ 
+              backgroundColor: '#064e3b', 
+              color: '#a7f3d0', 
+              border: '1px solid #059669',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              cursor: 'pointer',
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+            onClick={() => {
+              if (onClose) onClose();
+              onLockSite();
+            }}
+          >
+            <span>🔒 સાઇટ લોક કરો (Lock)</span>
+          </button>
+        )}
         <button 
           className="nav logout" 
           onClick={() => {

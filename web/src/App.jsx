@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext';
 import { useData } from './context/DataContext';
 import { Sidebar } from './components/Sidebar';
 import { SimpleBillModal } from './components/SimpleBillModal';
+import { SiteLock, checkSiteUnlocked, lockSite } from './components/SiteLock';
 
 import { Dashboard } from './pages/Dashboard';
 import { SalesBilling } from './pages/SalesBilling';
@@ -32,12 +33,23 @@ const tabTitles = {
 };
 
 export function App() {
+  const [siteUnlocked, setSiteUnlocked] = useState(checkSiteUnlocked);
   const { user, userProfile, loading } = useAuth();
   const { dbStatus, refreshData } = useData();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentBillModal, setCurrentBillModal] = useState(null);
   const [notice, setNotice] = useState('');
+
+  const handleLockSite = () => {
+    lockSite();
+    setSiteUnlocked(false);
+  };
+
+  // If site is not unlocked with password 44113290, immediately show SiteLock
+  if (!siteUnlocked) {
+    return <SiteLock onUnlock={() => setSiteUnlocked(true)} />;
+  }
 
   if (loading) {
     return (
@@ -122,6 +134,27 @@ export function App() {
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: dbStatus === 'connected' ? '#10b981' : '#f59e0b' }}></span>
             {dbStatus === 'connected' ? 'Live DB' : 'Sync'}
           </button>
+          <button 
+            type="button" 
+            onClick={handleLockSite}
+            title="સાઇટ લોક કરો (Lock)"
+            style={{
+              fontSize: '0.72rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '3px',
+              background: '#fee2e2',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
+              padding: '3px 8px',
+              borderRadius: '999px',
+              fontWeight: '700',
+              cursor: 'pointer'
+            }}
+          >
+            <span>🔒</span>
+            <span>લોક</span>
+          </button>
           <div className="mobile-role-pill">
             {userProfile?.displayName ? userProfile.displayName.split(' ')[0] : 'Admin'}
           </div>
@@ -143,6 +176,7 @@ export function App() {
         setActiveTab={setActiveTab} 
         isOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
+        onLockSite={handleLockSite}
       />
       
       {/* Main Content Area */}
@@ -174,6 +208,28 @@ export function App() {
             >
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: dbStatus === 'connected' ? '#10b981' : '#f59e0b' }}></span>
               {dbStatus === 'connected' ? 'PostgreSQL Live' : 'સિન્ક થાય છે...'}
+            </button>
+            <button
+              type="button"
+              onClick={handleLockSite}
+              title="સાઇટ લોક કરો (Lock Website)"
+              style={{
+                background: '#fee2e2',
+                color: '#b91c1c',
+                border: '1px solid #fca5a5',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                fontSize: '0.82rem',
+                fontWeight: '700',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <span>🔒</span>
+              <span>લોક (Lock)</span>
             </button>
             <span className={`role ${userProfile?.role === 'sub_user' ? 'sub' : ''}`}>
               {userProfile?.role === 'admin' ? 'Main Admin (Ravi)' : 'Sub User (Bhargav)'}

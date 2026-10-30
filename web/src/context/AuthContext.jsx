@@ -64,8 +64,11 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Check local storage for active session first
+    const isUnlocked = localStorage.getItem('krushi_site_access_key') === '44113290' || 
+                       sessionStorage.getItem('krushi_site_access_key') === '44113290';
+
     const savedUser = localStorage.getItem('krushi_active_user');
-    if (savedUser) {
+    if (savedUser && isUnlocked) {
       try {
         const parsed = JSON.parse(savedUser);
         setUser({ uid: parsed.uid, email: parsed.email });
@@ -73,11 +76,14 @@ export const AuthProvider = ({ children }) => {
       } catch (e) {
         console.error("Local user parse error", e);
       }
-    } else {
-      // Default initial login as Ravi Chaudhary (Main Admin)
+    } else if (isUnlocked) {
+      // When unlocked via site password, default to Ravi Chaudhary (Main Admin)
       setUser({ uid: defaultAdmin.uid, email: defaultAdmin.email });
       setUserProfile(defaultAdmin);
       localStorage.setItem('krushi_active_user', JSON.stringify(defaultAdmin));
+    } else {
+      setUser(null);
+      setUserProfile(null);
     }
 
     // If Firebase is configured with real project credentials, listen to Auth
@@ -104,7 +110,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Standard Login
+  // Standard Login with Password 44113290 verification
   const login = async (email, password) => {
     if (isFirebaseConfigured()) {
       const res = await signInWithEmailAndPassword(auth, email, password);
@@ -118,32 +124,30 @@ export const AuthProvider = ({ children }) => {
         return profile;
       }
     } else {
-      // Offline/Local validation
-      if (email.toLowerCase().includes("ravi") || email.toLowerCase().includes("admin")) {
-        setUser({ uid: defaultAdmin.uid, email });
-        setUserProfile(defaultAdmin);
-        localStorage.setItem('krushi_active_user', JSON.stringify(defaultAdmin));
-        return defaultAdmin;
+      // Validate password 44113290
+      if ((password || '').trim() === '44113290') {
+        const isSub = (email || '').toLowerCase().includes("bhargav") || (email || '').toLowerCase().includes("sub");
+        const profile = isSub ? defaultSubUser : defaultAdmin;
+        setUser({ uid: profile.uid, email: profile.email });
+        setUserProfile(profile);
+        localStorage.setItem('krushi_active_user', JSON.stringify(profile));
+        localStorage.setItem('krushi_site_access_key', '44113290');
+        return profile;
       } else {
-        setUser({ uid: defaultSubUser.uid, email });
-        setUserProfile(defaultSubUser);
-        localStorage.setItem('krushi_active_user', JSON.stringify(defaultSubUser));
-        return defaultSubUser;
+        throw new Error("અમાન્ય પાસવર્ડ! કૃપા કરીને સાચો પાસવર્ડ દાખલ કરો.");
       }
     }
   };
 
-  // Switch Role / Quick Demo Login
-  const loginAsDemo = (roleType) => {
-    if (roleType === 'admin') {
-      setUser({ uid: defaultAdmin.uid, email: defaultAdmin.email });
-      setUserProfile(defaultAdmin);
-      localStorage.setItem('krushi_active_user', JSON.stringify(defaultAdmin));
-    } else {
-      setUser({ uid: defaultSubUser.uid, email: defaultSubUser.email });
-      setUserProfile(defaultSubUser);
-      localStorage.setItem('krushi_active_user', JSON.stringify(defaultSubUser));
+  // Switch Role / Demo Login (requires password verification)
+  const loginAsDemo = (roleType, inputPass) => {
+    if ((inputPass || '').trim() !== '44113290' && localStorage.getItem('krushi_site_access_key') !== '44113290') {
+      throw new Error("સુરક્ષા પાસવર્ડ જરૂરી છે.");
     }
+    const profile = roleType === 'admin' ? defaultAdmin : defaultSubUser;
+    setUser({ uid: profile.uid, email: profile.email });
+    setUserProfile(profile);
+    localStorage.setItem('krushi_active_user', JSON.stringify(profile));
   };
 
   const logout = async () => {

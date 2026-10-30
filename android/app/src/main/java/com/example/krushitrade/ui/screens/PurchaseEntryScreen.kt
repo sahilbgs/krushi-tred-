@@ -55,7 +55,7 @@ fun PurchaseEntryScreen(
     // Mode 2: Market
     var selectedFirm by remember { mutableStateOf<Party?>(firms.firstOrNull()) }
     var firmDropdownExpanded by remember { mutableStateOf(false) }
-    val filteredTraders = remember(selectedFirm) {
+    val filteredTraders = remember(selectedFirm, traders) {
         traders.filter { selectedFirm == null || it.firmId == selectedFirm?.id }
     }
     var selectedTrader by remember { mutableStateOf<Party?>(filteredTraders.firstOrNull()) }
@@ -73,6 +73,30 @@ fun PurchaseEntryScreen(
     var bagsInput by remember { mutableStateOf("20") }
     var lastBagKgInput by remember { mutableStateOf("35") }
     var ratePerManInput by remember { mutableStateOf("2400") }
+
+    LaunchedEffect(farmers) {
+        if (selectedFarmer == null && farmers.isNotEmpty()) {
+            selectedFarmer = farmers.firstOrNull()
+            farmerVillage = selectedFarmer?.village ?: ""
+        }
+    }
+    LaunchedEffect(firms) {
+        if (selectedFirm == null && firms.isNotEmpty()) {
+            selectedFirm = firms.firstOrNull()
+        }
+    }
+    LaunchedEffect(filteredTraders) {
+        if (selectedTrader == null && filteredTraders.isNotEmpty()) {
+            selectedTrader = filteredTraders.firstOrNull()
+        }
+    }
+    LaunchedEffect(seeds) {
+        if (selectedSeed == null && seeds.isNotEmpty()) {
+            selectedSeed = seeds.firstOrNull()
+            ratePerManInput = selectedSeed?.defaultPurchaseRatePerMan?.toInt()?.toString() ?: "2400"
+            lastBagKgInput = selectedSeed?.bagWeightKg?.toInt()?.toString() ?: "35"
+        }
+    }
 
     // Items List
     val itemsList = remember { mutableStateListOf<PurchaseItem>() }

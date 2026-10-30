@@ -39,6 +39,17 @@ fun SalesBillingScreen(
     var farmerExpanded by remember { mutableStateOf(false) }
     var stockExpanded by remember { mutableStateOf(false) }
 
+    LaunchedEffect(farmers) {
+        if (selectedFarmer == null && farmers.isNotEmpty()) {
+            selectedFarmer = farmers.firstOrNull()
+        }
+    }
+    LaunchedEffect(stock) {
+        if (selectedStock == null && stock.isNotEmpty()) {
+            selectedStock = stock.firstOrNull()
+        }
+    }
+
     var bagsInput by remember { mutableStateOf("1") }
     var looseKgInput by remember { mutableStateOf("0") }
     var rateInput by remember { mutableStateOf("140") }
@@ -51,7 +62,7 @@ fun SalesBillingScreen(
 
     val bags = bagsInput.toIntOrNull() ?: 0
     val looseKg = looseKgInput.toDoubleOrNull() ?: 0.0
-    val bagWeight = selectedStock?.bagWeightKg ?: 50.0
+    val bagWeight = selectedStock?.bagWeightKg ?: BAG_STD_KG
     val totalKg = (bags * bagWeight) + looseKg
     val rate = rateInput.toDoubleOrNull() ?: 0.0
     val lineTotal = totalKg * rate

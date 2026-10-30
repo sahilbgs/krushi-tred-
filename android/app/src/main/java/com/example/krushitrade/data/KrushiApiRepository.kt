@@ -440,4 +440,150 @@ class KrushiApiRepository(context: Context) {
             Result.failure(e)
         }
     }
+
+    suspend fun updatePurchase(purchase: PurchaseRecord): Result<PurchaseRecord> = withContext(Dispatchers.IO) {
+        try {
+            val json = JSONObject().apply {
+                if (purchase.id.isNotEmpty()) put("id", purchase.id)
+                put("billNo", purchase.billNo)
+                put("purchaseDate", purchase.purchaseDate.ifEmpty { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) })
+                put("purchaseType", purchase.purchaseType)
+                put("partyId", purchase.partyId)
+                put("partyName", purchase.partyName)
+                put("village", purchase.village)
+                put("mobile", purchase.mobile)
+                put("firmId", purchase.firmId)
+                put("firmName", purchase.firmName)
+                put("traderId", purchase.traderId)
+                put("traderName", purchase.traderName)
+                put("truckNo", purchase.truckNo)
+                put("truckOwner", purchase.truckOwner)
+                put("itemsSubTotal", purchase.itemsSubTotal)
+                put("majuriRatePerBag", purchase.majuriRatePerBag)
+                put("majuriAmount", purchase.majuriAmount)
+                put("marketCommission", purchase.marketCommission)
+                put("firmCommission", purchase.firmCommission)
+                put("bardanExpense", purchase.bardanExpense)
+                put("totalExpenses", purchase.totalExpenses)
+                put("netTotal", purchase.netTotal)
+                put("paidAmount", purchase.paidAmount)
+                put("dueAmount", purchase.dueAmount)
+                put("paymentMode", purchase.paymentMode)
+                put("remarks", purchase.remarks)
+                put("createdBy", if (purchase.createdBy.isNotEmpty()) purchase.createdBy else "Sub User (Mobile APK)")
+
+                val itemsArr = JSONArray()
+                for (it in purchase.items) {
+                    val itObj = JSONObject().apply {
+                        put("seedId", it.seedId)
+                        put("varietyName", it.varietyName)
+                        put("bagWeightKg", it.bagWeightKg)
+                        put("bags", it.bags)
+                        put("lastBagKg", it.lastBagKg)
+                        put("netWeightKg", it.netWeightKg)
+                        put("totalMan", it.totalMan)
+                        put("ratePerMan", it.ratePerMan)
+                        put("ratePerKg", if (it.purchaseRate > 0) it.purchaseRate / 20.0 else it.ratePerMan / 20.0)
+                        put("itemTotal", it.itemTotal)
+                    }
+                    itemsArr.put(itObj)
+                }
+                put("items", itemsArr)
+            }
+
+            val resp = sendHttpRequest("/api/purchases/${purchase.billNo}", "PUT", json.toString())
+            val root = JSONObject(resp)
+            if (root.optBoolean("success")) {
+                Result.success(purchase)
+            } else {
+                Result.failure(Exception(root.optString("error", "Error updating purchase")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating purchase: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deletePurchase(billNo: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val resp = sendHttpRequest("/api/purchases/$billNo", "DELETE")
+            val root = JSONObject(resp)
+            if (root.optBoolean("success")) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception(root.optString("error", "Error deleting purchase")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting purchase: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateSale(sale: SaleInvoice): Result<SaleInvoice> = withContext(Dispatchers.IO) {
+        try {
+            val json = JSONObject().apply {
+                if (sale.id.isNotEmpty()) put("id", sale.id)
+                put("billNo", sale.billNo)
+                put("billDate", sale.billDate.ifEmpty { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) })
+                put("farmerId", sale.farmerId)
+                put("farmerName", sale.farmerName)
+                put("farmerMobile", sale.farmerMobile)
+                put("farmerVillage", sale.farmerVillage)
+                put("subTotal", sale.subTotal)
+                put("majuriAmount", sale.majuriAmount)
+                put("extraCharges", sale.extraCharges)
+                put("discount", sale.discount)
+                put("netAmount", sale.netAmount)
+                put("paidAmount", sale.paidAmount)
+                put("dueAmount", sale.dueAmount)
+                put("paymentMode", sale.paymentMode)
+                put("createdBy", if (sale.createdBy.isNotEmpty()) sale.createdBy else "Sub User (Mobile APK)")
+
+                val itemsArr = JSONArray()
+                for (it in sale.items) {
+                    val itObj = JSONObject().apply {
+                        put("seedId", it.seedId)
+                        put("varietyName", it.varietyName)
+                        put("bagWeightKg", it.bagWeightKg)
+                        put("bags", it.bags)
+                        put("looseKg", it.looseKg)
+                        put("totalWeightKg", it.totalWeightKg)
+                        put("totalMan", it.totalMan)
+                        put("rateUnit", it.rateUnit)
+                        put("rate", it.rate)
+                        put("itemTotal", it.itemTotal)
+                    }
+                    itemsArr.put(itObj)
+                }
+                put("items", itemsArr)
+            }
+
+            val resp = sendHttpRequest("/api/sales/${sale.billNo}", "PUT", json.toString())
+            val root = JSONObject(resp)
+            if (root.optBoolean("success")) {
+                Result.success(sale)
+            } else {
+                Result.failure(Exception(root.optString("error", "Error updating sale")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating sale: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteSale(billNo: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val resp = sendHttpRequest("/api/sales/$billNo", "DELETE")
+            val root = JSONObject(resp)
+            if (root.optBoolean("success")) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception(root.optString("error", "Error deleting sale")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting sale: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }
+

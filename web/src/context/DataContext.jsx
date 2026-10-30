@@ -676,6 +676,30 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  // ૩b. ખરીદી સુધારો (Update Purchase)
+  const updatePurchase = async (purchaseData) => {
+    const billNo = purchaseData.billNo;
+    if (!billNo) throw new Error('બિલ નંબર જરૂરી છે.');
+
+    try {
+      const res = await fetch(`/api/purchases/${encodeURIComponent(billNo)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(purchaseData)
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'ખરીદી સુધારવામાં ભૂલ આવી.');
+      }
+      await loadFromBackend(true);
+      return data;
+    } catch (err) {
+      console.error('Error updating purchase:', err);
+      await loadFromBackend(true);
+      throw err;
+    }
+  };
+
   // ૪. વેચાણ બિલિંગ (Sales Billing)
   const recordSale = async (saleData) => {
     const timestamp = new Date();
@@ -800,6 +824,30 @@ export const DataProvider = ({ children }) => {
       return saleRecord;
     } catch (err) {
       console.error('Error saving sale to PostgreSQL:', err);
+      await loadFromBackend(true);
+      throw err;
+    }
+  };
+
+  // ૪b. વેચાણ સુધારો (Update Sale)
+  const updateSale = async (saleData) => {
+    const billNo = saleData.billNo;
+    if (!billNo) throw new Error('બિલ નંબર જરૂરી છે.');
+
+    try {
+      const res = await fetch(`/api/sales/${encodeURIComponent(billNo)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saleData)
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'વેચાણ સુધારવામાં ભૂલ આવી.');
+      }
+      await loadFromBackend(true);
+      return data;
+    } catch (err) {
+      console.error('Error updating sale:', err);
       await loadFromBackend(true);
       throw err;
     }
@@ -1100,7 +1148,9 @@ export const DataProvider = ({ children }) => {
       addSupplier,
       addSeedProduct,
       recordPurchase,
+      updatePurchase,
       recordSale,
+      updateSale,
       recordVoucher,
       recordPayment,
       deleteVoucher,

@@ -80,6 +80,9 @@ fun MainApp(repository: KrushiApiRepository) {
     val tradersList = remember(partyList.toList()) {
         partyList.filter { it.partyType == "trader" }
     }
+    val transportersList = remember(partyList.toList()) {
+        partyList.filter { it.partyType == "transporter" }
+    }
 
     var isLoading by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
@@ -270,7 +273,9 @@ fun MainApp(repository: KrushiApiRepository) {
                     farmers = farmersList,
                     firms = firmsList,
                     traders = tradersList,
+                    transporters = transportersList,
                     seeds = seedList,
+                    recentPurchases = purchasesList,
                     onSavePurchase = { newPur ->
                         coroutineScope.launch {
                             isSaving = true
@@ -285,11 +290,80 @@ fun MainApp(repository: KrushiApiRepository) {
                                     Toast.LENGTH_SHORT
                                 ).show()
                                 loadData(showToast = false)
-                                currentScreen = Screen.Stock
+                                currentScreen = Screen.Purchases
                             }.onFailure { err ->
                                 Toast.makeText(
                                     context,
                                     "❌ ખરીદી સેવ કરવામાં ભૂલ: ${err.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    },
+                    onUpdatePurchase = { updPur ->
+                        coroutineScope.launch {
+                            isSaving = true
+                            savingMessage = "ખરીદી એન્ટ્રી સુધારી રહ્યા છીએ..."
+                            val result = repository.updatePurchase(updPur)
+                            isSaving = false
+
+                            result.onSuccess { saved ->
+                                Toast.makeText(
+                                    context,
+                                    "✅ ખરીદી બિલ નં. ${saved.billNo} સફળતાપૂર્વક સુધારી લેવાઈ છે!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                loadData(showToast = false)
+                            }.onFailure { err ->
+                                Toast.makeText(
+                                    context,
+                                    "❌ ખરીદી સુધારવામાં ભૂલ: ${err.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    },
+                    onDeletePurchase = { billNo ->
+                        coroutineScope.launch {
+                            isSaving = true
+                            savingMessage = "ખરીદી એન્ટ્રી રદ/ડીલીટ થઈ રહી છે..."
+                            val result = repository.deletePurchase(billNo)
+                            isSaving = false
+
+                            result.onSuccess {
+                                Toast.makeText(
+                                    context,
+                                    "🗑️ ખરીદી બિલ નં. $billNo રદ થઈ ગયું!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                loadData(showToast = false)
+                            }.onFailure { err ->
+                                Toast.makeText(
+                                    context,
+                                    "❌ ડીલીટ કરવામાં ભૂલ: ${err.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    },
+                    onSaveParty = { party ->
+                        coroutineScope.launch {
+                            isSaving = true
+                            savingMessage = "${party.name} અલગ સેવ થઈ રહ્યા છે..."
+                            val result = repository.saveParty(party)
+                            isSaving = false
+
+                            result.onSuccess { saved ->
+                                Toast.makeText(
+                                    context,
+                                    "✅ ${saved.name} અલગ સેવ થઈ ગયા!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                loadData(showToast = false)
+                            }.onFailure { err ->
+                                Toast.makeText(
+                                    context,
+                                    "❌ સેવ કરવામાં ભૂલ: ${err.message}",
                                     Toast.LENGTH_LONG
                                 ).show()
                             }

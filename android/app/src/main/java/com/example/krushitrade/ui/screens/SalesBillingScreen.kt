@@ -280,7 +280,7 @@ fun SalesBillingScreen(
                         value = majuriInput,
                         onValueChange = { majuriInput = it },
                         label = { Text("મજૂરી ખર્ચ ₹") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     )
@@ -288,7 +288,7 @@ fun SalesBillingScreen(
                         value = extraChargesInput,
                         onValueChange = { extraChargesInput = it },
                         label = { Text("અન્ય ચાર્જિસ ₹") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     )
@@ -301,7 +301,7 @@ fun SalesBillingScreen(
                         value = discountInput,
                         onValueChange = { discountInput = it },
                         label = { Text("ડિસ્કાઉન્ટ ₹") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     )
@@ -310,7 +310,7 @@ fun SalesBillingScreen(
                             value = paidInput,
                             onValueChange = { paidInput = it },
                             label = { Text("જમા રોકડ ₹") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         )

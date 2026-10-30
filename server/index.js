@@ -10,6 +10,13 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5005;
 
+process.on('uncaughtException', (err) => {
+  console.error('CRITICAL UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('CRITICAL UNHANDLED REJECTION:', reason);
+});
+
 app.use(cors());
 app.use(express.json());
 app.use('/public', express.static(path.join(__dirname, 'public')));
@@ -425,6 +432,32 @@ app.post('/api/purchases', async (req, res) => {
         const total = parseFloat(item.itemTotal || 0);
         const lastBagKg = Math.min(bagWeight, Math.max(0, parseFloat(item.lastBagKg !== undefined ? item.lastBagKg : bagWeight)));
 
+        let validSeedId = item.seedId || null;
+        if (validSeedId) {
+          const chk = await client.query('SELECT id FROM seed_varieties WHERE id = $1', [validSeedId]);
+          if (chk.rows.length === 0) {
+            const match = await client.query('SELECT id FROM seed_varieties WHERE variety_name = $1 LIMIT 1', [item.varietyName]);
+            validSeedId = match.rows[0]?.id || null;
+          }
+        }
+        if (!validSeedId && item.varietyName) {
+          const match = await client.query('SELECT id FROM seed_varieties WHERE variety_name = $1 LIMIT 1', [item.varietyName]);
+          if (match.rows.length > 0) {
+            validSeedId = match.rows[0].id;
+          } else {
+            // Auto-create missing seed variety so inventory integrity is maintained
+            validSeedId = 'seed_' + Date.now();
+            await client.query(
+              `INSERT INTO seed_varieties (id, variety_name, crop_type, company, bag_weight_kg, default_purchase_rate_per_man, default_sale_rate_per_man, min_stock_alert_bags)
+               VALUES ($1, $2, 'મગફળી', 'SHREE NANDINI SEEDS', $3, $4, $5, 10)
+               ON CONFLICT (variety_name) DO NOTHING`,
+              [validSeedId, item.varietyName, bagWeight, ratePerMan, ratePerMan * 1.15]
+            );
+            const refetch = await client.query('SELECT id FROM seed_varieties WHERE variety_name = $1 LIMIT 1', [item.varietyName]);
+            validSeedId = refetch.rows[0]?.id || validSeedId;
+          }
+        }
+
         await client.query(
           `INSERT INTO purchase_items (
             id, purchase_id, seed_id, variety_name, bag_weight_kg, bags, last_bag_kg, net_weight_kg, total_man, rate_per_man, rate_per_kg, item_total
@@ -432,7 +465,7 @@ app.post('/api/purchases', async (req, res) => {
           [
             itemId,
             purchaseId,
-            item.seedId || null,
+            validSeedId,
             item.varietyName,
             bagWeight,
             bags,
@@ -446,23 +479,25 @@ app.post('/api/purchases', async (req, res) => {
         );
 
         // Update Stock Ledger
-        await client.query(
-          `INSERT INTO stock_ledger (id, seed_id, variety_name, batch_no, bag_weight_kg, available_bags, available_loose_kg, last_purchase_rate)
-           VALUES ($1, $2, $3, 'MAIN', $4, $5, $6, $7)
-           ON CONFLICT (seed_id, batch_no) DO UPDATE SET
-             available_bags = stock_ledger.available_bags + EXCLUDED.available_bags,
-             available_loose_kg = stock_ledger.available_loose_kg + EXCLUDED.available_loose_kg,
-             last_purchase_rate = EXCLUDED.last_purchase_rate`,
-          [
-            'stock_' + Date.now(),
-            item.seedId || 'seed_1',
-            item.varietyName,
-            bagWeight,
-            bags,
-            Math.max(0, netKg - (bags * bagWeight)),
-            ratePerMan
-          ]
-        );
+        if (validSeedId) {
+          await client.query(
+            `INSERT INTO stock_ledger (id, seed_id, variety_name, batch_no, bag_weight_kg, available_bags, available_loose_kg, last_purchase_rate)
+             VALUES ($1, $2, $3, 'MAIN', $4, $5, $6, $7)
+             ON CONFLICT (seed_id, batch_no) DO UPDATE SET
+               available_bags = stock_ledger.available_bags + EXCLUDED.available_bags,
+               available_loose_kg = stock_ledger.available_loose_kg + EXCLUDED.available_loose_kg,
+               last_purchase_rate = EXCLUDED.last_purchase_rate`,
+            [
+              'stock_' + Date.now(),
+              validSeedId,
+              item.varietyName,
+              bagWeight,
+              bags,
+              Math.max(0, netKg - (bags * bagWeight)),
+              ratePerMan
+            ]
+          );
+        }
       }
     }
 
@@ -649,6 +684,21 @@ app.post('/api/sales', async (req, res) => {
         const rawUnit = (item.rateUnit || 'man').toString().toLowerCase();
         const rateUnit = ['man', 'kg', 'bag'].includes(rawUnit) ? rawUnit : 'man';
 
+        let validSaleSeedId = item.seedId || null;
+        if (validSaleSeedId) {
+          const chk = await client.query('SELECT id FROM seed_varieties WHERE id = $1', [validSaleSeedId]);
+          if (chk.rows.length === 0) {
+            const match = await client.query('SELECT id FROM seed_varieties WHERE variety_name = $1 LIMIT 1', [item.varietyName]);
+            validSaleSeedId = match.rows[0]?.id || null;
+          }
+        }
+        if (!validSaleSeedId && item.varietyName) {
+          const match = await client.query('SELECT id FROM seed_varieties WHERE variety_name = $1 LIMIT 1', [item.varietyName]);
+          if (match.rows.length > 0) {
+            validSaleSeedId = match.rows[0].id;
+          }
+        }
+
         await client.query(
           `INSERT INTO sale_items (
             id, sale_id, seed_id, variety_name, bag_weight_kg, bags, loose_kg, total_weight_kg, total_man, rate_unit, rate, item_total
@@ -656,7 +706,7 @@ app.post('/api/sales', async (req, res) => {
           [
             itemId,
             saleId,
-            item.seedId || null,
+            validSaleSeedId,
             item.varietyName,
             bagWeight,
             bags,
@@ -670,13 +720,13 @@ app.post('/api/sales', async (req, res) => {
         );
 
         // Deduct Stock
-        if (item.seedId) {
+        if (validSaleSeedId) {
           await client.query(
             `UPDATE stock_ledger
              SET available_bags = GREATEST(0, available_bags - $1),
                  available_loose_kg = GREATEST(0, available_loose_kg - $2)
              WHERE seed_id = $3`,
-            [bags, looseKg, item.seedId]
+            [bags, looseKg, validSaleSeedId]
           );
         }
       }
@@ -1027,6 +1077,475 @@ app.delete('/api/sales/:billNo', async (req, res) => {
   }
 });
 
+// 8d. Update Purchase (ખરીદી સુધારો)
+app.put('/api/purchases/:billNo', async (req, res) => {
+  const { billNo } = req.params;
+  const purchaseData = req.body;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Fetch existing purchase
+    const purRes = await client.query('SELECT * FROM purchases WHERE bill_no = $1 LIMIT 1', [billNo]);
+    if (purRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: 'ખરીદી બિલ મળ્યું નથી.' });
+    }
+    const oldPur = purRes.rows[0];
+
+    // 2. Revert Old Stock Ledger
+    const oldItemsRes = await client.query('SELECT seed_id, bags, net_weight_kg FROM purchase_items WHERE purchase_id = $1', [oldPur.id]);
+    for (const it of oldItemsRes.rows) {
+      if (it.seed_id) {
+        await client.query(
+          `UPDATE stock_ledger
+           SET available_bags = GREATEST(0, available_bags - $1)
+           WHERE seed_id = $2`,
+          [it.bags || 0, it.seed_id]
+        );
+      }
+    }
+
+    // 3. Delete old purchase items
+    await client.query('DELETE FROM purchase_items WHERE purchase_id = $1', [oldPur.id]);
+
+    // 4. Determine party
+    let determinedPartyType = (purchaseData.partyType || (purchaseData.purchaseType === 'market' ? 'firm' : 'farmer')).toLowerCase();
+    if (!['farmer', 'firm', 'supplier', 'trader', 'transporter', 'other'].includes(determinedPartyType)) {
+      determinedPartyType = 'farmer';
+    }
+    const isFarmer = determinedPartyType === 'farmer';
+
+    let finalPartyId = purchaseData.partyId || oldPur.party_id;
+    if (finalPartyId) {
+      const checkParty = await client.query('SELECT id, party_type FROM parties WHERE id = $1', [finalPartyId]);
+      if (checkParty.rows.length === 0) {
+        await client.query(
+          `INSERT INTO parties (id, party_type, code, name, mobile, village, opening_balance, balance_type, current_balance, credit_limit)
+           VALUES ($1, $2, $3, $4, $5, $6, 0, 'dr', 0, 50000)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            finalPartyId,
+            determinedPartyType,
+            `P-${Date.now().toString(36).toUpperCase()}`,
+            purchaseData.partyName || 'ખાતેદાર',
+            purchaseData.mobile || null,
+            purchaseData.village || null
+          ]
+        );
+      }
+    }
+
+    const rawMode = (purchaseData.paymentMode || 'credit').toString().toLowerCase().trim();
+    const normalizedMode = ['cash', 'bank', 'upi', 'credit', 'cheque'].includes(rawMode) ? rawMode : 'credit';
+
+    // 5. Update purchase record
+    await client.query(
+      `UPDATE purchases SET
+        purchase_type = $1,
+        purchase_date = $2,
+        party_id = $3,
+        party_name = $4,
+        firm_id = $5,
+        firm_name = $6,
+        trader_id = $7,
+        trader_name = $8,
+        village = $9,
+        mobile = $10,
+        truck_no = $11,
+        truck_owner = $12,
+        items_sub_total = $13,
+        majuri_rate_per_bag = $14,
+        majuri_amount = $15,
+        market_commission = $16,
+        firm_commission = $17,
+        bardan_expense = $18,
+        total_expenses = $19,
+        net_total = $20,
+        paid_amount = $21,
+        due_amount = $22,
+        payment_mode = $23,
+        remarks = $24,
+        updated_at = NOW()
+      WHERE id = $25`,
+      [
+        isFarmer ? 'farmer' : 'market',
+        purchaseData.purchaseDate || oldPur.purchase_date,
+        finalPartyId,
+        purchaseData.partyName || oldPur.party_name,
+        purchaseData.firmId || null,
+        purchaseData.firmName || null,
+        purchaseData.traderId || null,
+        purchaseData.traderName || null,
+        purchaseData.village || null,
+        purchaseData.mobile || null,
+        purchaseData.truckNo || null,
+        purchaseData.truckOwner || null,
+        parseFloat(purchaseData.itemsSubTotal || 0),
+        parseFloat(purchaseData.majuriRatePerBag || 0),
+        parseFloat(purchaseData.majuriAmount || 0),
+        parseFloat(purchaseData.marketCommission || 0),
+        parseFloat(purchaseData.firmCommission || 0),
+        parseFloat(purchaseData.bardanExpense || 0),
+        parseFloat(purchaseData.totalExpenses || 0),
+        parseFloat(purchaseData.netTotal || 0),
+        parseFloat(purchaseData.paidAmount || 0),
+        parseFloat(purchaseData.dueAmount || 0),
+        normalizedMode,
+        purchaseData.remarks || null,
+        oldPur.id
+      ]
+    );
+
+    // 6. Insert New Purchase Items & Add To Stock
+    if (Array.isArray(purchaseData.items)) {
+      for (const item of purchaseData.items) {
+        const itemId = item.id || ('pitm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
+        const bagWeight = parseFloat(item.bagWeightKg || 35);
+        const bags = parseInt(item.bags || 0);
+        const netKg = parseFloat(item.netWeightKg || 0);
+        const man = parseFloat(item.totalMan || (netKg / 20));
+        const ratePerMan = parseFloat(item.ratePerMan || item.rate || 0);
+        const total = parseFloat(item.itemTotal || 0);
+        const lastBagKg = Math.min(bagWeight, Math.max(0, parseFloat(item.lastBagKg !== undefined ? item.lastBagKg : bagWeight)));
+
+        let validSeedId = item.seedId || null;
+        if (validSeedId) {
+          const chk = await client.query('SELECT id FROM seed_varieties WHERE id = $1', [validSeedId]);
+          if (chk.rows.length === 0) {
+            const match = await client.query('SELECT id FROM seed_varieties WHERE variety_name = $1 LIMIT 1', [item.varietyName]);
+            validSeedId = match.rows[0]?.id || null;
+          }
+        }
+        if (!validSeedId && item.varietyName) {
+          const match = await client.query('SELECT id FROM seed_varieties WHERE variety_name = $1 LIMIT 1', [item.varietyName]);
+          if (match.rows.length > 0) {
+            validSeedId = match.rows[0].id;
+          }
+        }
+
+        await client.query(
+          `INSERT INTO purchase_items (
+            id, purchase_id, seed_id, variety_name, bag_weight_kg, bags, last_bag_kg, net_weight_kg, total_man, rate_per_man, rate_per_kg, item_total
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [
+            itemId,
+            oldPur.id,
+            validSeedId,
+            item.varietyName,
+            bagWeight,
+            bags,
+            lastBagKg,
+            netKg,
+            man,
+            ratePerMan,
+            parseFloat(item.ratePerKg || (ratePerMan / 20)),
+            total
+          ]
+        );
+
+        if (validSeedId) {
+          await client.query(
+            `INSERT INTO stock_ledger (id, seed_id, variety_name, batch_no, bag_weight_kg, available_bags, available_loose_kg, last_purchase_rate)
+             VALUES ($1, $2, $3, 'MAIN', $4, $5, $6, $7)
+             ON CONFLICT (seed_id, batch_no) DO UPDATE SET
+               available_bags = stock_ledger.available_bags + EXCLUDED.available_bags,
+               last_purchase_rate = EXCLUDED.last_purchase_rate`,
+            [
+              'stock_' + Date.now(),
+              validSeedId,
+              item.varietyName,
+              bagWeight,
+              bags,
+              Math.max(0, netKg - (bags * bagWeight)),
+              ratePerMan
+            ]
+          );
+        }
+      }
+    }
+
+    // 7. Update Party Ledger Transaction
+    await client.query(`DELETE FROM party_transactions WHERE voucher_no = $1 OR bill_id = $2`, [billNo, oldPur.id]);
+    if (finalPartyId) {
+      const totalBags = purchaseData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0;
+      const totalKg = purchaseData.items?.reduce((s, it) => s + parseFloat(it.netWeightKg || 0), 0) || 0;
+      const totalMan = purchaseData.items?.reduce((s, it) => s + parseFloat(it.totalMan || (totalKg / 20)), 0) || 0;
+      const ratePerMan = purchaseData.items?.[0]?.ratePerMan || purchaseData.items?.[0]?.rate || 0;
+
+      await client.query(
+        `INSERT INTO party_transactions (
+          id, date, time, party_id, party_name, party_type, voucher_no, voucher_type, particulars, variety_name, bags, weight_kg, total_man, rate_per_man, debit, credit, running_balance, payment_mode, bill_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+        [
+          'tx_' + Date.now(),
+          purchaseData.purchaseDate || oldPur.purchase_date,
+          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          finalPartyId,
+          purchaseData.partyName || oldPur.party_name,
+          determinedPartyType,
+          billNo,
+          'purchase',
+          `${determinedPartyType === 'farmer' ? 'ખેડૂત ખરીદી (સુધારેલ)' : 'પેઢી/સપ્લાયર ખરીદી (સુધારેલ)'} (${purchaseData.items?.map(it => it.varietyName).join(', ')})`,
+          purchaseData.items?.map(it => it.varietyName).join(', '),
+          totalBags,
+          totalKg,
+          totalMan,
+          ratePerMan,
+          parseFloat(purchaseData.paidAmount || 0),
+          parseFloat(purchaseData.netTotal || 0),
+          parseFloat(purchaseData.dueAmount || 0),
+          purchaseData.paymentMode || 'credit',
+          oldPur.id
+        ]
+      );
+
+      await recalculatePartyBalance(client, finalPartyId);
+      if (oldPur.party_id && oldPur.party_id !== finalPartyId) {
+        await recalculatePartyBalance(client, oldPur.party_id);
+      }
+    }
+
+    // 8. Update Rojmel
+    await client.query(`DELETE FROM rojmel WHERE voucher_no = $1`, [billNo]);
+    const purBags = purchaseData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0;
+    const purKg = purchaseData.items?.reduce((s, it) => s + parseFloat(it.netWeightKg || 0), 0) || 0;
+    const purMan = purchaseData.items?.reduce((s, it) => s + parseFloat(it.totalMan || (purKg / 20)), 0) || 0;
+
+    await client.query(
+      `INSERT INTO rojmel (
+        id, date, time, voucher_no, voucher_type, party_name, particulars, variety_name, bags, weight_kg, total_man, account, debit, credit, payment_mode
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+      [
+        'roj_' + Date.now(),
+        purchaseData.purchaseDate || oldPur.purchase_date,
+        new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        billNo,
+        'purchase',
+        purchaseData.partyName || oldPur.party_name,
+        `ખરીદી (સુધારેલ): ${purchaseData.items?.map(it => `${it.varietyName} (${it.bags}B/${it.netWeightKg}KG)`).join(', ')}`,
+        purchaseData.items?.map(it => it.varietyName).join(', '),
+        purBags,
+        purKg,
+        purMan,
+        purchaseData.paymentMode === 'cash' ? 'cash' : 'bank',
+        parseFloat(purchaseData.paidAmount || 0),
+        parseFloat(purchaseData.paidAmount || 0) > 0 ? 0 : parseFloat(purchaseData.netTotal || 0),
+        purchaseData.paymentMode || 'credit'
+      ]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: `ખરીદી બિલ ${billNo} સફળતાપૂર્વક સુધારાઈ ગયું.` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error updating purchase in PostgreSQL:', err);
+    res.status(500).json({ success: false, error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// 8e. Update Sale (વેચાણ સુધારો)
+app.put('/api/sales/:billNo', async (req, res) => {
+  const { billNo } = req.params;
+  const saleData = req.body;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const saleRes = await client.query('SELECT * FROM sales WHERE bill_no = $1 LIMIT 1', [billNo]);
+    if (saleRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: 'વેચાણ બિલ મળ્યું નથી.' });
+    }
+    const oldSale = saleRes.rows[0];
+
+    // Revert old sale items from stock
+    const oldItemsRes = await client.query('SELECT seed_id, bags, loose_kg FROM sale_items WHERE sale_id = $1', [oldSale.id]);
+    for (const it of oldItemsRes.rows) {
+      if (it.seed_id) {
+        await client.query(
+          `UPDATE stock_ledger
+           SET available_bags = available_bags + $1,
+               available_loose_kg = available_loose_kg + $2
+           WHERE seed_id = $3`,
+          [it.bags || 0, it.loose_kg || 0, it.seed_id]
+        );
+      }
+    }
+
+    await client.query('DELETE FROM sale_items WHERE sale_id = $1', [oldSale.id]);
+
+    let finalSalePartyId = saleData.farmerId || saleData.partyId || oldSale.party_id;
+    const rawSaleMode = (saleData.paymentMode || 'cash').toString().toLowerCase().trim();
+    const normalizedSaleMode = ['cash', 'bank', 'upi', 'credit', 'cheque', 'cash_and_credit'].includes(rawSaleMode) ? rawSaleMode : 'cash';
+
+    await client.query(
+      `UPDATE sales SET
+        bill_date = $1,
+        party_id = $2,
+        farmer_name = $3,
+        farmer_mobile = $4,
+        farmer_village = $5,
+        sub_total = $6,
+        majuri_amount = $7,
+        discount = $8,
+        net_amount = $9,
+        paid_amount = $10,
+        due_amount = $11,
+        payment_mode = $12,
+        remarks = $13,
+        updated_at = NOW()
+      WHERE id = $14`,
+      [
+        saleData.billDate || oldSale.bill_date,
+        finalSalePartyId,
+        saleData.farmerName || oldSale.farmer_name,
+        saleData.farmerMobile || '',
+        saleData.farmerVillage || '',
+        parseFloat(saleData.subTotal || 0),
+        parseFloat(saleData.majuriAmount || 0),
+        parseFloat(saleData.discount || 0),
+        parseFloat(saleData.netAmount || 0),
+        parseFloat(saleData.paidAmount || 0),
+        parseFloat(saleData.dueAmount || 0),
+        normalizedSaleMode,
+        saleData.remarks || '',
+        oldSale.id
+      ]
+    );
+
+    if (Array.isArray(saleData.items)) {
+      for (const item of saleData.items) {
+        const itemId = item.id || ('sitm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
+        const bagWeight = parseFloat(item.bagWeightKg || 35);
+        const bags = parseInt(item.bags || 0);
+        const looseKg = parseFloat(item.looseKg || 0);
+        const totalWeight = parseFloat(item.totalWeightKg || (bags * bagWeight + looseKg));
+        const totalMan = parseFloat(item.totalMan || (totalWeight / 20));
+        const rate = parseFloat(item.rate || 0);
+        const itemTotal = parseFloat(item.itemTotal || 0);
+        const rawUnit = (item.rateUnit || 'man').toString().toLowerCase();
+        const rateUnit = ['man', 'kg', 'bag'].includes(rawUnit) ? rawUnit : 'man';
+
+        let validSaleSeedId = item.seedId || null;
+        if (validSaleSeedId) {
+          const chk = await client.query('SELECT id FROM seed_varieties WHERE id = $1', [validSaleSeedId]);
+          if (chk.rows.length === 0) {
+            const match = await client.query('SELECT id FROM seed_varieties WHERE variety_name = $1 LIMIT 1', [item.varietyName]);
+            validSaleSeedId = match.rows[0]?.id || null;
+          }
+        }
+        if (!validSaleSeedId && item.varietyName) {
+          const match = await client.query('SELECT id FROM seed_varieties WHERE variety_name = $1 LIMIT 1', [item.varietyName]);
+          if (match.rows.length > 0) validSaleSeedId = match.rows[0].id;
+        }
+
+        await client.query(
+          `INSERT INTO sale_items (
+            id, sale_id, seed_id, variety_name, bag_weight_kg, bags, loose_kg, total_weight_kg, total_man, rate_unit, rate, item_total
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [
+            itemId,
+            oldSale.id,
+            validSaleSeedId,
+            item.varietyName,
+            bagWeight,
+            bags,
+            looseKg,
+            totalWeight,
+            totalMan,
+            rateUnit,
+            rate,
+            itemTotal
+          ]
+        );
+
+        if (validSaleSeedId) {
+          await client.query(
+            `UPDATE stock_ledger
+             SET available_bags = GREATEST(0, available_bags - $1),
+                 available_loose_kg = GREATEST(0, available_loose_kg - $2)
+             WHERE seed_id = $3`,
+            [bags, looseKg, validSaleSeedId]
+          );
+        }
+      }
+    }
+
+    // Update transactions & rojmel
+    await client.query('DELETE FROM party_transactions WHERE voucher_no = $1 OR bill_id = $2', [billNo, oldSale.id]);
+    if (finalSalePartyId) {
+      await client.query(
+        `INSERT INTO party_transactions (
+          id, date, time, party_id, party_name, party_type, voucher_no, voucher_type, particulars, variety_name, bags, weight_kg, total_man, rate_per_man, debit, credit, running_balance, payment_mode, bill_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+        [
+          'tx_' + Date.now(),
+          saleData.billDate || oldSale.bill_date,
+          new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          finalSalePartyId,
+          saleData.farmerName || oldSale.farmer_name,
+          'farmer',
+          billNo,
+          'sale',
+          `બિયારણ વેચાણ (સુધારેલ): ${saleData.items?.map(it => it.varietyName).join(', ')}`,
+          saleData.items?.map(it => it.varietyName).join(', '),
+          saleData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0,
+          saleData.items?.reduce((s, it) => s + parseFloat(it.totalWeightKg || 0), 0) || 0,
+          saleData.items?.reduce((s, it) => s + parseFloat(it.totalMan || 0), 0) || 0,
+          saleData.items?.[0]?.rate || 0,
+          parseFloat(saleData.netAmount || 0),
+          parseFloat(saleData.paidAmount || 0),
+          parseFloat(saleData.dueAmount || 0),
+          normalizedSaleMode,
+          oldSale.id
+        ]
+      );
+      await recalculatePartyBalance(client, finalSalePartyId);
+      if (oldSale.party_id && oldSale.party_id !== finalSalePartyId) {
+        await recalculatePartyBalance(client, oldSale.party_id);
+      }
+    }
+
+    await client.query('DELETE FROM rojmel WHERE voucher_no = $1', [billNo]);
+    await client.query(
+      `INSERT INTO rojmel (
+        id, date, time, voucher_no, voucher_type, party_name, particulars, variety_name, bags, weight_kg, total_man, account, debit, credit, payment_mode
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+      [
+        'roj_' + Date.now(),
+        saleData.billDate || oldSale.bill_date,
+        new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        billNo,
+        'sale',
+        saleData.farmerName || oldSale.farmer_name,
+        `વેચાણ (સુધારેલ): ${saleData.items?.map(it => `${it.varietyName} (${it.bags}B/${it.totalWeightKg}KG)`).join(', ')}`,
+        saleData.items?.map(it => it.varietyName).join(', '),
+        saleData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0,
+        saleData.items?.reduce((s, it) => s + parseFloat(it.totalWeightKg || 0), 0) || 0,
+        saleData.items?.reduce((s, it) => s + parseFloat(it.totalMan || 0), 0) || 0,
+        saleData.paymentMode === 'cash' ? 'cash' : 'bank',
+        0,
+        parseFloat(saleData.paidAmount || 0) > 0 ? parseFloat(saleData.paidAmount || 0) : parseFloat(saleData.netAmount || 0),
+        normalizedSaleMode
+      ]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: `વેચાણ બિલ ${billNo} સફળતાપૂર્વક સુધારાઈ ગયું.` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error updating sale in PostgreSQL:', err);
+    res.status(500).json({ success: false, error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // 9. Stock Adjustment
 app.post('/api/stock/adjust', async (req, res) => {
   const { stockId, bagDiff, kgDiff, reason } = req.body;
@@ -1044,6 +1563,16 @@ app.post('/api/stock/adjust', async (req, res) => {
     console.error('Error adjusting stock in PostgreSQL:', err);
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// Serve frontend dist for maximum resilience
+const distPath = path.resolve(__dirname, '../web/dist');
+app.use(express.static(distPath));
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/public')) return next();
+  res.sendFile(path.join(distPath, 'index.html'), (err) => {
+    if (err) next();
+  });
 });
 
 app.listen(PORT, '0.0.0.0', async () => {

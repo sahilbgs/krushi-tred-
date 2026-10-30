@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { useData, BAG_STD_KG, MAN_STD_KG, PARTY_TAGS, getPartyTagInfo } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -8,12 +9,15 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     parties, 
     purchases, 
     recordPurchase,
+    updatePurchase,
     addParty,
     deletePurchase
   } = useData();
   const { userProfile } = useAuth();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingBillNo, setEditingBillNo] = useState('');
 
   // Helper to compute next bill no
   const getNextBillNo = () => {
@@ -35,8 +39,10 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
   const [billNo, setBillNo] = useState(getNextBillNo);
 
   useEffect(() => {
-    setBillNo(getNextBillNo());
-  }, [purchases]);
+    if (!isEditing) {
+      setBillNo(getNextBillNo());
+    }
+  }, [purchases, isEditing]);
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [partyId, setPartyId] = useState('');
@@ -52,8 +58,10 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
   // Transport & Commission Fields
   const [showTransportDetails, setShowTransportDetails] = useState(false);
   const [pethiName, setPethiName] = useState('');
+  const [selectedTruckId, setSelectedTruckId] = useState('');
   const [truckNumber, setTruckNumber] = useState('');
   const [truckOwnerName, setTruckOwnerName] = useState('');
+  const [truckMobile, setTruckMobile] = useState('');
   const [marketCommission, setMarketCommission] = useState('0');
   const [pethiCommission, setPethiCommission] = useState('0');
   const [bardana, setBardana] = useState('0');
@@ -90,8 +98,15 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     return true;
   });
 
-  const money = n => '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN');
-  const num = v => Math.max(0, Number(v || 0));
+  const transporterParties = parties.filter(p => p.partyType === 'transporter');
+
+  const money = n => {
+    const val = Number(n || 0);
+    return '₹' + (val % 1 !== 0
+      ? val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : Math.round(val).toLocaleString('en-IN'));
+  };
+  const num = v => Math.max(0, parseFloat(v) || 0);
 
   // Handle party select from dropdown
   const handlePartySelect = (id) => {
@@ -115,6 +130,185 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     }
   };
 
+  // Handle selecting an existing truck/transporter
+  const handleSelectTruck = (tId) => {
+    setSelectedTruckId(tId);
+    const trk = parties.find(p => p.id === tId);
+    if (trk) {
+      setTruckOwnerName(trk.name || '');
+      setTruckNumber(trk.firmName || trk.name || '');
+      if (trk.mobile) setTruckMobile(trk.mobile);
+      setShowTransportDetails(true);
+    }
+  };
+
+  // Save current Malik / Goods Owner separately to master
+  const handleSaveMalikSeparately = async () => {
+    if (!partyName.trim()) {
+      setNotice('કૃપા કરીને માલિક / ખાતેદારનું નામ દાખલ કરો.');
+      return;
+    }
+    try {
+      const created = await addParty({
+        partyType,
+        name: partyName.trim(),
+        firmName: pethiName || partyName.trim(),
+        mobile: partyMobile.trim(),
+        village: village.trim(),
+        city: village.trim(),
+        openingBalance: 0,
+        balanceType: 'cr'
+      });
+      if (created?.id) {
+        setPartyId(created.id);
+      }
+      setNotice(`✅ માલિક / ખાતેદાર "${partyName}" સફળતાપૂર્વક અલગથી સેવ થઈ ગયા.`);
+    } catch (err) {
+      setNotice('માલિક સેવ કરવામાં ક્ષતિ આવી: ' + (err.message || 'Error'));
+    }
+  };
+
+  // Save current Truck / Transporter separately to master
+  const handleSaveTruckSeparately = async () => {
+    if (!truckNumber.trim() && !truckOwnerName.trim()) {
+      setNotice('કૃપા કરીને ટ્રક નંબર અથવા ટ્રાન્સપોર્ટર / માલિકનું નામ દાખલ કરો.');
+      return;
+    }
+    try {
+      const ownerLabel = truckOwnerName.trim() || truckNumber.trim();
+      const created = await addParty({
+        partyType: 'transporter',
+        name: ownerLabel,
+        firmName: truckNumber.trim() || ownerLabel,
+        mobile: truckMobile.trim(),
+        village: 'વાહન / ટ્રાન્સપોર્ટ',
+        city: 'વાહન / ટ્રાન્સપોર્ટ',
+        openingBalance: 0,
+        balanceType: 'cr'
+      });
+      if (created?.id) {
+        setSelectedTruckId(created.id);
+      }
+      setNotice(`✅ ટ્રક વિગત "${truckNumber || ownerLabel}" અલગથી ટ્રાન્સપોર્ટર લિસ્ટમાં સેવ થઈ ગઈ.`);
+    } catch (err) {
+      setNotice('ટ્રક વિગત સેવ કરવામાં ક્ષતિ: ' + (err.message || 'Error'));
+    }
+  };
+
+  // Export Purchases to Excel (.xlsx)
+  const handleExportExcel = () => {
+    if (!purchases || purchases.length === 0) {
+      alert('એક્સપોર્ટ કરવા માટે કોઈ ખરીદી ડેટા ઉપલબ્ધ નથી.');
+      return;
+    }
+    const rows = purchases.map((p, idx) => {
+      const party = parties.find(x => x.id === p.partyId);
+      const tag = p.partyType || party?.partyType || (p.purchaseType === 'farmer' ? 'farmer' : 'firm');
+      const tagInfo = getPartyTagInfo(tag);
+      const varieties = p.items?.map(it => it.varietyName || it.productName).join(', ') || '—';
+      const totalBags = p.items?.reduce((s, it) => s + (parseInt(it.bags) || 0), 0) || 0;
+      const totalKg = p.items?.reduce((s, it) => s + (parseFloat(it.netWeightKg || it.qtyKg) || 0), 0) || 0;
+      const totalMan = p.items?.reduce((s, it) => s + (parseFloat(it.totalMan || it.qtyMan) || 0), 0) || 0;
+      const rates = p.items?.map(it => it.ratePerMan || it.rate).join(', ') || '—';
+
+      return {
+        'ક્રમ': idx + 1,
+        'બિલ નંબર': p.billNo || p.invoiceNo || '—',
+        'તારીખ': p.purchaseDate || p.date || '—',
+        'ખાતેદાર પ્રકાર': tagInfo.label,
+        'માલિક / ખાતેદારનું નામ': p.partyName || '—',
+        'પેઢીનું નામ': p.firmName || p.pethiName || party?.firmName || '—',
+        'ગામ / શહેર': p.village || party?.village || '—',
+        'મોબાઇલ નંબર': p.mobile || p.partyMobile || party?.mobile || '—',
+        'ટ્રક / વાહન નંબર': p.truckNo || p.truckNumber || '—',
+        'ટ્રાન્સપોર્ટ / ટ્રક માલિક': p.truckOwner || p.truckOwnerName || '—',
+        'બિયારણ જાત': varieties,
+        'કુલ બોરી': totalBags,
+        'કુલ વજન (KG)': totalKg,
+        'કુલ મણ (20 KG)': Number(totalMan.toFixed(2)),
+        'ભાવ પ્રતિ મણ (₹/મણ)': rates,
+        'માલની રકમ (₹)': parseFloat(p.itemsSubTotal || p.goodsTotal || 0),
+        'મજૂરી ખર્ચ (₹)': parseFloat(p.majuriAmount || 0),
+        'કુલ ખર્ચ/કમિશન (₹)': parseFloat(p.totalExpenses || 0),
+        'નેટ કુલ રકમ (₹)': parseFloat(p.netTotal || p.totalAmount || 0),
+        'ચૂકવેલ રકમ (₹)': parseFloat(p.paidAmount || p.paid || 0),
+        'બાકી રકમ (₹)': parseFloat(p.dueAmount || p.balance || 0),
+        'ચુકવણી રીત': (p.paymentMode || 'credit').toUpperCase(),
+        'નોંધ': p.remarks || p.note || ''
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ખરીદી રજિસ્ટર');
+    XLSX.writeFile(wb, `Kharidi_Register_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  // Start Editing an existing Purchase
+  const handleStartEdit = (purchase) => {
+    setIsEditing(true);
+    const pBill = purchase.billNo || purchase.invoiceNo || '';
+    setEditingBillNo(pBill);
+    setBillNo(pBill);
+    setDate(purchase.purchaseDate || purchase.date || new Date().toISOString().slice(0, 10));
+    setPartyId(purchase.partyId || '');
+    setPartyType(purchase.partyType || (purchase.purchaseType === 'farmer' ? 'farmer' : 'firm'));
+    setPartyName(purchase.partyName || '');
+    setPartyMobile(purchase.mobile || purchase.partyMobile || '');
+    setVillage(purchase.village || '');
+    setPethiName(purchase.pethiName || purchase.firmName || '');
+    setTruckNumber(purchase.truckNo || purchase.truckNumber || '');
+    setTruckOwnerName(purchase.truckOwner || purchase.truckOwnerName || '');
+    setMarketCommission((purchase.marketCommission || 0).toString());
+    setPethiCommission((purchase.firmCommission || purchase.pethiCommission || 0).toString());
+    setBardana((purchase.bardanExpense || purchase.bardana || 0).toString());
+    setLabour((purchase.majuriRatePerBag || '10').toString());
+    setPaid((purchase.paidAmount || purchase.paid || 0).toString());
+    setPaymentMode(purchase.paymentMode || 'bank');
+    setPaymentReference(purchase.paymentReference || '');
+    setNote(purchase.remarks || purchase.note || '');
+
+    if (purchase.truckNo || purchase.truckOwner) {
+      setShowTransportDetails(true);
+    }
+
+    if (Array.isArray(purchase.items) && purchase.items.length > 0) {
+      setItems(purchase.items.map(it => ({
+        productId: it.seedId || it.productId || '',
+        bags: (it.bags || 1).toString(),
+        lastBagKg: (it.lastBagKg !== undefined ? it.lastBagKg : 35).toString(),
+        rate: (it.ratePerMan || it.rate || 2400).toString()
+      })));
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setNotice(`✏️ ખરીદી બિલ "${pBill}" સુધારવા માટે લોડ થયું છે.`);
+  };
+
+  // Cancel Editing
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditingBillNo('');
+    setBillNo(getNextBillNo());
+    setDate(new Date().toISOString().slice(0, 10));
+    setPartyId('');
+    setPartyName('');
+    setPartyMobile('');
+    setVillage('');
+    setPethiName('');
+    setTruckNumber('');
+    setTruckOwnerName('');
+    setTruckMobile('');
+    setSelectedTruckId('');
+    setMarketCommission('0');
+    setPethiCommission('0');
+    setBardana('0');
+    setLabour('10');
+    setPaid('0');
+    setPaymentReference('');
+    setNote('');
+    setItems([{ productId: seeds[0]?.id || '', bags: '10', lastBagKg: '35', rate: '2400' }]);
+  };
+
   // Dynamic Line & Totals calculation: 1 bag = 35 KG, 1 man = 20 KG
   const totals = items.reduce((sum, row) => {
     const b = num(row.bags);
@@ -122,7 +316,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     const kg = b > 0 ? (Math.max(0, b - 1) * BAG_STD_KG + Math.min(BAG_STD_KG, lastKg)) : 0;
     const man = kg / MAN_STD_KG;
     const rate = num(row.rate);
-    const goods = man * rate;
+    const goods = Number((man * rate).toFixed(2));
     return {
       kg: sum.kg + kg,
       man: sum.man + man,
@@ -132,10 +326,10 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
   }, { kg: 0, man: 0, goods: 0, bags: 0 });
 
   // Charges calculation: labour per bag + optional commissions/bardana
-  const labourTotal = num(labour) * totals.bags;
-  const chargesTotal = labourTotal + num(marketCommission) + num(pethiCommission) + num(bardana);
-  const netTotal = totals.goods + chargesTotal;
-  const balance = Math.max(0, netTotal - num(paid));
+  const labourTotal = Number((num(labour) * totals.bags).toFixed(2));
+  const chargesTotal = Number((labourTotal + num(marketCommission) + num(pethiCommission) + num(bardana)).toFixed(2));
+  const netTotal = Number((totals.goods + chargesTotal).toFixed(2));
+  const balance = Math.max(0, Number((netTotal - num(paid)).toFixed(2)));
 
   const updateItem = (i, key, value) => {
     setItems(old => old.map((row, index) => index === i ? { ...row, [key]: value } : row));
@@ -203,8 +397,8 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
         qtyMan: Number(man.toFixed(2)),
         ratePerMan: rate,
         rate: rate,
-        itemTotal: Math.round(man * rate),
-        amount: Math.round(man * rate)
+        itemTotal: Number((man * rate).toFixed(2)),
+        amount: Number((man * rate).toFixed(2))
       };
     });
 
@@ -214,7 +408,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     const payload = {
       purchaseType: legacyPurchaseType,
       partyType,
-      billNo: billNo || `SN-PUR-${Date.now().toString().slice(-6)}`,
+      billNo: isEditing ? editingBillNo : (billNo || `SN-PUR-${Date.now().toString().slice(-6)}`),
       purchaseDate: date,
       partyId,
       partyName: partyName.trim(),
@@ -242,41 +436,47 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
 
     try {
       setIsSubmitting(true);
-      const saved = await recordPurchase(payload);
+      if (isEditing) {
+        await updatePurchase(payload);
+        setNotice(`✅ ખરીદી બિલ "${payload.billNo}" સફળતાપૂર્વક સુધારાઈ ગયું છે.`);
+        handleCancelEdit();
+      } else {
+        const saved = await recordPurchase(payload);
 
-      setLastInvoice({
-        invoiceNo: saved.billNo,
-        date,
-        partyName: partyName.trim(),
-        partyMobile,
-        village,
-        partyTag: partyType,
-        purchaseSource: legacyPurchaseType,
-        pethiName,
-        truckNumber,
-        truckOwnerName,
-        items: normalizedItems,
-        goodsTotal: totals.goods,
-        totalAmount: netTotal,
-        charges: {
-          labour: labourTotal,
-          marketCommission: num(marketCommission),
-          pethiCommission: num(pethiCommission),
-          bardana: num(bardana)
-        },
-        paid: num(paid),
-        balance,
-        note
-      });
+        setLastInvoice({
+          invoiceNo: saved.billNo,
+          date,
+          partyName: partyName.trim(),
+          partyMobile,
+          village,
+          partyTag: partyType,
+          purchaseSource: legacyPurchaseType,
+          pethiName,
+          truckNumber,
+          truckOwnerName,
+          items: normalizedItems,
+          goodsTotal: totals.goods,
+          totalAmount: netTotal,
+          charges: {
+            labour: labourTotal,
+            marketCommission: num(marketCommission),
+            pethiCommission: num(pethiCommission),
+            bardana: num(bardana)
+          },
+          paid: num(paid),
+          balance,
+          note
+        });
 
-      setNotice(`ખરીદી બિલ "${saved.billNo}" સફળતાપૂર્વક સેવ થઈ ગયું છે અને સ્ટોક અપડેટ થયો.`);
+        setNotice(`ખરીદી બિલ "${saved.billNo}" સફળતાપૂર્વક સેવ થઈ ગયું છે અને સ્ટોક અપડેટ થયો.`);
 
-      // Reset Form
-      setBillNo(getNextBillNo());
-      setPaid('0');
-      setPaymentReference('');
-      setNote('');
-      setItems([{ productId: seeds[0]?.id || '', bags: '10', lastBagKg: '35', rate: '2400' }]);
+        // Reset Form
+        setBillNo(getNextBillNo());
+        setPaid('0');
+        setPaymentReference('');
+        setNote('');
+        setItems([{ productId: seeds[0]?.id || '', bags: '10', lastBagKg: '35', rate: '2400' }]);
+      }
     } catch (err) {
       console.error('Error saving purchase:', err);
       setNotice('ખરીદી સાચવવામાં ક્ષતિ આવી: ' + (err.message || 'Error'));
@@ -566,25 +766,72 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
         </div>
       )}
 
+      {/* Edit Mode Banner */}
+      {isEditing && (
+        <div style={{
+          background: '#fef3c7',
+          border: '1px solid #f59e0b',
+          padding: '12px 16px',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px'
+        }}>
+          <div>
+            <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#92400e' }}>
+              ✏️ ખરીદી બિલ &quot;{editingBillNo}&quot; સુધારી રહ્યા છો (Edit Mode)
+            </span>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#78350f' }}>
+              જરૂરી ફેરફારો કરીને નીચે &ldquo;ખરીદી સુધારો સેવ કરો&rdquo; બટન દબાવો. સ્ટોક અને ખાતાની બાકી આપોઆપ અપડેટ થશે.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="secondary"
+            style={{ borderColor: '#b45309', color: '#92400e', fontWeight: '600' }}
+            onClick={handleCancelEdit}
+          >
+            ❌ સુધારો રદ કરો (Cancel)
+          </button>
+        </div>
+      )}
+
       {/* Main Purchase Form Panel */}
       <form className="panel purchase-form" onSubmit={handleSubmit}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
-          <h2 style={{ margin: 0 }}>નવી બિયારણ ખરીદી એન્ટ્રી</h2>
-          <button
-            type="button"
-            className="primary-action"
-            style={{ width: 'auto', padding: '7px 14px', fontSize: '0.84rem' }}
-            onClick={() => setShowAddPartyModal(true)}
-          >
-            ＋ નવો ખાતેદાર ઉમેરો (ખેડૂત / પેઢી / સપ્લાયર)
-          </button>
+          <h2 style={{ margin: 0, color: isEditing ? '#b45309' : undefined }}>
+            {isEditing ? `✏️ ખરીદી બિલ સુધારો (${editingBillNo})` : 'નવી બિયારણ ખરીદી એન્ટ્રી'}
+          </h2>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {isEditing && (
+              <button
+                type="button"
+                className="secondary"
+                style={{ fontSize: '0.84rem', padding: '7px 12px' }}
+                onClick={handleCancelEdit}
+              >
+                ＋ નવી એન્ટ્રી બનાવો
+              </button>
+            )}
+            <button
+              type="button"
+              className="primary-action"
+              style={{ width: 'auto', padding: '7px 14px', fontSize: '0.84rem' }}
+              onClick={() => setShowAddPartyModal(true)}
+            >
+              ＋ નવો ખાતેદાર ઉમેરો (ખેડૂત / પેઢી / સપ્લાયર)
+            </button>
+          </div>
         </div>
 
         {/* 1. Unified Customer Selection with Tag Filters */}
         <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#166534' }}>
-              ખાતેદાર પ્રકાર / ટેગ ફિલ્ટર:
+              માલિક / ખાતેદાર પ્રકાર ટેગ ફિલ્ટર:
             </span>
             <div className="tag-filter-pills" style={{ margin: 0 }}>
               <button
@@ -627,13 +874,13 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
 
           <div className="formgrid" style={{ marginBottom: 0 }}>
             <label className="full" style={{ marginBottom: 0 }}>
-              ખાતેદાર / ગ્રાહક પસંદ કરો (ખેડૂત, પેઢી, સપ્લાયર, અન્ય વેપારી એક જ લિસ્ટમાં)
+              માલના માલિક / ખાતેદાર પસંદ કરો (ખેડૂત, પેઢી, સપ્લાયર, અન્ય વેપારી એક જ લિસ્ટમાં)
               <select
                 value={partyId}
                 onChange={e => handlePartySelect(e.target.value)}
                 style={{ fontSize: '0.95rem', fontWeight: '600' }}
               >
-                <option value="">-- માસ્ટરમાંથી ખાતેદાર / પાર્ટી પસંદ કરો --</option>
+                <option value="">-- માસ્ટરમાંથી માલિક / ખાતેદાર પસંદ કરો --</option>
                 {activeParties.map(p => {
                   const tagInfo = getPartyTagInfo(p.partyType);
                   const bal = (parseFloat(p.currentBalance) || 0).toLocaleString('en-IN');
@@ -676,6 +923,19 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
         </div>
 
         {/* 2. Party Details and Header Grid */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <span style={{ fontWeight: '700', color: '#166534', fontSize: '0.95rem' }}>
+            👤 માલિકની વિગત (Goods Owner Details)
+          </span>
+          <button
+            type="button"
+            className="secondary"
+            style={{ padding: '4px 10px', fontSize: '0.8rem', background: '#ecfdf5', borderColor: '#059669', color: '#047857', fontWeight: 'bold' }}
+            onClick={handleSaveMalikSeparately}
+          >
+            💾 આ માલિક વિગત અલગ સેવ કરો
+          </button>
+        </div>
         <div className="formgrid">
           <label>
             પાર્ટી ટેગ (વર્ગીકરણ)*
@@ -756,65 +1016,99 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
           </label>
         </div>
 
-        {/* 3. Collapsible Transport & Market Details */}
-        <div style={{ marginTop: '10px', marginBottom: '16px' }}>
-          <button
-            type="button"
-            className="secondary"
-            style={{ fontSize: '0.84rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onClick={() => setShowTransportDetails(prev => !prev)}
-          >
-            <span>{showTransportDetails ? '▼' : '▶'}</span>
-            <span>ટ્રાન્સપોર્ટ & માર્કેટ કમિશન વિગતો (ટ્રક નં, ટ્રાન્સપોર્ટ, કમિશન, બારદાન)</span>
-          </button>
+        {/* 3. Transport & Truck Details */}
+        <div style={{ marginTop: '14px', marginBottom: '16px', background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+            <span style={{ fontSize: '0.92rem', fontWeight: '700', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              🚚 ટ્રક તથા વાહન વિગત (Truck & Vehicle Details)
+            </span>
+            <button
+              type="button"
+              className="secondary"
+              style={{ padding: '4px 12px', fontSize: '0.8rem', background: '#ecfdf5', borderColor: '#059669', color: '#047857', fontWeight: 'bold' }}
+              onClick={handleSaveTruckSeparately}
+            >
+              💾 આ ટ્રક વિગત અલગ સેવ કરો (ટ્રાન્સપોર્ટર લિસ્ટમાં)
+            </button>
+          </div>
 
-          {(showTransportDetails || partyType === 'firm' || partyType === 'supplier' || truckNumber || num(marketCommission) > 0) && (
-            <div className="panel formgrid" style={{ marginTop: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-              <label>
-                ટ્રક / વાહન નંબર
-                <input
-                  value={truckNumber}
-                  onChange={e => setTruckNumber(e.target.value)}
-                  placeholder="દા.ત. GJ-11-X-4589"
-                />
-              </label>
-              <label>
-                ટ્રાન્સપોર્ટ / ટ્રક માલિક
-                <input
-                  value={truckOwnerName}
-                  onChange={e => setTruckOwnerName(e.target.value)}
-                  placeholder="દા.ત. જય ખોડિયાર ટ્રાન્સપોર્ટ"
-                />
-              </label>
-              <label>
-                માર્કેટ કમિશન (₹)
-                <input
-                  type="number"
-                  min="0"
-                  value={marketCommission}
-                  onChange={e => setMarketCommission(e.target.value)}
-                />
-              </label>
-              <label>
-                પેઢીનું કમિશન (₹)
-                <input
-                  type="number"
-                  min="0"
-                  value={pethiCommission}
-                  onChange={e => setPethiCommission(e.target.value)}
-                />
-              </label>
-              <label>
-                બારદાન ખર્ચ (₹)
-                <input
-                  type="number"
-                  min="0"
-                  value={bardana}
-                  onChange={e => setBardana(e.target.value)}
-                />
-              </label>
-            </div>
-          )}
+          <div className="formgrid" style={{ marginBottom: '8px' }}>
+            <label className="full">
+              સેવ કરેલ ટ્રક / ટ્રાન્સપોર્ટર પસંદ કરો (ઓટો-ફિલ માટે):
+              <select
+                value={selectedTruckId}
+                onChange={e => handleSelectTruck(e.target.value)}
+                style={{ fontSize: '0.9rem' }}
+              >
+                <option value="">-- લિસ્ટમાંથી સેવ કરેલ ટ્રક / ટ્રાન્સપોર્ટર પસંદ કરો --</option>
+                {transporterParties.map(t => (
+                  <option key={t.id} value={t.id}>
+                    🚛 {t.firmName || t.name} {t.mobile ? `(${t.mobile})` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              ટ્રક / વાહન નંબર
+              <input
+                value={truckNumber}
+                onChange={e => setTruckNumber(e.target.value)}
+                placeholder="દા.ત. GJ-11-X-4589"
+              />
+            </label>
+
+            <label>
+              ટ્રાન્સપોર્ટ / ટ્રક માલિકનું નામ
+              <input
+                value={truckOwnerName}
+                onChange={e => setTruckOwnerName(e.target.value)}
+                placeholder="દા.ત. જય ખોડિયાર ટ્રાન્સપોર્ટ"
+              />
+            </label>
+
+            <label>
+              ટ્રક માલિક / ડ્રાઈવરનો મોબાઈલ
+              <input
+                value={truckMobile}
+                onChange={e => setTruckMobile(e.target.value)}
+                placeholder="૧૦ આંકડાનો મોબાઇલ"
+              />
+            </label>
+
+            <label>
+              માર્કેટ કમિશન (₹)
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={marketCommission}
+                onChange={e => setMarketCommission(e.target.value)}
+              />
+            </label>
+
+            <label>
+              પેઢીનું કમિશન (₹)
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={pethiCommission}
+                onChange={e => setPethiCommission(e.target.value)}
+              />
+            </label>
+
+            <label>
+              બારદાન ખર્ચ (₹)
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={bardana}
+                onChange={e => setBardana(e.target.value)}
+              />
+            </label>
+          </div>
         </div>
 
         {/* Section: Seed Varieties & Weights */}
@@ -834,7 +1128,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
           const kg = b > 0 ? (Math.max(0, b - 1) * BAG_STD_KG + Math.min(BAG_STD_KG, lastKg)) : 0;
           const man = kg / MAN_STD_KG;
           const rate = num(row.rate);
-          const lineGoods = man * rate;
+          const lineGoods = Number((man * rate).toFixed(2));
 
           return (
             <div className="item-row" key={i}>
@@ -888,7 +1182,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
                     type="number"
                     min="0"
                     max="35"
-                    step="0.1"
+                    step="any"
                     value={row.lastBagKg}
                     onChange={e => updateItem(i, 'lastBagKg', e.target.value)}
                     placeholder="0 થી 35 KG"
@@ -901,10 +1195,10 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
                     required
                     type="number"
                     min="0"
-                    step="1"
+                    step="any"
                     value={row.rate}
                     onChange={e => updateItem(i, 'rate', e.target.value)}
-                    placeholder="દા.ત. 2400"
+                    placeholder="દા.ત. 2400.50"
                   />
                 </label>
 
@@ -930,7 +1224,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
               <input
                 type="number"
                 min="0"
-                step="1"
+                step="any"
                 value={labour}
                 onChange={e => setLabour(e.target.value)}
               />
@@ -950,6 +1244,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
             <input
               type="number"
               min="0"
+              step="any"
               value={paid}
               onChange={e => setPaid(e.target.value)}
             />
@@ -1001,9 +1296,32 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
           </div>
         </div>
 
-        <button type="submit" className="primary-action" disabled={isSubmitting} style={{ opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}>
-          {isSubmitting ? '⏳ ખરીદી સેવ થઈ રહી છે...' : 'ખરીદી સેવ કરો અને સ્ટોક અપડેટ કરો'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '16px' }}>
+          <button 
+            type="submit" 
+            className="primary-action" 
+            disabled={isSubmitting} 
+            style={{ 
+              opacity: isSubmitting ? 0.7 : 1, 
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              backgroundColor: isEditing ? '#b45309' : undefined
+            }}
+          >
+            {isSubmitting 
+              ? (isEditing ? '⏳ ખરીદી સુધારો સેવ થઈ રહ્યો છે...' : '⏳ ખરીદી સેવ થઈ રહી છે...') 
+              : (isEditing ? '💾 ખરીદી સુધારો સેવ કરો (Update Purchase)' : 'ખરીદી સેવ કરો અને સ્ટોક અપડેટ કરો')}
+          </button>
+          {isEditing && (
+            <button
+              type="button"
+              className="secondary"
+              style={{ padding: '10px 18px', fontWeight: 'bold' }}
+              onClick={handleCancelEdit}
+            >
+              ❌ સુધારો રદ કરો
+            </button>
+          )}
+        </div>
 
         <p className="muted" style={{ marginTop: '10px', textAlign: 'center' }}>
           ભાવ પ્રતિ મણ (1 મણ = 20 KG). 1 બેગ = 35 KG; છેલ્લી બેગનું વજન અલગ દાખલ કરો. નેટ ટોટલમાં લાગુ પડતી મજૂરી/કમિશન/બારદાન ઉમેરાશે.
@@ -1011,7 +1329,18 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       </form>
 
       {/* Recent Purchases Table */}
-      <h2>તાજેતરની ખરીદી (Purchase Register)</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginTop: '24px', marginBottom: '10px' }}>
+        <h2 style={{ margin: 0 }}>તાજેતરની ખરીદી (Purchase Register)</h2>
+        <button
+          type="button"
+          className="secondary"
+          style={{ backgroundColor: '#107c41', color: 'white', borderColor: '#107c41', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
+          onClick={handleExportExcel}
+        >
+          <span>📗</span>
+          <span>એક્સેલ એક્સપોર્ટ (Export to Excel)</span>
+        </button>
+      </div>
       <div className="tablewrap">
         <table>
           <thead>
@@ -1056,7 +1385,15 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
                   <td style={{ color: (r.dueAmount || r.balance) > 0 ? '#b91c1c' : '#166534', fontWeight: '700' }}>
                     {money(r.dueAmount || r.balance)}
                   </td>
-                  <td style={{ textAlign: 'center' }}>
+                  <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    <button
+                      type="button"
+                      className="secondary"
+                      style={{ padding: '3px 8px', fontSize: '0.75rem', color: '#0284c7', borderColor: '#7dd3fc', marginRight: '6px' }}
+                      onClick={() => handleStartEdit(r)}
+                    >
+                      ✏️ એડિટ
+                    </button>
                     <button
                       type="button"
                       className="secondary"

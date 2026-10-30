@@ -9,9 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.krushitrade.model.*
 import com.example.krushitrade.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,17 +32,27 @@ fun PurchaseEntryScreen(
     farmers: List<Party>,
     firms: List<Party>,
     traders: List<Party>,
+    transporters: List<Party> = emptyList(),
     seeds: List<SeedProduct>,
-    onSavePurchase: (PurchaseRecord) -> Unit
+    recentPurchases: List<PurchaseRecord> = emptyList(),
+    onSavePurchase: (PurchaseRecord) -> Unit,
+    onUpdatePurchase: (PurchaseRecord) -> Unit = {},
+    onDeletePurchase: (String) -> Unit = {},
+    onSaveParty: (Party) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val scrollState = rememberScrollState()
+
+    // Edit Mode State
+    var editingPurchase by remember { mutableStateOf<PurchaseRecord?>(null) }
 
     // Purchase Mode: "farmer" (ખેડૂત પાસેથી) or "market" (માર્કેટ પેઢી પાસેથી)
     var purchaseType by remember { mutableStateOf("farmer") }
 
     // Common fields
-    var billNo by remember { mutableStateOf("SN-PUR-2026-0001") }
-    var purchaseDate by remember { mutableStateOf("2026-10-25") }
+    val todayDateStr = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }
+    var billNo by remember { mutableStateOf("SN-PUR-${System.currentTimeMillis().toString().takeLast(6)}") }
+    var purchaseDate by remember { mutableStateOf(todayDateStr) }
     var paymentMode by remember { mutableStateOf("bank") }
     var paidInput by remember { mutableStateOf("") }
     var remarksInput by remember { mutableStateOf("") }
@@ -49,7 +60,9 @@ fun PurchaseEntryScreen(
     // Mode 1: Farmer
     var selectedFarmer by remember { mutableStateOf<Party?>(farmers.firstOrNull()) }
     var farmerDropdownExpanded by remember { mutableStateOf(false) }
+    var farmerNameInput by remember { mutableStateOf(selectedFarmer?.name ?: "") }
     var farmerVillage by remember { mutableStateOf(selectedFarmer?.village ?: "") }
+    var farmerMobile by remember { mutableStateOf(selectedFarmer?.mobile ?: "") }
     var majuriPerBagInput by remember { mutableStateOf("10") }
 
     // Mode 2: Market
@@ -60,12 +73,17 @@ fun PurchaseEntryScreen(
     }
     var selectedTrader by remember { mutableStateOf<Party?>(filteredTraders.firstOrNull()) }
     var traderDropdownExpanded by remember { mutableStateOf(false) }
-    var truckNoInput by remember { mutableStateOf("") }
-    var truckOwnerInput by remember { mutableStateOf("") }
     var marketCommissionInput by remember { mutableStateOf("0") }
     var firmCommissionInput by remember { mutableStateOf("0") }
     var bardanExpenseInput by remember { mutableStateOf("0") }
     var marketMajuriInput by remember { mutableStateOf("0") }
+
+    // Truck / Transporter Details (Available in BOTH Farmer and Market purchases)
+    var selectedTransporter by remember { mutableStateOf<Party?>(null) }
+    var transporterDropdownExpanded by remember { mutableStateOf(false) }
+    var truckNoInput by remember { mutableStateOf("") }
+    var truckOwnerInput by remember { mutableStateOf("") }
+    var truckMobileInput by remember { mutableStateOf("") }
 
     // Item adding state
     var selectedSeed by remember { mutableStateOf<SeedProduct?>(seeds.firstOrNull()) }
@@ -74,35 +92,50 @@ fun PurchaseEntryScreen(
     var lastBagKgInput by remember { mutableStateOf("35") }
     var ratePerManInput by remember { mutableStateOf("2400") }
 
+    // Items List
+    val itemsList = remember { mutableStateListOf<PurchaseItem>() }
+
+    // Confirmation & Delete Dialogs
+    var showConfirmDialog by remember { mutableStateOf(false) }
+    var purchaseToDelete by remember { mutableStateOf<PurchaseRecord?>(null) }
+
+    // Update defaults when master lists load
     LaunchedEffect(farmers) {
-        if (selectedFarmer == null && farmers.isNotEmpty()) {
-            selectedFarmer = farmers.firstOrNull()
-            farmerVillage = selectedFarmer?.village ?: ""
+        if (selectedFarmer == null && farmers.isNotEmpty() && editingPurchase == null) {
+            val f = farmers.firstOrNull()
+            selectedFarmer = f
+            farmerNameInput = f?.name ?: ""
+            farmerVillage = f?.village ?: ""
+            farmerMobile = f?.mobile ?: ""
         }
     }
     LaunchedEffect(firms) {
-        if (selectedFirm == null && firms.isNotEmpty()) {
+        if (selectedFirm == null && firms.isNotEmpty() && editingPurchase == null) {
             selectedFirm = firms.firstOrNull()
         }
     }
     LaunchedEffect(filteredTraders) {
-        if (selectedTrader == null && filteredTraders.isNotEmpty()) {
+        if (selectedTrader == null && filteredTraders.isNotEmpty() && editingPurchase == null) {
             selectedTrader = filteredTraders.firstOrNull()
         }
     }
     LaunchedEffect(seeds) {
-        if (selectedSeed == null && seeds.isNotEmpty()) {
+        if (selectedSeed == null && seeds.isNotEmpty() && editingPurchase == null) {
             selectedSeed = seeds.firstOrNull()
-            ratePerManInput = selectedSeed?.defaultPurchaseRatePerMan?.toInt()?.toString() ?: "2400"
-            lastBagKgInput = selectedSeed?.bagWeightKg?.toInt()?.toString() ?: "35"
+            val defRate = selectedSeed?.defaultPurchaseRatePerMan ?: 2400.0
+            ratePerManInput = if (defRate % 1.0 == 0.0) defRate.toInt().toString() else defRate.toString()
+            lastBagKgInput = (selectedSeed?.bagWeightKg ?: 35.0).let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }
         }
     }
 
-    // Items List
-    val itemsList = remember { mutableStateListOf<PurchaseItem>() }
-
-    // Preview / Confirm Dialog
-    var showConfirmDialog by remember { mutableStateOf(false) }
+    // Helper to format currency/numbers
+    fun fmt(num: Double): String {
+        return if (num % 1.0 == 0.0) {
+            num.toInt().toString()
+        } else {
+            String.format(Locale.US, "%.2f", num)
+        }
+    }
 
     // Calculations for currently typed item
     val curBags = bagsInput.toIntOrNull() ?: 0
@@ -132,12 +165,74 @@ fun PurchaseEntryScreen(
     val paidAmount = if (paidInput.isEmpty()) netTotal else (paidInput.toDoubleOrNull() ?: 0.0)
     val dueAmount = (netTotal - paidAmount).coerceAtLeast(0.0)
 
+    // Reset Form
+    fun resetForm() {
+        editingPurchase = null
+        billNo = "SN-PUR-${System.currentTimeMillis().toString().takeLast(6)}"
+        purchaseDate = todayDateStr
+        itemsList.clear()
+        paidInput = ""
+        remarksInput = ""
+        truckNoInput = ""
+        truckOwnerInput = ""
+        truckMobileInput = ""
+        selectedTransporter = null
+        majuriPerBagInput = "10"
+        marketCommissionInput = "0"
+        firmCommissionInput = "0"
+        bardanExpenseInput = "0"
+        marketMajuriInput = "0"
+        val f = farmers.firstOrNull()
+        selectedFarmer = f
+        farmerNameInput = f?.name ?: ""
+        farmerVillage = f?.village ?: ""
+        farmerMobile = f?.mobile ?: ""
+    }
+
+    // Populate form for Edit
+    fun startEdit(pur: PurchaseRecord) {
+        editingPurchase = pur
+        purchaseType = if (pur.purchaseType == "market" || pur.purchaseType == "firm") "market" else "farmer"
+        billNo = pur.billNo
+        purchaseDate = pur.purchaseDate
+        paymentMode = pur.paymentMode
+        paidInput = if (pur.paidAmount > 0) fmt(pur.paidAmount) else ""
+        remarksInput = pur.remarks
+        truckNoInput = pur.truckNo
+        truckOwnerInput = pur.truckOwner
+
+        if (purchaseType == "farmer") {
+            selectedFarmer = farmers.find { it.id == pur.partyId } ?: Party(
+                id = pur.partyId,
+                name = pur.partyName,
+                village = pur.village,
+                mobile = pur.mobile
+            )
+            farmerNameInput = pur.partyName
+            farmerVillage = pur.village
+            farmerMobile = pur.mobile
+            majuriPerBagInput = if (pur.majuriRatePerBag > 0) fmt(pur.majuriRatePerBag) else "10"
+        } else {
+            selectedFirm = firms.find { it.id == pur.firmId } ?: Party(id = pur.firmId, name = pur.firmName)
+            selectedTrader = traders.find { it.id == pur.traderId } ?: Party(id = pur.traderId, name = pur.traderName)
+            marketCommissionInput = fmt(pur.marketCommission)
+            firmCommissionInput = fmt(pur.firmCommission)
+            bardanExpenseInput = fmt(pur.bardanExpense)
+            marketMajuriInput = fmt(pur.majuriAmount)
+        }
+
+        itemsList.clear()
+        itemsList.addAll(pur.items)
+
+        Toast.makeText(context, "✏️ બિલ ${pur.billNo} સુધારવા માટે લોડ થઈ ગયું છે.", Toast.LENGTH_SHORT).show()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgLight)
             .padding(16.dp)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
     ) {
         // Header
         Text(
@@ -147,11 +242,52 @@ fun PurchaseEntryScreen(
             color = GreenDark
         )
         Text(
-            text = "નવી બિયારણ ખરીદી (૧ બેગ = ૩૫ KG, ૧ મણ = ૨૦ KG)",
+            text = if (editingPurchase != null) "ખરીદી એન્ટ્રી સુધારો (Edit Purchase)" else "નવી બિયારણ ખરીદી (૧ બેગ = ૩૫ KG, ૧ મણ = ૨૦ KG)",
             fontSize = 12.sp,
             color = Color(0xFF64748B),
             modifier = Modifier.padding(bottom = 12.dp)
         )
+
+        // Edit Mode Banner
+        if (editingPurchase != null) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "✏️ એડિટ મોડ: બિલ નં. ${editingPurchase!!.billNo}",
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFB45309),
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "આ બિલમાં ફેરફાર કરી નીચે 'ખરીદી સુધારો સેવ કરો' દબાવો.",
+                            fontSize = 11.sp,
+                            color = Color(0xFF78350F)
+                        )
+                    }
+                    Button(
+                        onClick = { resetForm() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text("રદ કરો (Cancel)", fontSize = 11.sp)
+                    }
+                }
+            }
+        }
 
         // Purchase Mode Switcher
         Row(
@@ -185,7 +321,7 @@ fun PurchaseEntryScreen(
             }
         }
 
-        // Section 1: Party Details
+        // Section 1: Malik / Party Details
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -194,11 +330,17 @@ fun PurchaseEntryScreen(
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                Text(
-                    text = if (purchaseType == "farmer") "૧. ખેડૂત વિગત" else "૧. પેઢી / વેપારી & ટ્રક વિગત",
-                    fontWeight = FontWeight.Bold,
-                    color = GreenDark
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (purchaseType == "farmer") "૧. માલિક / ખેડૂત વિગત" else "૧. માલિક / પેઢી & વેપારી વિગત",
+                        fontWeight = FontWeight.Bold,
+                        color = GreenDark
+                    )
+                }
                 Spacer(modifier = Modifier.height(8.dp))
 
                 if (purchaseType == "farmer") {
@@ -208,10 +350,11 @@ fun PurchaseEntryScreen(
                         onExpandedChange = { farmerDropdownExpanded = !farmerDropdownExpanded }
                     ) {
                         OutlinedTextField(
-                            value = selectedFarmer?.name ?: "ખેડૂત પસંદ કરો",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("ખેડૂત પસંદ કરો") },
+                            value = farmerNameInput.ifEmpty { "ખેડૂત પસંદ કરો / લખો" },
+                            onValueChange = {
+                                farmerNameInput = it
+                            },
+                            label = { Text("માલિક / ખેડૂતનું નામ") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = farmerDropdownExpanded) },
                             modifier = Modifier
                                 .menuAnchor()
@@ -227,7 +370,9 @@ fun PurchaseEntryScreen(
                                     text = { Text("${f.name} (${f.village})") },
                                     onClick = {
                                         selectedFarmer = f
+                                        farmerNameInput = f.name
                                         farmerVillage = f.village
+                                        farmerMobile = f.mobile
                                         farmerDropdownExpanded = false
                                     }
                                 )
@@ -236,13 +381,53 @@ fun PurchaseEntryScreen(
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = farmerVillage,
-                        onValueChange = { farmerVillage = it },
-                        label = { Text("ગામ") },
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = farmerVillage,
+                            onValueChange = { farmerVillage = it },
+                            label = { Text("ગામ") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        OutlinedTextField(
+                            value = farmerMobile,
+                            onValueChange = { farmerMobile = it },
+                            label = { Text("મોબાઈલ નં") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Separate Malik Save Button
+                    OutlinedButton(
+                        onClick = {
+                            if (farmerNameInput.isBlank()) {
+                                Toast.makeText(context, "ખેડૂતનું નામ દાખલ કરો!", Toast.LENGTH_SHORT).show()
+                                return@OutlinedButton
+                            }
+                            val existing = farmers.find { it.name.trim() == farmerNameInput.trim() }
+                            val party = existing?.copy(
+                                village = farmerVillage,
+                                mobile = farmerMobile
+                            ) ?: Party(
+                                id = "party_${System.currentTimeMillis()}",
+                                partyType = "farmer",
+                                name = farmerNameInput.trim(),
+                                village = farmerVillage.trim(),
+                                mobile = farmerMobile.trim()
+                            )
+                            onSaveParty(party)
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    )
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GreenDark)
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("💾 આ માલિક વિગત અલગ સેવ કરો (ખેડૂત લિસ્ટમાં)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 } else {
                     // Market Firm & Trader Dropdown
                     ExposedDropdownMenuBox(
@@ -311,27 +496,28 @@ fun PurchaseEntryScreen(
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = truckNoInput,
-                            onValueChange = { truckNoInput = it },
-                            label = { Text("ટ્રક નં") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        OutlinedTextField(
-                            value = truckOwnerInput,
-                            onValueChange = { truckOwnerInput = it },
-                            label = { Text("ટ્રક માલિક") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp)
-                        )
+                    OutlinedButton(
+                        onClick = {
+                            val party = selectedTrader ?: selectedFirm
+                            if (party != null) {
+                                onSaveParty(party)
+                            } else {
+                                Toast.makeText(context, "પેઢી અથવા વેપારી પસંદ કરો!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GreenDark)
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("💾 આ પેઢી/વેપારી અલગ સેવ કરો", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
 
-        // Section 2: Seed Variety, Bags & Rate Input
+        // Section 2: Truck / Transporter Details (Available for BOTH modes)
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -340,7 +526,122 @@ fun PurchaseEntryScreen(
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                Text("૨. બિયારણ જાત, વજન અને ₹/મણ ભાવ", fontWeight = FontWeight.Bold, color = GreenDark)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.LocalShipping, contentDescription = null, tint = GreenDark, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("૨. ટ્રક અને ટ્રાન્સપોર્ટર વિગત (અલગ સેવ ઉપલબ્ધ)", fontWeight = FontWeight.Bold, color = GreenDark)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Transporter Dropdown
+                if (transporters.isNotEmpty()) {
+                    ExposedDropdownMenuBox(
+                        expanded = transporterDropdownExpanded,
+                        onExpandedChange = { transporterDropdownExpanded = !transporterDropdownExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedTransporter?.name ?: (if (truckOwnerInput.isNotEmpty()) truckOwnerInput else "ટ્રાન્સપોર્ટર પસંદ કરો (વૈકલ્પિક)"),
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("સાચવેલ ટ્રાન્સપોર્ટર લિસ્ટ") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = transporterDropdownExpanded) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = transporterDropdownExpanded,
+                            onDismissRequest = { transporterDropdownExpanded = false }
+                        ) {
+                            transporters.forEach { t ->
+                                DropdownMenuItem(
+                                    text = { Text("${t.name} ${if (t.firmName.isNotEmpty()) "(${t.firmName})" else ""}") },
+                                    onClick = {
+                                        selectedTransporter = t
+                                        truckOwnerInput = t.name
+                                        if (t.firmName.isNotEmpty()) truckNoInput = t.firmName
+                                        if (t.mobile.isNotEmpty()) truckMobileInput = t.mobile
+                                        transporterDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = truckNoInput,
+                        onValueChange = { truckNoInput = it.uppercase() },
+                        label = { Text("ટ્રક નંબર") },
+                        placeholder = { Text("GJ-01-AB-1234") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    OutlinedTextField(
+                        value = truckOwnerInput,
+                        onValueChange = { truckOwnerInput = it },
+                        label = { Text("ટ્રક માલિક / ટ્રાન્સપોર્ટર") },
+                        placeholder = { Text("દા.ત. પટેલ ટ્રાન્સપોર્ટ") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = truckMobileInput,
+                    onValueChange = { truckMobileInput = it },
+                    label = { Text("ટ્રક ડ્રાઈવર / માલિક મોબાઈલ નં") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                // Separate Truck Save Button
+                OutlinedButton(
+                    onClick = {
+                        if (truckOwnerInput.isBlank() && truckNoInput.isBlank()) {
+                            Toast.makeText(context, "ટ્રક નંબર અથવા માલિકનું નામ લખો!", Toast.LENGTH_SHORT).show()
+                            return@OutlinedButton
+                        }
+                        val tName = truckOwnerInput.ifBlank { truckNoInput }
+                        val newTransporter = Party(
+                            id = "party_${System.currentTimeMillis()}",
+                            partyType = "transporter",
+                            name = tName,
+                            firmName = truckNoInput,
+                            mobile = truckMobileInput
+                        )
+                        onSaveParty(newTransporter)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GreenDark)
+                ) {
+                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("💾 આ ટ્રક વિગત અલગ સેવ કરો (ટ્રાન્સપોર્ટર લિસ્ટમાં)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Section 3: Seed Variety, Bags & Rate Input (With Full Decimal Support)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text("૩. બિયારણ જાત, વજન અને ₹/મણ ભાવ", fontWeight = FontWeight.Bold, color = GreenDark)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Variety
@@ -368,6 +669,10 @@ fun PurchaseEntryScreen(
                                 text = { Text(s.varietyName) },
                                 onClick = {
                                     selectedSeed = s
+                                    val defRate = s.defaultPurchaseRatePerMan
+                                    ratePerManInput = if (defRate % 1.0 == 0.0) defRate.toInt().toString() else defRate.toString()
+                                    val defBagKg = s.bagWeightKg
+                                    lastBagKgInput = if (defBagKg % 1.0 == 0.0) defBagKg.toInt().toString() else defBagKg.toString()
                                     seedDropdownExpanded = false
                                 }
                             )
@@ -402,11 +707,13 @@ fun PurchaseEntryScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Rate per man: KeyboardType.Decimal allows decimals like 2400.50
                     OutlinedTextField(
                         value = ratePerManInput,
                         onValueChange = { ratePerManInput = it },
-                        label = { Text("ભાવ (₹/મણ)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = { Text("ભાવ (₹/મણ - દશાંશ સ્વીકાર્ય)") },
+                        placeholder = { Text("2400.50") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     )
@@ -419,9 +726,9 @@ fun PurchaseEntryScreen(
                             .padding(8.dp),
                         horizontalAlignment = Alignment.End
                     ) {
-                        Text("કુલ KG: ${curTotalKg} kg", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("કુલ મણ: ${"%.2f".format(curTotalMan)} મણ", fontSize = 12.sp, color = GreenPrimary, fontWeight = FontWeight.Bold)
-                        Text("રકમ: ₹${curItemTotal.toInt()}", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("કુલ KG: ${fmt(curTotalKg)} kg", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("કુલ મણ: ${fmt(curTotalMan)} મણ", fontSize = 12.sp, color = GreenPrimary, fontWeight = FontWeight.Bold)
+                        Text("રકમ: ₹${fmt(curItemTotal)}", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                     }
                 }
 
@@ -447,6 +754,7 @@ fun PurchaseEntryScreen(
                                 netWeightKg = curTotalKg,
                                 totalMan = curTotalMan,
                                 ratePerMan = curRate,
+                                purchaseRate = curRate,
                                 itemTotal = curItemTotal
                             )
                         )
@@ -462,7 +770,7 @@ fun PurchaseEntryScreen(
             }
         }
 
-        // Section 3: Added Items List
+        // Section 4: Added Items List
         if (itemsList.isNotEmpty()) {
             Card(
                 modifier = Modifier
@@ -485,9 +793,9 @@ fun PurchaseEntryScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(it.varietyName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text("${it.bags} બેગ | ${it.netWeightKg} KG (${"%.2f".format(it.totalMan)} મણ) @ ₹${it.ratePerMan.toInt()}", fontSize = 11.sp, color = Color(0xFF64748B))
+                                Text("${it.bags} બેગ | ${fmt(it.netWeightKg)} KG (${fmt(it.totalMan)} મણ) @ ₹${fmt(it.ratePerMan)}", fontSize = 11.sp, color = Color(0xFF64748B))
                             }
-                            Text("₹${it.itemTotal.toInt()}", fontWeight = FontWeight.Bold, color = GreenPrimary)
+                            Text("₹${fmt(it.itemTotal)}", fontWeight = FontWeight.Bold, color = GreenPrimary)
                             IconButton(onClick = { itemsList.removeAt(idx) }) {
                                 Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red)
                             }
@@ -498,7 +806,7 @@ fun PurchaseEntryScreen(
             }
         }
 
-        // Section 4: Expenses & Net Total
+        // Section 5: Expenses & Net Total (With Decimal Support)
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -507,7 +815,7 @@ fun PurchaseEntryScreen(
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                Text("૩. ખર્ચ અને Net Total", fontWeight = FontWeight.Bold, color = GreenDark)
+                Text("૪. ખર્ચ અને Net Total", fontWeight = FontWeight.Bold, color = GreenDark)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 if (purchaseType == "farmer") {
@@ -515,7 +823,7 @@ fun PurchaseEntryScreen(
                         value = majuriPerBagInput,
                         onValueChange = { majuriPerBagInput = it },
                         label = { Text("મજૂરી પ્રતિ બેગ (₹/બેગ)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     )
@@ -524,14 +832,16 @@ fun PurchaseEntryScreen(
                         OutlinedTextField(
                             value = marketCommissionInput,
                             onValueChange = { marketCommissionInput = it },
-                            label = { Text("માર્કેટ કમિશન") },
+                            label = { Text("માર્કેટ કમિશન ₹") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         )
                         OutlinedTextField(
                             value = firmCommissionInput,
                             onValueChange = { firmCommissionInput = it },
-                            label = { Text("પેઢી કમિશન") },
+                            label = { Text("પેઢી કમિશન ₹") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         )
@@ -541,14 +851,16 @@ fun PurchaseEntryScreen(
                         OutlinedTextField(
                             value = bardanExpenseInput,
                             onValueChange = { bardanExpenseInput = it },
-                            label = { Text("બારદાન") },
+                            label = { Text("બારદાન ₹") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         )
                         OutlinedTextField(
                             value = marketMajuriInput,
                             onValueChange = { marketMajuriInput = it },
-                            label = { Text("મજૂરી") },
+                            label = { Text("મજૂરી ₹") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         )
@@ -558,7 +870,7 @@ fun PurchaseEntryScreen(
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Net Total:", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = GreenDark)
-                    Text("₹${netTotal.toInt()}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = GreenDark)
+                    Text("₹${fmt(netTotal)}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = GreenDark)
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -566,15 +878,15 @@ fun PurchaseEntryScreen(
                     value = paidInput,
                     onValueChange = { paidInput = it },
                     label = { Text("ચૂકવેલ રકમ (Paid)") },
-                    placeholder = { Text("દા.ત. ${netTotal.toInt()}") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    placeholder = { Text("દા.ત. ${fmt(netTotal)}") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp)
                 )
 
                 if (dueAmount > 0) {
                     Text(
-                        text = "બાકી રકમ (Due): ₹${dueAmount.toInt()}",
+                        text = "બાકી રકમ (Due): ₹${fmt(dueAmount)}",
                         color = Color(0xFFEA580C),
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 4.dp)
@@ -583,7 +895,7 @@ fun PurchaseEntryScreen(
             }
         }
 
-        // Save Button
+        // Save / Update Button
         Button(
             onClick = {
                 if (itemsList.isEmpty()) {
@@ -595,12 +907,123 @@ fun PurchaseEntryScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (editingPurchase != null) Color(0xFFD97706) else GreenDark
+            ),
             shape = RoundedCornerShape(10.dp)
         ) {
-            Icon(Icons.Default.Check, contentDescription = null)
+            Icon(if (editingPurchase != null) Icons.Default.Edit else Icons.Default.Check, contentDescription = null)
             Spacer(modifier = Modifier.width(6.dp))
-            Text("ખરીદી સેવ કરો (Confirm Purchase)", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = if (editingPurchase != null) "💾 ખરીદી સુધારો સેવ કરો (Update Purchase)" else "ખરીદી સેવ કરો (Confirm Purchase)",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Section 7: Recent Purchases Register (With Edit & Delete options)
+        if (recentPurchases.isNotEmpty()) {
+            Text(
+                text = "📋 તાજેતરની ખરીદીઓ (Recent Purchases - ${recentPurchases.size})",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A),
+                modifier = Modifier.padding(bottom = 10.dp)
+            )
+
+            recentPurchases.take(15).forEach { pur ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                    shape = RoundedCornerShape(10.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(pur.billNo, fontWeight = FontWeight.Bold, color = GreenDark, fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = if (pur.purchaseType == "market" || pur.purchaseType == "firm") Color(0xFFEFF6FF) else Color(0xFFDCFCE7)
+                                ) {
+                                    Text(
+                                        text = if (pur.purchaseType == "market" || pur.purchaseType == "firm") "માર્કેટ" else "ખેડૂત",
+                                        fontSize = 10.sp,
+                                        color = if (pur.purchaseType == "market" || pur.purchaseType == "firm") Color(0xFF2563EB) else Color(0xFF16A34A),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Text(pur.purchaseDate, fontSize = 11.sp, color = Color(0xFF64748B))
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "માલિક: ${pur.partyName} ${if (pur.village.isNotEmpty()) "(${pur.village})" else ""}",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+
+                        if (pur.truckNo.isNotEmpty() || pur.truckOwner.isNotEmpty()) {
+                            Text(
+                                text = "🚚 ટ્રક: ${pur.truckNo} ${if (pur.truckOwner.isNotEmpty()) "(${pur.truckOwner})" else ""}",
+                                fontSize = 11.sp,
+                                color = Color(0xFF475569)
+                            )
+                        }
+
+                        val purBags = pur.items.sumOf { it.bags }
+                        val purKg = pur.items.sumOf { it.netWeightKg }
+                        Text(
+                            text = "કુલ: $purBags બેગ | ${fmt(purKg)} kg | Net: ₹${fmt(pur.netTotal)}",
+                            fontSize = 12.sp,
+                            color = Color(0xFF334155),
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { startEdit(pur) },
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF2563EB))
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("✏️ એડિટ", fontSize = 11.sp)
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            OutlinedButton(
+                                onClick = { purchaseToDelete = pur },
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDC2626))
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("🗑️ ડીલીટ", fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -608,48 +1031,120 @@ fun PurchaseEntryScreen(
     if (showConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
-            title = { Text("બિલ ખાતરી કરો") },
+            title = {
+                Text(if (editingPurchase != null) "ખરીદી સુધારો ખાતરી કરો" else "ખરીદી ખાતરી કરો")
+            },
             text = {
                 Column {
+                    Text("બિલ નં: $billNo")
                     Text("કુલ બેગ: $totalBagsCount")
-                    Text("કુલ વજન: $totalWeightKg KG (${"%.2f".format(totalManCount)} મણ)")
-                    Text("Net Total: ₹${netTotal.toInt()}")
-                    Text("ચૂકવેલ: ₹${paidAmount.toInt()} | બાકી: ₹${dueAmount.toInt()}")
+                    Text("કુલ વજન: ${fmt(totalWeightKg)} KG (${fmt(totalManCount)} મણ)")
+                    Text("Net Total: ₹${fmt(netTotal)}")
+                    Text("ચૂકવેલ: ₹${fmt(paidAmount)} | બાકી: ₹${fmt(dueAmount)}")
+                    if (truckNoInput.isNotEmpty()) {
+                        Text("ટ્રક નંબર: $truckNoInput")
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val party = if (purchaseType == "farmer") selectedFarmer else (selectedTrader ?: selectedFirm)
+                        val party = if (purchaseType == "farmer") {
+                            selectedFarmer ?: Party(
+                                id = "party_${System.currentTimeMillis()}",
+                                name = farmerNameInput,
+                                village = farmerVillage,
+                                mobile = farmerMobile
+                            )
+                        } else {
+                            (selectedTrader ?: selectedFirm)
+                        }
+
+                        val majuriRate = if (purchaseType == "farmer") majuriPerBagInput.toDoubleOrNull() ?: 10.0 else 0.0
+
                         val record = PurchaseRecord(
-                            id = "pur_${System.currentTimeMillis()}",
+                            id = editingPurchase?.id ?: "pur_${System.currentTimeMillis()}",
                             purchaseType = purchaseType,
                             billNo = billNo,
                             purchaseDate = purchaseDate,
                             partyId = party?.id ?: "",
-                            partyName = party?.name ?: "",
+                            partyName = party?.name ?: (if (purchaseType == "farmer") farmerNameInput else "અજ્ઞાત"),
                             village = if (purchaseType == "farmer") farmerVillage else (selectedFirm?.village ?: ""),
-                            mobile = party?.mobile ?: "",
+                            mobile = if (purchaseType == "farmer") farmerMobile else (party?.mobile ?: ""),
+                            firmId = selectedFirm?.id ?: "",
+                            firmName = selectedFirm?.name ?: "",
+                            traderId = selectedTrader?.id ?: "",
+                            traderName = selectedTrader?.name ?: "",
+                            truckNo = truckNoInput,
+                            truckOwner = truckOwnerInput,
                             items = itemsList.toList(),
                             itemsSubTotal = itemsSubTotal,
+                            majuriRatePerBag = majuriRate,
                             majuriAmount = calculatedExpenses,
+                            marketCommission = marketCommissionInput.toDoubleOrNull() ?: 0.0,
+                            firmCommission = firmCommissionInput.toDoubleOrNull() ?: 0.0,
+                            bardanExpense = bardanExpenseInput.toDoubleOrNull() ?: 0.0,
+                            totalExpenses = calculatedExpenses,
                             netTotal = netTotal,
                             paidAmount = paidAmount,
                             dueAmount = dueAmount,
                             paymentMode = paymentMode,
                             remarks = remarksInput,
-                            createdBy = "Ravi Chaudhary (Main Admin)"
+                            createdBy = editingPurchase?.createdBy ?: "Ravi Chaudhary (Main Admin)"
                         )
-                        onSavePurchase(record)
+
+                        if (editingPurchase != null) {
+                            onUpdatePurchase(record)
+                        } else {
+                            onSavePurchase(record)
+                        }
+
                         showConfirmDialog = false
-                        Toast.makeText(context, "ખરીદી સફળતાપૂર્વક સેવ થઈ ગઈ છે!", Toast.LENGTH_LONG).show()
+                        resetForm()
                     }
                 ) {
-                    Text("હા, સેવ કરો")
+                    Text(if (editingPurchase != null) "હા, સુધારો" else "હા, સેવ કરો")
                 }
             },
             dismissButton = {
                 OutlinedButton(onClick = { showConfirmDialog = false }) {
+                    Text("રદ કરો")
+                }
+            }
+        )
+    }
+
+    // Delete Confirmation Dialog
+    if (purchaseToDelete != null) {
+        val pur = purchaseToDelete!!
+        AlertDialog(
+            onDismissRequest = { purchaseToDelete = null },
+            title = { Text("⚠️ ખરીદી રદ / ડીલીટ કરો") },
+            text = {
+                Column {
+                    Text("શું તમે ખરેખર ખરીદી બિલ નં. ${pur.billNo} ડીલીટ કરવા માંગો છો?")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "નોંધ: આ બિલ સાથે જોડાયેલ સ્ટોક રદ થશે અને ખાતાવહી/રોજમેળ આપમેળે અપડેટ થશે.",
+                        fontSize = 12.sp,
+                        color = Color(0xFFDC2626)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val bNo = pur.billNo
+                        purchaseToDelete = null
+                        onDeletePurchase(bNo)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                ) {
+                    Text("હા, ડીલીટ કરો")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { purchaseToDelete = null }) {
                     Text("રદ કરો")
                 }
             }

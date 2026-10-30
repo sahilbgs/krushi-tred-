@@ -13,12 +13,13 @@ else
 fi
 
 cd "$DIR/web"
+npm run build
 if pm2 list | grep -q "krushi-trade-web"; then
-  echo "Restarting krushi-trade-web..."
+  echo "Restarting krushi-trade-web (preview mode)..."
   pm2 restart krushi-trade-web
 else
-  echo "Starting krushi-trade-web on port 3000..."
-  pm2 start npm --name "krushi-trade-web" -- run dev
+  echo "Starting krushi-trade-web on port 3000 (preview mode)..."
+  pm2 start npm --name "krushi-trade-web" -- run preview
 fi
 pm2 save
 pm2 status

@@ -15,6 +15,7 @@ export const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose, onLockSite }
     { id: 'seeds', label: 'બીજની જાતો', allowed: hasPermission('seedMaster') },
     { id: 'payments', label: 'જમા-ઉધાર વાઉચર', allowed: hasPermission('payments') },
     { id: 'reports', label: 'હિસાબી રિપોર્ટ્સ', allowed: hasPermission('reports') },
+    { id: 'trucks', label: '🚚 ટ્રક / ગાડી ફેરા', allowed: hasPermission('reports') },
     { id: 'users', label: 'યુઝર પરવાનગી', allowed: userProfile?.role === 'admin' }
   ];
 

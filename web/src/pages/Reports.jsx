@@ -13,11 +13,11 @@ import {
   Truck
 } from 'lucide-react';
 
-export const Reports = ({ onOpenBill }) => {
+export const Reports = ({ onOpenBill, initialTab }) => {
   const { companyName, sales, purchases, parties, stock } = useData();
 
   // Active Report Tab: 'purchases' | 'stock' | 'outstanding' | 'sales' | 'trucks'
-  const [activeReportTab, setActiveReportTab] = useState('purchases');
+  const [activeReportTab, setActiveReportTab] = useState(initialTab || 'purchases');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [purchaseTypeFilter, setPurchaseTypeFilter] = useState('all'); // all | farmer | market
@@ -55,7 +55,9 @@ export const Reports = ({ onOpenBill }) => {
   // 4. Truck & Transporter Trips Report Data
   const allTruckTrips = purchases
     .filter(p => {
-      const hasTruck = (p.truckNo && p.truckNo.trim()) || (p.truckOwner && p.truckOwner.trim());
+      const tNo = (p.truckNo || p.truckNumber || '').toString().trim();
+      const tOwner = (p.truckOwner || p.truckOwnerName || '').toString().trim();
+      const hasTruck = tNo.length > 0 || tOwner.length > 0;
       if (!hasTruck) return false;
       if (filterStartDate && p.purchaseDate < filterStartDate) return false;
       if (filterEndDate && p.purchaseDate > filterEndDate) return false;
@@ -66,12 +68,14 @@ export const Reports = ({ onOpenBill }) => {
       const weightKg = p.items?.reduce((s, it) => s + (parseFloat(it.netWeightKg || it.qtyKg) || 0), 0) || 0;
       const man = p.items?.reduce((s, it) => s + (parseFloat(it.totalMan || it.qtyMan) || 0), 0) || 0;
       const varieties = p.items?.map(it => it.varietyName || it.productName).filter(Boolean).join(', ') || '—';
+      const tNo = (p.truckNo || p.truckNumber || '').toString().trim().toUpperCase();
+      const tOwner = (p.truckOwner || p.truckOwnerName || '').toString().trim();
       return {
         id: p.id,
         billNo: p.billNo || p.invoiceNo || '—',
         date: p.purchaseDate || p.date || '—',
-        truckNo: (p.truckNo || 'વાહન નં. વિના').trim(),
-        truckOwner: (p.truckOwner || 'ટ્રાન્સપોર્ટર વિના').trim(),
+        truckNo: tNo || 'વાહન નં. વિના',
+        truckOwner: tOwner || 'સામાન્ય ટ્રાન્સપોર્ટ',
         partyName: p.partyName || p.firmName || '—',
         varietyName: varieties,
         bags,

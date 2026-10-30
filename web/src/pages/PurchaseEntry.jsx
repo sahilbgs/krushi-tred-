@@ -405,6 +405,10 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
     // Determine purchaseType for backend backward-compatibility
     const legacyPurchaseType = ['firm', 'supplier', 'trader'].includes(partyType) ? 'market' : 'farmer';
 
+    const cleanTruckNo = (truckNumber || '').trim().toUpperCase();
+    const cleanTruckOwner = (truckOwnerName || '').trim();
+    const cleanTruckMobile = (truckMobile || '').trim();
+
     const payload = {
       purchaseType: legacyPurchaseType,
       partyType,
@@ -415,8 +419,11 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       partyMobile,
       village,
       pethiName: pethiName || '',
-      truckNumber: truckNumber || '',
-      truckOwnerName: truckOwnerName || '',
+      truckNo: cleanTruckNo,
+      truckNumber: cleanTruckNo,
+      truckOwner: cleanTruckOwner,
+      truckOwnerName: cleanTruckOwner,
+      truckMobile: cleanTruckMobile,
       items: normalizedItems,
       itemsSubTotal: totals.goods,
       majuriRatePerBag: num(labour),
@@ -438,7 +445,11 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
       setIsSubmitting(true);
       if (isEditing) {
         await updatePurchase(payload);
-        setNotice(`✅ ખરીદી બિલ "${payload.billNo}" સફળતાપૂર્વક સુધારાઈ ગયું છે.`);
+        if (cleanTruckNo || cleanTruckOwner) {
+          setNotice(`✅ ખરીદી બિલ "${payload.billNo}" સફળતાપૂર્વક સુધારી લેવાયું અને ટ્રક ${cleanTruckNo || cleanTruckOwner} માં ${totals.bags} બોરી (${totals.kg} KG) અપડેટ થઈ ગઈ!`);
+        } else {
+          setNotice(`✅ ખરીદી બિલ "${payload.billNo}" સફળતાપૂર્વક સુધારી લેવાયું (વાહન વિના).`);
+        }
         handleCancelEdit();
       } else {
         const saved = await recordPurchase(payload);
@@ -452,8 +463,10 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
           partyTag: partyType,
           purchaseSource: legacyPurchaseType,
           pethiName,
-          truckNumber,
-          truckOwnerName,
+          truckNo: cleanTruckNo,
+          truckNumber: cleanTruckNo,
+          truckOwner: cleanTruckOwner,
+          truckOwnerName: cleanTruckOwner,
           items: normalizedItems,
           goodsTotal: totals.goods,
           totalAmount: netTotal,
@@ -468,13 +481,21 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
           note
         });
 
-        setNotice(`ખરીદી બિલ "${saved.billNo}" સફળતાપૂર્વક સેવ થઈ ગયું છે અને સ્ટોક અપડેટ થયો.`);
+        if (cleanTruckNo || cleanTruckOwner) {
+          setNotice(`✅ ખરીદી બિલ "${saved.billNo}" સફળતાપૂર્વક સેવ થયું અને ગાડી નં. ${cleanTruckNo || cleanTruckOwner} માં ${totals.bags} બોરી (${totals.kg} KG માલ) આપોઆપ ટ્રક રજિસ્ટરમાં એડ થઈ ગયા!`);
+        } else {
+          setNotice(`✅ ખરીદી બિલ "${saved.billNo}" સફળતાપૂર્વક સેવ થયું (કોઈ વાહન ન હોવાથી માત્ર ખરીદી નોંધાઈ છે).`);
+        }
 
         // Reset Form
         setBillNo(getNextBillNo());
         setPaid('0');
         setPaymentReference('');
         setNote('');
+        setTruckNumber('');
+        setTruckOwnerName('');
+        setTruckMobile('');
+        setSelectedTruckId('');
         setItems([{ productId: seeds[0]?.id || '', bags: '10', lastBagKg: '35', rate: '2400' }]);
       }
     } catch (err) {
@@ -1019,17 +1040,27 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
         {/* 3. Transport & Truck Details */}
         <div style={{ marginTop: '14px', marginBottom: '16px', background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-            <span style={{ fontSize: '0.92rem', fontWeight: '700', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              🚚 ટ્રક તથા વાહન વિગત (Truck & Vehicle Details)
-            </span>
-            <button
-              type="button"
-              className="secondary"
-              style={{ padding: '4px 12px', fontSize: '0.8rem', background: '#ecfdf5', borderColor: '#059669', color: '#047857', fontWeight: 'bold' }}
-              onClick={handleSaveTruckSeparately}
-            >
-              💾 આ ટ્રક વિગત અલગ સેવ કરો (ટ્રાન્સપોર્ટર લિસ્ટમાં)
-            </button>
+            <div>
+              <span style={{ fontSize: '0.94rem', fontWeight: '700', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                🚚 ટ્રક / ગાડી વિગત (Truck & Vehicle Details)
+              </span>
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#475569' }}>
+                {truckNumber.trim() ? (
+                  <span style={{ color: '#15803d', fontWeight: '700' }}>
+                    ⚡ ગાડી નંબર દાખલ કરેલ છે: <b>{totals.bags} બોરી</b> અને <b>{totals.kg} KG</b> માલ આપોઆપ ટ્રક રજિસ્ટરમાં એડ થશે (અલગથી સેવ કરવાની જરૂર નથી).
+                  </span>
+                ) : (
+                  <span style={{ color: '#64748b' }}>
+                    💡 જો વાહન ન હોય તો આ ખાનું ખાલી રાખો — <b>માત્ર ખરીદી જ એડ થશે, કોઈ ગાડી એડ નહીં થાય</b>.
+                  </span>
+                )}
+              </p>
+            </div>
+            {truckNumber.trim() && (
+              <span style={{ padding: '4px 10px', fontSize: '0.78rem', background: '#dcfce7', border: '1px solid #86efac', color: '#14532d', borderRadius: '6px', fontWeight: '800' }}>
+                ✅ ઓટો લિંક: {totals.bags} બોરી | {totals.kg} KG માલ
+              </span>
+            )}
           </div>
 
           <div className="formgrid" style={{ marginBottom: '8px' }}>

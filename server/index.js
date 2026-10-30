@@ -111,7 +111,7 @@ app.get('/api/initial-data', async (req, res) => {
       pool.query(`SELECT id, variety_name AS "varietyName", crop_type AS "cropType", company, bag_weight_kg AS "bagWeightKg", default_purchase_rate_per_man AS "defaultPurchaseRatePerMan", default_sale_rate_per_man AS "defaultSaleRatePerMan", default_sale_rate_per_bag AS "defaultSaleRatePerBag", default_sale_rate_per_kg AS "defaultSaleRatePerKg", min_stock_alert_bags AS "minStockAlertBags" FROM seed_varieties WHERE is_active = true ORDER BY created_at ASC`),
       pool.query(`SELECT id, party_type AS "partyType", code, name, firm_name AS "firmName", mobile, village, taluka, opening_balance AS "openingBalance", COALESCE(opening_balance_type, balance_type, 'dr') AS "openingBalanceType", balance_type AS "balanceType", current_balance AS "currentBalance", credit_limit AS "creditLimit" FROM parties WHERE is_active = true ORDER BY name ASC`),
       pool.query(`SELECT id, seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", available_bags AS "availableBags", available_loose_kg AS "availableLooseKg", total_weight_kg AS "totalWeightKg", total_man AS "totalMan", last_purchase_rate AS "lastPurchaseRate" FROM stock_ledger ORDER BY variety_name ASC`),
-      pool.query(`SELECT id, bill_no AS "billNo", TO_CHAR(purchase_date, 'YYYY-MM-DD') AS "purchaseDate", purchase_type AS "purchaseType", party_id AS "partyId", party_name AS "partyName", firm_name AS "firmName", village, mobile, truck_no AS "truckNo", items_sub_total AS "itemsSubTotal", majuri_amount AS "majuriAmount", market_commission AS "marketCommission", firm_commission AS "firmCommission", total_expenses AS "totalExpenses", net_total AS "netTotal", paid_amount AS "paidAmount", due_amount AS "dueAmount", payment_mode AS "paymentMode", remarks, created_by AS "createdBy", created_at AS "createdAt" FROM purchases ORDER BY purchase_date DESC, created_at DESC LIMIT 100`),
+      pool.query(`SELECT id, bill_no AS "billNo", TO_CHAR(purchase_date, 'YYYY-MM-DD') AS "purchaseDate", purchase_type AS "purchaseType", party_id AS "partyId", party_name AS "partyName", firm_name AS "firmName", village, mobile, truck_no AS "truckNo", truck_no AS "truckNumber", truck_owner AS "truckOwner", truck_owner AS "truckOwnerName", items_sub_total AS "itemsSubTotal", majuri_amount AS "majuriAmount", market_commission AS "marketCommission", firm_commission AS "firmCommission", total_expenses AS "totalExpenses", net_total AS "netTotal", paid_amount AS "paidAmount", due_amount AS "dueAmount", payment_mode AS "paymentMode", remarks, created_by AS "createdBy", created_at AS "createdAt" FROM purchases ORDER BY purchase_date DESC, created_at DESC LIMIT 100`),
       pool.query(`SELECT id, purchase_id AS "purchaseId", seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", bags, last_bag_kg AS "lastBagKg", net_weight_kg AS "netWeightKg", total_man AS "totalMan", rate_per_man AS "ratePerMan", rate_per_kg AS "ratePerKg", item_total AS "itemTotal" FROM purchase_items`),
       pool.query(`SELECT id, bill_no AS "billNo", TO_CHAR(bill_date, 'YYYY-MM-DD') AS "billDate", party_id AS "partyId", farmer_name AS "farmerName", farmer_mobile AS "farmerMobile", farmer_village AS "farmerVillage", sub_total AS "subTotal", majuri_amount AS "majuriAmount", discount, net_amount AS "netAmount", paid_amount AS "paidAmount", due_amount AS "dueAmount", payment_mode AS "paymentMode", remarks, created_by AS "createdBy", created_at AS "createdAt" FROM sales ORDER BY bill_date DESC, created_at DESC LIMIT 100`),
       pool.query(`SELECT id, sale_id AS "saleId", seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", bags, loose_kg AS "looseKg", total_weight_kg AS "totalWeightKg", total_man AS "totalMan", rate_unit AS "rateUnit", rate, item_total AS "itemTotal" FROM sale_items`),
@@ -373,6 +373,36 @@ app.post('/api/purchases', async (req, res) => {
     const rawMode = (purchaseData.paymentMode || 'credit').toString().toLowerCase().trim();
     const normalizedMode = ['cash', 'bank', 'upi', 'credit', 'cheque'].includes(rawMode) ? rawMode : 'credit';
 
+    // Truck / Vehicle Information
+    const cleanTruckNo = (purchaseData.truckNo || purchaseData.truckNumber || '').toString().trim().toUpperCase();
+    const cleanTruckOwner = (purchaseData.truckOwner || purchaseData.truckOwnerName || '').toString().trim();
+    const cleanTruckMobile = (purchaseData.truckMobile || '').toString().trim();
+
+    // Auto-register Transporter in parties master if truck information is supplied
+    if (cleanTruckNo || cleanTruckOwner) {
+      const transporterLabel = cleanTruckOwner || cleanTruckNo;
+      const transporterFirm = cleanTruckNo || cleanTruckOwner;
+      const checkTrk = await client.query(
+        `SELECT id FROM parties WHERE party_type = 'transporter' AND (UPPER(firm_name) = $1 OR UPPER(name) = $2) LIMIT 1`,
+        [cleanTruckNo, transporterLabel.toUpperCase()]
+      );
+      if (checkTrk.rows.length === 0) {
+        const trkPartyId = 'party_trk_' + Date.now();
+        await client.query(
+          `INSERT INTO parties (id, party_type, code, name, firm_name, mobile, village, opening_balance, balance_type, current_balance, credit_limit)
+           VALUES ($1, 'transporter', $2, $3, $4, $5, 'વાહન / ટ્રાન્સપોર્ટ', 0, 'cr', 0, 50000)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            trkPartyId,
+            `TRK-${Date.now().toString(36).toUpperCase()}`,
+            transporterLabel,
+            transporterFirm,
+            cleanTruckMobile || null
+          ]
+        );
+      }
+    }
+
     // 3. Insert Purchase
     await client.query(
       `INSERT INTO purchases (
@@ -387,6 +417,8 @@ app.post('/api/purchases', async (req, res) => {
         purchase_date = EXCLUDED.purchase_date,
         party_id = EXCLUDED.party_id,
         party_name = EXCLUDED.party_name,
+        truck_no = EXCLUDED.truck_no,
+        truck_owner = EXCLUDED.truck_owner,
         net_total = EXCLUDED.net_total,
         due_amount = EXCLUDED.due_amount`,
       [
@@ -402,8 +434,8 @@ app.post('/api/purchases', async (req, res) => {
         purchaseData.traderName || null,
         purchaseData.village || null,
         purchaseData.mobile || null,
-        purchaseData.truckNo || null,
-        purchaseData.truckOwner || null,
+        cleanTruckNo || null,
+        cleanTruckOwner || null,
         parseFloat(purchaseData.itemsSubTotal || 0),
         parseFloat(purchaseData.majuriRatePerBag || 0),
         parseFloat(purchaseData.majuriAmount || 0),
@@ -1140,6 +1172,36 @@ app.put('/api/purchases/:billNo', async (req, res) => {
     const rawMode = (purchaseData.paymentMode || 'credit').toString().toLowerCase().trim();
     const normalizedMode = ['cash', 'bank', 'upi', 'credit', 'cheque'].includes(rawMode) ? rawMode : 'credit';
 
+    // Truck / Vehicle Information
+    const cleanTruckNo = (purchaseData.truckNo || purchaseData.truckNumber || '').toString().trim().toUpperCase();
+    const cleanTruckOwner = (purchaseData.truckOwner || purchaseData.truckOwnerName || '').toString().trim();
+    const cleanTruckMobile = (purchaseData.truckMobile || '').toString().trim();
+
+    // Auto-register Transporter in parties master if truck information is supplied
+    if (cleanTruckNo || cleanTruckOwner) {
+      const transporterLabel = cleanTruckOwner || cleanTruckNo;
+      const transporterFirm = cleanTruckNo || cleanTruckOwner;
+      const checkTrk = await client.query(
+        `SELECT id FROM parties WHERE party_type = 'transporter' AND (UPPER(firm_name) = $1 OR UPPER(name) = $2) LIMIT 1`,
+        [cleanTruckNo, transporterLabel.toUpperCase()]
+      );
+      if (checkTrk.rows.length === 0) {
+        const trkPartyId = 'party_trk_' + Date.now();
+        await client.query(
+          `INSERT INTO parties (id, party_type, code, name, firm_name, mobile, village, opening_balance, balance_type, current_balance, credit_limit)
+           VALUES ($1, 'transporter', $2, $3, $4, $5, 'વાહન / ટ્રાન્સપોર્ટ', 0, 'cr', 0, 50000)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            trkPartyId,
+            `TRK-${Date.now().toString(36).toUpperCase()}`,
+            transporterLabel,
+            transporterFirm,
+            cleanTruckMobile || null
+          ]
+        );
+      }
+    }
+
     // 5. Update purchase record
     await client.query(
       `UPDATE purchases SET
@@ -1180,8 +1242,8 @@ app.put('/api/purchases/:billNo', async (req, res) => {
         purchaseData.traderName || null,
         purchaseData.village || null,
         purchaseData.mobile || null,
-        purchaseData.truckNo || null,
-        purchaseData.truckOwner || null,
+        cleanTruckNo || null,
+        cleanTruckOwner || null,
         parseFloat(purchaseData.itemsSubTotal || 0),
         parseFloat(purchaseData.majuriRatePerBag || 0),
         parseFloat(purchaseData.majuriAmount || 0),

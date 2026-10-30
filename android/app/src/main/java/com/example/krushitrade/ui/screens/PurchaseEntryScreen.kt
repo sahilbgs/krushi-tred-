@@ -604,30 +604,29 @@ fun PurchaseEntryScreen(
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
-                // Separate Truck Save Button
-                OutlinedButton(
-                    onClick = {
-                        if (truckOwnerInput.isBlank() && truckNoInput.isBlank()) {
-                            Toast.makeText(context, "ટ્રક નંબર અથવા માલિકનું નામ લખો!", Toast.LENGTH_SHORT).show()
-                            return@OutlinedButton
-                        }
-                        val tName = truckOwnerInput.ifBlank { truckNoInput }
-                        val newTransporter = Party(
-                            id = "party_${System.currentTimeMillis()}",
-                            partyType = "transporter",
-                            name = tName,
-                            firmName = truckNoInput,
-                            mobile = truckMobileInput
-                        )
-                        onSaveParty(newTransporter)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
+                // Automatic Truck Sync Banner
+                Surface(
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GreenDark)
+                    color = if (truckNoInput.isNotBlank()) Color(0xFFDCFCE7) else Color(0xFFF1F5F9),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (truckNoInput.isNotBlank()) Color(0xFF86EFAC) else Color(0xFFCBD5E1)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("💾 આ ટ્રક વિગત અલગ સેવ કરો (ટ્રાન્સપોર્ટર લિસ્ટમાં)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        if (truckNoInput.isNotBlank()) {
+                            Text(
+                                text = "⚡ ઓટો-લિંક: ટ્રક $truckNoInput માં $totalBagsCount બોરી (${fmt(totalWeightKg)} KG માલ) આપોઆપ ટ્રક રજિસ્ટરમાં એડ થઈ જશે (અલગથી સેવ કરવાની જરૂર નથી).",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF14532D)
+                            )
+                        } else {
+                            Text(
+                                text = "💡 જો વાહન ન હોય તો આ ખાનું ખાલી રાખો — માત્ર ખરીદી જ સેવ થશે, કોઈ ગાડી એડ નહીં થાય.",
+                                fontSize = 11.sp,
+                                color = Color(0xFF475569)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1074,9 +1073,8 @@ fun PurchaseEntryScreen(
                             firmId = selectedFirm?.id ?: "",
                             firmName = selectedFirm?.name ?: "",
                             traderId = selectedTrader?.id ?: "",
-                            traderName = selectedTrader?.name ?: "",
-                            truckNo = truckNoInput,
-                            truckOwner = truckOwnerInput,
+                            truckNo = truckNoInput.trim().uppercase(),
+                            truckOwner = truckOwnerInput.trim(),
                             items = itemsList.toList(),
                             itemsSubTotal = itemsSubTotal,
                             majuriRatePerBag = majuriRate,
@@ -1093,10 +1091,34 @@ fun PurchaseEntryScreen(
                             createdBy = editingPurchase?.createdBy ?: "Ravi Chaudhary (Main Admin)"
                         )
 
+                        val cleanTrk = truckNoInput.trim().uppercase()
+                        val cleanOwner = truckOwnerInput.trim()
+                        if (cleanTrk.isNotBlank() || cleanOwner.isNotBlank()) {
+                            val tName = cleanOwner.ifBlank { cleanTrk }
+                            val newTransporter = Party(
+                                id = "party_${System.currentTimeMillis()}",
+                                partyType = "transporter",
+                                name = tName,
+                                firmName = cleanTrk,
+                                mobile = truckMobileInput.trim()
+                            )
+                            onSaveParty(newTransporter)
+                        }
+
                         if (editingPurchase != null) {
                             onUpdatePurchase(record)
+                            if (cleanTrk.isNotBlank() || cleanOwner.isNotBlank()) {
+                                Toast.makeText(context, "✅ ખરીદી સુધારી & ટ્રક $cleanTrk માં $totalBagsCount બોરી અપડેટ થઈ!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "✅ ખરીદી બિલ સુધારાઈ ગયું (વાહન વિના).", Toast.LENGTH_SHORT).show()
+                            }
                         } else {
                             onSavePurchase(record)
+                            if (cleanTrk.isNotBlank() || cleanOwner.isNotBlank()) {
+                                Toast.makeText(context, "✅ ખરીદી બિલ સેવ થયું & ટ્રક $cleanTrk માં $totalBagsCount બોરી આપોઆપ ઉમેરાઈ ગઈ!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "✅ ખરીદી બિલ સફળતાપૂર્વક સેવ થયું (વાહન વિના).", Toast.LENGTH_SHORT).show()
+                            }
                         }
 
                         showConfirmDialog = false

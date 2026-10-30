@@ -29,6 +29,7 @@ const tabTitles = {
   seeds: 'બીજની જાતો માસ્ટર (Seed Varieties)',
   payments: 'જમા-ઉધાર વાઉચર એન્ટ્રી (Payments)',
   reports: 'હિસાબી રિપોર્ટ્સ (Reports & Ledger)',
+  trucks: 'ટ્રક & ગાડી ફેરા રજિસ્ટર (Truck Register)',
   users: 'યુઝર પરવાનગી અને અધિકારો'
 };
 
@@ -85,6 +86,8 @@ export function App() {
         return <Payments />;
       case 'reports':
         return <Reports onOpenBill={(sale) => setCurrentBillModal(sale)} />;
+      case 'trucks':
+        return <Reports initialTab="trucks" onOpenBill={(sale) => setCurrentBillModal(sale)} />;
       case 'users':
         return <UserManagement />;
       default:

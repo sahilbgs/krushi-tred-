@@ -156,7 +156,7 @@ export const PurchaseBillModal = ({ purchase, onClose }) => {
                 </div>
               )}
               <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                યુનિટ: ૧ બોરી = ૩૫ KG | ૧ મણ = ૨૦ KG
+                યુનિટ: ૧ મણ = ૨૦ KG
               </div>
             </div>
           </div>
@@ -168,7 +168,7 @@ export const PurchaseBillModal = ({ purchase, onClose }) => {
                 <th style={{ padding: '0.65rem', border: '1px solid #064e3b' }}>ક્રમ</th>
                 <th style={{ padding: '0.65rem', border: '1px solid #064e3b' }}>બિયારણ જાત (Variety)</th>
                 <th style={{ padding: '0.65rem', textAlign: 'center', border: '1px solid #064e3b' }}>કુલ બેગ</th>
-                <th style={{ padding: '0.65rem', textAlign: 'center', border: '1px solid #064e3b' }}>છેલ્લી બેગ (KG)</th>
+                <th style={{ padding: '0.65rem', textAlign: 'center', border: '1px solid #064e3b' }}>બેગ × કિલો વિગત</th>
                 <th style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #064e3b' }}>કુલ વજન (KG)</th>
                 <th style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #064e3b' }}>કુલ મણ</th>
                 <th style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #064e3b' }}>ભાવ (₹/મણ)</th>
@@ -176,32 +176,46 @@ export const PurchaseBillModal = ({ purchase, onClose }) => {
               </tr>
             </thead>
             <tbody>
-              {purchase.items?.map((it, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', fontSize: '0.88rem' }}>
-                  <td style={{ padding: '0.65rem', border: '1px solid #e2e8f0' }}>{idx + 1}</td>
-                  <td style={{ padding: '0.65rem', border: '1px solid #e2e8f0', fontWeight: '600', color: '#0f172a' }}>
-                    {it.varietyName}
-                  </td>
-                  <td style={{ padding: '0.65rem', textAlign: 'center', border: '1px solid #e2e8f0' }}>
-                    <b>{it.bags}</b> બોરી
-                  </td>
-                  <td style={{ padding: '0.65rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#475569' }}>
-                    {it.lastBagKg} KG
-                  </td>
-                  <td style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #e2e8f0' }}>
-                    <b>{it.netWeightKg}</b> kg
-                  </td>
-                  <td style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #e2e8f0', color: '#064e3b', fontWeight: '700' }}>
-                    {Number(it.totalMan).toFixed(2)} મણ
-                  </td>
-                  <td style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #e2e8f0' }}>
-                    ₹{Number(it.ratePerMan).toLocaleString('en-IN')}
-                  </td>
-                  <td style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #e2e8f0', fontWeight: '700' }}>
-                    ₹{Math.round(it.itemTotal).toLocaleString('en-IN')}
-                  </td>
-                </tr>
-              ))}
+              {purchase.items?.map((it, idx) => {
+                const b1 = (it.bags1 !== undefined && Number(it.bags1) > 0) ? it.bags1 : (it.bags ? Math.max(1, it.bags - (it.lastBagKg ? 1 : 0)) : (it.bags || 1));
+                const k1 = it.kg1 !== undefined ? it.kg1 : (it.bagWeightKg || 35);
+                const b2 = it.bags2 !== undefined ? it.bags2 : (it.lastBagKg && it.bags > 0 ? 1 : 0);
+                const k2 = it.kg2 !== undefined ? it.kg2 : (it.lastBagKg || 0);
+
+                let breakdownText = `${it.bags} બોરી`;
+                if (b2 > 0) {
+                  breakdownText = `${b1} × ${k1} kg + ${b2} × ${k2} kg`;
+                } else if (k1) {
+                  breakdownText = `${it.bags} × ${k1} kg`;
+                }
+
+                return (
+                  <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', fontSize: '0.88rem' }}>
+                    <td style={{ padding: '0.65rem', border: '1px solid #e2e8f0' }}>{idx + 1}</td>
+                    <td style={{ padding: '0.65rem', border: '1px solid #e2e8f0', fontWeight: '600', color: '#0f172a' }}>
+                      {it.varietyName || it.productName}
+                    </td>
+                    <td style={{ padding: '0.65rem', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+                      <b>{it.bags}</b> બોરી
+                    </td>
+                    <td style={{ padding: '0.65rem', textAlign: 'center', border: '1px solid #e2e8f0', color: '#475569', fontSize: '0.82rem' }}>
+                      {breakdownText}
+                    </td>
+                    <td style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #e2e8f0' }}>
+                      <b>{it.netWeightKg || it.qtyKg}</b> kg
+                    </td>
+                    <td style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #e2e8f0', color: '#064e3b', fontWeight: '700' }}>
+                      {Number(it.totalMan || it.qtyMan || 0).toFixed(2)} મણ
+                    </td>
+                    <td style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #e2e8f0' }}>
+                      ₹{Number(it.ratePerMan || it.rate || 0).toLocaleString('en-IN')}
+                    </td>
+                    <td style={{ padding: '0.65rem', textAlign: 'right', border: '1px solid #e2e8f0', fontWeight: '700' }}>
+                      ₹{Math.round(it.itemTotal || it.amount || 0).toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr style={{ backgroundColor: '#f1f5f9', fontWeight: '700', fontSize: '0.88rem' }}>

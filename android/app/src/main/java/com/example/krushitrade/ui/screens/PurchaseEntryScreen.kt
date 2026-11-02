@@ -1,5 +1,8 @@
 package com.example.krushitrade.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -85,19 +88,22 @@ fun PurchaseEntryScreen(
     var truckOwnerInput by remember { mutableStateOf("") }
     var truckMobileInput by remember { mutableStateOf("") }
 
-    // Item adding state
+    // Item adding state - 2 Groups (બોરી × કિલો અને ફરી બોરી × કિલો)
     var selectedSeed by remember { mutableStateOf<SeedProduct?>(seeds.firstOrNull()) }
     var seedDropdownExpanded by remember { mutableStateOf(false) }
-    var bagsInput by remember { mutableStateOf("20") }
-    var lastBagKgInput by remember { mutableStateOf("35") }
+    var bags1Input by remember { mutableStateOf("20") }
+    var kg1Input by remember { mutableStateOf("35") }
+    var bags2Input by remember { mutableStateOf("0") }
+    var kg2Input by remember { mutableStateOf("0") }
     var ratePerManInput by remember { mutableStateOf("2400") }
 
     // Items List
     val itemsList = remember { mutableStateListOf<PurchaseItem>() }
 
-    // Confirmation & Delete Dialogs
+    // Confirmation, Delete Dialogs & Print state
     var showConfirmDialog by remember { mutableStateOf(false) }
     var purchaseToDelete by remember { mutableStateOf<PurchaseRecord?>(null) }
+    var savedPurchaseForPrint by remember { mutableStateOf<PurchaseRecord?>(null) }
 
     // Update defaults when master lists load
     LaunchedEffect(farmers) {
@@ -124,7 +130,10 @@ fun PurchaseEntryScreen(
             selectedSeed = seeds.firstOrNull()
             val defRate = selectedSeed?.defaultPurchaseRatePerMan ?: 2400.0
             ratePerManInput = if (defRate % 1.0 == 0.0) defRate.toInt().toString() else defRate.toString()
-            lastBagKgInput = (selectedSeed?.bagWeightKg ?: 35.0).let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }
+            val defKg = selectedSeed?.bagWeightKg ?: 35.0
+            kg1Input = if (defKg % 1.0 == 0.0) defKg.toInt().toString() else defKg.toString()
+            bags2Input = "0"
+            kg2Input = "0"
         }
     }
 
@@ -137,10 +146,14 @@ fun PurchaseEntryScreen(
         }
     }
 
-    // Calculations for currently typed item
-    val curBags = bagsInput.toIntOrNull() ?: 0
-    val curLastKg = lastBagKgInput.toDoubleOrNull() ?: BAG_STD_KG
-    val curTotalKg = if (curBags > 0) ((curBags - 1) * BAG_STD_KG) + curLastKg else 0.0
+    // Calculations for currently typed item: (bags1 * kg1) + (bags2 * kg2)
+    val curB1 = bags1Input.toIntOrNull() ?: 0
+    val curK1 = kg1Input.toDoubleOrNull() ?: 0.0
+    val curB2 = bags2Input.toIntOrNull() ?: 0
+    val curK2 = kg2Input.toDoubleOrNull() ?: 0.0
+
+    val curBags = curB1 + curB2
+    val curTotalKg = (curB1 * curK1) + (curB2 * curK2)
     val curTotalMan = curTotalKg / MAN_STD_KG
     val curRate = ratePerManInput.toDoubleOrNull() ?: 0.0
     val curItemTotal = curTotalMan * curRate
@@ -171,6 +184,11 @@ fun PurchaseEntryScreen(
         billNo = "SN-PUR-${System.currentTimeMillis().toString().takeLast(6)}"
         purchaseDate = todayDateStr
         itemsList.clear()
+        bags1Input = "20"
+        kg1Input = "35"
+        bags2Input = "0"
+        kg2Input = "0"
+        ratePerManInput = "2400"
         paidInput = ""
         remarksInput = ""
         truckNoInput = ""
@@ -242,7 +260,7 @@ fun PurchaseEntryScreen(
             color = GreenDark
         )
         Text(
-            text = if (editingPurchase != null) "ખરીદી એન્ટ્રી સુધારો (Edit Purchase)" else "નવી બિયારણ ખરીદી (૧ બેગ = ૩૫ KG, ૧ મણ = ૨૦ KG)",
+            text = if (editingPurchase != null) "ખરીદી એન્ટ્રી સુધારો (Edit Purchase)" else "નવી બિયારણ ખરીદી (બોરી × કિલો ગણતરી, ૧ મણ = ૨૦ KG)",
             fontSize = 12.sp,
             color = Color(0xFF64748B),
             modifier = Modifier.padding(bottom = 12.dp)
@@ -631,7 +649,7 @@ fun PurchaseEntryScreen(
             }
         }
 
-        // Section 3: Seed Variety, Bags & Rate Input (With Full Decimal Support)
+        // Section 3: Seed Variety, Bags x KG Input (Group 1 + Group 2)
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -640,7 +658,7 @@ fun PurchaseEntryScreen(
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                Text("૩. બિયારણ જાત, વજન અને ₹/મણ ભાવ", fontWeight = FontWeight.Bold, color = GreenDark)
+                Text("૩. બિયારણ જાત, બોરી × કિલો અને ભાવ", fontWeight = FontWeight.Bold, color = GreenDark)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Variety
@@ -671,9 +689,94 @@ fun PurchaseEntryScreen(
                                     val defRate = s.defaultPurchaseRatePerMan
                                     ratePerManInput = if (defRate % 1.0 == 0.0) defRate.toInt().toString() else defRate.toString()
                                     val defBagKg = s.bagWeightKg
-                                    lastBagKgInput = if (defBagKg % 1.0 == 0.0) defBagKg.toInt().toString() else defBagKg.toString()
+                                    kg1Input = if (defBagKg % 1.0 == 0.0) defBagKg.toInt().toString() else defBagKg.toString()
+                                    bags2Input = "0"
+                                    kg2Input = "0"
                                     seedDropdownExpanded = false
                                 }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Group 1: Bags 1 x KG 1
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFF8FAFC),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("૧. બોરી (બેગ) × કિલો", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = GreenDark)
+                            Text("સબ-ટોટલ: ${fmt(curB1 * curK1)} KG", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = bags1Input,
+                                onValueChange = { bags1Input = it },
+                                label = { Text("બોરી ૧ (બેગ)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            OutlinedTextField(
+                                value = kg1Input,
+                                onValueChange = { kg1Input = it },
+                                label = { Text("વજન પ્રતિ બેગ (KG)") },
+                                placeholder = { Text("35") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Group 2: Bags 2 x KG 2
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFFFBEB),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("૨. ફરી બોરી × કિલો (વધારાની / અલગ વજન)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFFB45309))
+                            Text("સબ-ટોટલ: ${fmt(curB2 * curK2)} KG", fontSize = 11.sp, color = Color(0xFF92400E), fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = bags2Input,
+                                onValueChange = { bags2Input = it },
+                                label = { Text("ફરી બોરી ૨ (બેગ)") },
+                                placeholder = { Text("0") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            OutlinedTextField(
+                                value = kg2Input,
+                                onValueChange = { kg2Input = it },
+                                label = { Text("વજન ૨ (KG)") },
+                                placeholder = { Text("0") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
                             )
                         }
                     }
@@ -682,36 +785,12 @@ fun PurchaseEntryScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = bagsInput,
-                        onValueChange = { bagsInput = it },
-                        label = { Text("કુલ બેગ") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = lastBagKgInput,
-                        onValueChange = { lastBagKgInput = it },
-                        label = { Text("છેલ્લી બેગ (KG)") },
-                        supportingText = { Text("0-35 KG") },
-                        isError = (lastBagKgInput.toDoubleOrNull() ?: 0.0) > 35.0 || (lastBagKgInput.toDoubleOrNull() ?: 0.0) < 0.0,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Rate per man: KeyboardType.Decimal allows decimals like 2400.50
+                    // Rate per man
                     OutlinedTextField(
                         value = ratePerManInput,
                         onValueChange = { ratePerManInput = it },
-                        label = { Text("ભાવ (₹/મણ - દશાંશ સ્વીકાર્ય)") },
-                        placeholder = { Text("2400.50") },
+                        label = { Text("ભાવ (₹/મણ - ૨૦ KG)") },
+                        placeholder = { Text("2400") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
@@ -725,7 +804,7 @@ fun PurchaseEntryScreen(
                             .padding(8.dp),
                         horizontalAlignment = Alignment.End
                     ) {
-                        Text("કુલ KG: ${fmt(curTotalKg)} kg", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("કુલ બોરી: $curBags | KG: ${fmt(curTotalKg)}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Text("કુલ મણ: ${fmt(curTotalMan)} મણ", fontSize = 12.sp, color = GreenPrimary, fontWeight = FontWeight.Bold)
                         Text("રકમ: ₹${fmt(curItemTotal)}", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                     }
@@ -735,21 +814,20 @@ fun PurchaseEntryScreen(
 
                 Button(
                     onClick = {
-                        val lastKg = lastBagKgInput.toDoubleOrNull() ?: 35.0
-                        if (lastKg < 0.0 || lastKg > 35.0) {
-                            Toast.makeText(context, "છેલ્લી બેગનું વજન 0 થી 35 KG હોવું જોઈએ!", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (curBags <= 0 || selectedSeed == null) {
-                            Toast.makeText(context, "યોગ્ય વિગત દાખલ કરો", Toast.LENGTH_SHORT).show()
+                        if (curBags <= 0 || curTotalKg <= 0.0 || selectedSeed == null) {
+                            Toast.makeText(context, "યોગ્ય બોરી અને વજન વિગત દાખલ કરો", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         itemsList.add(
                             PurchaseItem(
                                 seedId = selectedSeed!!.id,
                                 varietyName = selectedSeed!!.varietyName,
+                                bags1 = curB1,
+                                kg1 = curK1,
+                                bags2 = curB2,
+                                kg2 = curK2,
                                 bags = curBags,
-                                lastBagKg = lastKg,
+                                lastBagKg = curK1,
                                 netWeightKg = curTotalKg,
                                 totalMan = curTotalMan,
                                 ratePerMan = curRate,
@@ -792,7 +870,8 @@ fun PurchaseEntryScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(it.varietyName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text("${it.bags} બેગ | ${fmt(it.netWeightKg)} KG (${fmt(it.totalMan)} મણ) @ ₹${fmt(it.ratePerMan)}", fontSize = 11.sp, color = Color(0xFF64748B))
+                                val breakdown = if (it.bags2 > 0) "${it.bags1}×${fmt(it.kg1)}kg + ${it.bags2}×${fmt(it.kg2)}kg" else "${it.bags1}×${fmt(it.kg1)}kg"
+                                Text("${it.bags} બોરી ($breakdown) | ${fmt(it.netWeightKg)} KG (${fmt(it.totalMan)} મણ) @ ₹${fmt(it.ratePerMan)}", fontSize = 11.sp, color = Color(0xFF64748B))
                             }
                             Text("₹${fmt(it.itemTotal)}", fontWeight = FontWeight.Bold, color = GreenPrimary)
                             IconButton(onClick = { itemsList.removeAt(idx) }) {
@@ -997,9 +1076,22 @@ fun PurchaseEntryScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             OutlinedButton(
+                                onClick = { sharePurchaseVoucher(context, pur) },
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = GreenDark)
+                            ) {
+                                Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("🖨️ પ્રિન્ટ", fontSize = 11.sp)
+                            }
+
+                            Spacer(modifier = Modifier.width(6.dp))
+
+                            OutlinedButton(
                                 onClick = { startEdit(pur) },
                                 shape = RoundedCornerShape(6.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF2563EB))
                             ) {
                                 Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -1007,12 +1099,12 @@ fun PurchaseEntryScreen(
                                 Text("✏️ એડિટ", fontSize = 11.sp)
                             }
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
 
                             OutlinedButton(
                                 onClick = { purchaseToDelete = pur },
                                 shape = RoundedCornerShape(6.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDC2626))
                             ) {
                                 Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -1107,6 +1199,7 @@ fun PurchaseEntryScreen(
 
                         if (editingPurchase != null) {
                             onUpdatePurchase(record)
+                            savedPurchaseForPrint = record
                             if (cleanTrk.isNotBlank() || cleanOwner.isNotBlank()) {
                                 Toast.makeText(context, "✅ ખરીદી સુધારી & ટ્રક $cleanTrk માં $totalBagsCount બોરી અપડેટ થઈ!", Toast.LENGTH_SHORT).show()
                             } else {
@@ -1114,6 +1207,7 @@ fun PurchaseEntryScreen(
                             }
                         } else {
                             onSavePurchase(record)
+                            savedPurchaseForPrint = record
                             if (cleanTrk.isNotBlank() || cleanOwner.isNotBlank()) {
                                 Toast.makeText(context, "✅ ખરીદી બિલ સેવ થયું & ટ્રક $cleanTrk માં $totalBagsCount બોરી આપોઆપ ઉમેરાઈ ગઈ!", Toast.LENGTH_SHORT).show()
                             } else {
@@ -1131,6 +1225,43 @@ fun PurchaseEntryScreen(
             dismissButton = {
                 OutlinedButton(onClick = { showConfirmDialog = false }) {
                     Text("રદ કરો")
+                }
+            }
+        )
+    }
+
+    // Print / Share Dialog after Saving Bill
+    if (savedPurchaseForPrint != null) {
+        val pur = savedPurchaseForPrint!!
+        AlertDialog(
+            onDismissRequest = { savedPurchaseForPrint = null },
+            icon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = GreenPrimary, modifier = Modifier.size(36.dp)) },
+            title = { Text("🎉 બિલ સફળતાપૂર્વક સેવ થયું!", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("બિલ નં: ${pur.billNo}", fontWeight = FontWeight.Bold)
+                    Text("પાર્ટી: ${pur.partyName} ${if (pur.village.isNotEmpty()) "(${pur.village})" else ""}")
+                    Text("કુલ બોરી: ${pur.items.sumOf { it.bags }} બોરી (${fmt(pur.items.sumOf { it.netWeightKg })} KG)")
+                    Text("Net રકમ: ₹${fmt(pur.netTotal)}", fontWeight = FontWeight.Bold, color = GreenDark)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("આ બિલ પ્રિન્ટ કરવા અથવા WhatsApp પર શેર કરવા માટે નીચે 'પ્રિન્ટ / શેર' બટન દબાવો.", fontSize = 12.sp, color = Color(0xFF64748B))
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        sharePurchaseVoucher(context, pur)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+                ) {
+                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("🖨️ બિલ પ્રિન્ટ / શેર કરો", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { savedPurchaseForPrint = null }) {
+                    Text("બંધ કરો (Close)")
                 }
             }
         )
@@ -1171,5 +1302,42 @@ fun PurchaseEntryScreen(
                 }
             }
         )
+    }
+}
+
+fun sharePurchaseVoucher(context: Context, pur: PurchaseRecord) {
+    try {
+        val itemsStr = pur.items.joinToString("\n") { it ->
+            val breakdown = if (it.bags2 > 0) "${it.bags1}×${if (it.kg1 % 1.0 == 0.0) it.kg1.toInt() else it.kg1}kg + ${it.bags2}×${if (it.kg2 % 1.0 == 0.0) it.kg2.toInt() else it.kg2}kg" else "${it.bags1}×${if (it.kg1 % 1.0 == 0.0) it.kg1.toInt() else it.kg1}kg"
+            "• ${it.varietyName}: ${it.bags} બોરી ($breakdown) = ${if (it.netWeightKg % 1.0 == 0.0) it.netWeightKg.toInt() else String.format(Locale.US, "%.2f", it.netWeightKg)} KG (${if (it.totalMan % 1.0 == 0.0) it.totalMan.toInt() else String.format(Locale.US, "%.2f", it.totalMan)} મણ) @ ₹${if (it.ratePerMan % 1.0 == 0.0) it.ratePerMan.toInt() else it.ratePerMan}/મણ = ₹${if (it.itemTotal % 1.0 == 0.0) it.itemTotal.toInt() else String.format(Locale.US, "%.2f", it.itemTotal)}"
+        }
+        val text = "🧾 *શ્રી નંદિની સીડ્સ - ખરીદી વાઉચર*\n" +
+                "------------------------------------\n" +
+                "બિલ નં: ${pur.billNo}\n" +
+                "તારીખ: ${pur.purchaseDate}\n" +
+                "પ્રકાર: ${if (pur.purchaseType == "market" || pur.purchaseType == "firm") "માર્કેટ પેઢી" else "ખેડૂત"}\n" +
+                "નામ: ${pur.partyName} ${if (pur.village.isNotEmpty()) "(${pur.village})" else ""}\n" +
+                (if (pur.truckNo.isNotEmpty()) "ગાડી નં: ${pur.truckNo} (${pur.truckOwner})\n" else "") +
+                "------------------------------------\n" +
+                "આઈટમ વિગત:\n$itemsStr\n" +
+                "------------------------------------\n" +
+                "કુલ બોરી: ${pur.items.sumOf { it.bags }}\n" +
+                "કુલ વજન: ${pur.items.sumOf { it.netWeightKg }} KG (${pur.items.sumOf { it.totalMan }} મણ)\n" +
+                "માલ રકમ: ₹${pur.itemsSubTotal}\n" +
+                (if (pur.totalExpenses > 0) "ખર્ચ/મજૂરી: ₹${pur.totalExpenses}\n" else "") +
+                "*ચુકવવાપાત્ર કુલ: ₹${pur.netTotal}*\n" +
+                "ચુકવેલ રકમ: ₹${pur.paidAmount}\n" +
+                (if (pur.dueAmount > 0) "*બાકી રકમ: ₹${pur.dueAmount}*\n" else "") +
+                "------------------------------------\n" +
+                "શ્રી નંદિની સીડ્સ | કૃષિ ટ્રેડ"
+
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            putExtra(Intent.EXTRA_TEXT, text)
+            type = "text/plain"
+        }
+        val shareIntent = Intent.createChooser(sendIntent, "🖨️ ખરીદી બિલ પ્રિન્ટ / શેર કરો")
+        context.startActivity(shareIntent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "શેર કરવામાં ભૂલ આવી", Toast.LENGTH_SHORT).show()
     }
 }

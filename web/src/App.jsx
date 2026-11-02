@@ -187,7 +187,7 @@ export function App() {
         <header className="page-header">
           <div className="page-title-box">
             <h1>{tabTitles[activeTab] || 'SHREE NANDINI SEEDS'}</h1>
-            <p className="muted header-subtitle">બીજ ખરીદી (35 KG/બોરી • ₹/મણ) • વેચાણ • બિલિંગ • સ્ટોક • ખાતાવહી</p>
+            <p className="muted header-subtitle">બીજ ખરીદી (બોરી × KG • ₹/મણ) • વેચાણ • બિલિંગ • સ્ટોક • ખાતાવહી</p>
           </div>
           <div className="header-actions">
             <button 

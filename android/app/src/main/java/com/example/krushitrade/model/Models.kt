@@ -71,6 +71,10 @@ data class SaleItem(
     val seedId: String = "",
     val varietyName: String = "",
     val bagWeightKg: Double = BAG_STD_KG,
+    val bags1: Int = 0,
+    val kg1: Double = BAG_STD_KG,
+    val bags2: Int = 0,
+    val kg2: Double = 0.0,
     val bags: Int = 0,
     val looseKg: Double = 0.0,
     val totalWeightKg: Double = 0.0,
@@ -104,13 +108,17 @@ data class PurchaseItem(
     val seedId: String = "",
     val varietyName: String = "",
     val bagWeightKg: Double = BAG_STD_KG,
+    val bags1: Int = 0,
+    val kg1: Double = BAG_STD_KG,
+    val bags2: Int = 0,
+    val kg2: Double = 0.0,
     val bags: Int = 0,
-    val lastBagKg: Double = BAG_STD_KG, // 0 to 35 KG
-    val netWeightKg: Double = 0.0, // ((bags - 1) * 35) + lastBagKg
-    val totalMan: Double = 0.0, // netWeightKg / 20
-    val ratePerMan: Double = 0.0, // ₹ પ્રતિ મણ (₹/મણ)
-    val purchaseRate: Double = 0.0, // ₹ પ્રતિ મણ
-    val itemTotal: Double = 0.0 // totalMan * ratePerMan
+    val lastBagKg: Double = 0.0,
+    val netWeightKg: Double = 0.0,
+    val totalMan: Double = 0.0,
+    val ratePerMan: Double = 0.0,
+    val purchaseRate: Double = 0.0,
+    val itemTotal: Double = 0.0
 )
 
 data class PurchaseRecord(

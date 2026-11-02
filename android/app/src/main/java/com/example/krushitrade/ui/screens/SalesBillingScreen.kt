@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.krushitrade.model.*
 import com.example.krushitrade.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,8 +53,10 @@ fun SalesBillingScreen(
         }
     }
 
-    var bagsInput by remember { mutableStateOf("1") }
-    var looseKgInput by remember { mutableStateOf("0") }
+    var bags1Input by remember { mutableStateOf("1") }
+    var kg1Input by remember { mutableStateOf("35") }
+    var bags2Input by remember { mutableStateOf("0") }
+    var kg2Input by remember { mutableStateOf("0") }
     var rateInput by remember { mutableStateOf("140") }
     var majuriInput by remember { mutableStateOf("0") }
     var extraChargesInput by remember { mutableStateOf("0") }
@@ -59,11 +64,23 @@ fun SalesBillingScreen(
     var isUdhar by remember { mutableStateOf(false) }
     var paidInput by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
+    var savedSaleForPrint by remember { mutableStateOf<SaleInvoice?>(null) }
 
-    val bags = bagsInput.toIntOrNull() ?: 0
-    val looseKg = looseKgInput.toDoubleOrNull() ?: 0.0
-    val bagWeight = selectedStock?.bagWeightKg ?: BAG_STD_KG
-    val totalKg = (bags * bagWeight) + looseKg
+    LaunchedEffect(selectedStock) {
+        if (selectedStock != null) {
+            val bagW = selectedStock!!.bagWeightKg
+            kg1Input = if (bagW % 1.0 == 0.0) bagW.toInt().toString() else bagW.toString()
+        }
+    }
+
+    val curB1 = bags1Input.toIntOrNull() ?: 0
+    val curK1 = kg1Input.toDoubleOrNull() ?: 35.0
+    val curB2 = bags2Input.toIntOrNull() ?: 0
+    val curK2 = kg2Input.toDoubleOrNull() ?: 0.0
+
+    val totalBags = curB1 + curB2
+    val totalKg = (curB1 * curK1) + (curB2 * curK2)
+    val totalMan = totalKg / 20.0
     val rate = rateInput.toDoubleOrNull() ?: 0.0
     val lineTotal = totalKg * rate
 
@@ -190,33 +207,91 @@ fun SalesBillingScreen(
                     }
                 }
 
+                // Group 1: Bags 1 x KG 1
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFF8FAFC),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("૧. બોરી (બેગ) × કિલો", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = GreenDark)
+                            Text("સબ-ટોટલ: ${curB1 * curK1} KG", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = bags1Input,
+                                onValueChange = { bags1Input = it },
+                                label = { Text("બોરી ૧ (બેગ)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            OutlinedTextField(
+                                value = kg1Input,
+                                onValueChange = { kg1Input = it },
+                                label = { Text("વજન પ્રતિ બેગ (KG)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = bagsInput,
-                        onValueChange = { bagsInput = it },
-                        label = { Text("બોરી (Bags)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = looseKgInput,
-                        onValueChange = { looseKgInput = it },
-                        label = { Text("છૂટક કિલો (KG)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
+                // Group 2: Bags 2 x KG 2
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFFFBEB),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("૨. ફરી બોરી × કિલો (વધારાની / અલગ વજન)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFFB45309))
+                            Text("સબ-ટોટલ: ${curB2 * curK2} KG", fontSize = 11.sp, color = Color(0xFF92400E), fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = bags2Input,
+                                onValueChange = { bags2Input = it },
+                                label = { Text("ફરી બોરી ૨ (બેગ)") },
+                                placeholder = { Text("0") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            OutlinedTextField(
+                                value = kg2Input,
+                                onValueChange = { kg2Input = it },
+                                label = { Text("વજન ૨ (KG)") },
+                                placeholder = { Text("0") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
-                        value = "${totalKg} kg",
+                        value = "$totalBags બોરી (${totalKg} kg)",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("કુલ વજન (Net KG)") },
@@ -364,10 +439,15 @@ fun SalesBillingScreen(
                         SaleItem(
                             seedId = selectedStock!!.seedId,
                             varietyName = selectedStock!!.varietyName,
-                            bagWeightKg = selectedStock!!.bagWeightKg,
-                            bags = bags,
-                            looseKg = looseKg,
+                            bagWeightKg = curK1,
+                            bags1 = curB1,
+                            kg1 = curK1,
+                            bags2 = curB2,
+                            kg2 = curK2,
+                            bags = totalBags,
+                            looseKg = if (curB2 > 0) curB2 * curK2 else 0.0,
                             totalWeightKg = totalKg,
+                            totalMan = totalMan,
                             rateUnit = "kg",
                             rate = rate,
                             itemTotal = lineTotal
@@ -384,12 +464,8 @@ fun SalesBillingScreen(
                 )
 
                 onSaveSale(saleInvoice)
+                savedSaleForPrint = saleInvoice
                 Toast.makeText(context, "બિલ તૈયાર થયું! સ્ટોક ઘટ્યો.", Toast.LENGTH_SHORT).show()
-
-                // Share to WhatsApp
-                if (selectedFarmer!!.mobile.isNotEmpty()) {
-                    shareBillOnWhatsApp(context, saleInvoice)
-                }
             },
             colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
             shape = RoundedCornerShape(10.dp),
@@ -397,21 +473,118 @@ fun SalesBillingScreen(
         ) {
             Icon(Icons.Default.Print, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("સાદું બિલ બનાવો & WhatsApp મોકલો", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text("સાદું બિલ બનાવો (Save Bill)", fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
+    }
+
+    // Print / Share Dialog after Saving Sale Bill
+    if (savedSaleForPrint != null) {
+        val sale = savedSaleForPrint!!
+        val it = sale.items.firstOrNull()
+        val breakdown = if ((it?.bags2 ?: 0) > 0) "${it?.bags1}×${it?.kg1}kg + ${it?.bags2}×${it?.kg2}kg" else "${it?.bags1}×${it?.kg1}kg"
+
+        AlertDialog(
+            onDismissRequest = { savedSaleForPrint = null },
+            icon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = GreenPrimary, modifier = Modifier.size(36.dp)) },
+            title = { Text("🎉 વેચાણ બિલ સફળતાપૂર્વક બન્યું!", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("બિલ નં: ${sale.billNo}", fontWeight = FontWeight.Bold)
+                    Text("ખેડૂત: ${sale.farmerName} ${if (sale.farmerVillage.isNotEmpty()) "(${sale.farmerVillage})" else ""}")
+                    Text("બિયારણ: ${it?.varietyName}")
+                    Text("વજન: ${sale.items.sumOf { it.bags }} બોરી ($breakdown = ${sale.items.sumOf { it.totalWeightKg }} kg)")
+                    Text("કુલ રકમ: ₹${sale.netAmount.toInt()}", fontWeight = FontWeight.Bold, color = GreenDark)
+                    if (sale.dueAmount > 0) {
+                        Text("બાકી ઉધાર: ₹${sale.dueAmount.toInt()}", fontWeight = FontWeight.Bold, color = RedDanger)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("આ બિલ પ્રિન્ટ કરવા અથવા WhatsApp પર મોકલવા માટે નીચેનું બટન પસંદ કરો:", fontSize = 12.sp, color = Color(0xFF64748B))
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            shareSaleReceipt(context, sale)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+                    ) {
+                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("🖨️ પ્રિન્ટ / શેર")
+                    }
+                    if (sale.farmerMobile.isNotBlank()) {
+                        Button(
+                            onClick = {
+                                shareBillOnWhatsApp(context, sale)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                        ) {
+                            Text("💬 WhatsApp")
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { savedSaleForPrint = null }) {
+                    Text("બંધ કરો")
+                }
+            }
+        )
+    }
+}
+
+fun shareSaleReceipt(context: Context, sale: SaleInvoice) {
+    try {
+        val item = sale.items.firstOrNull() ?: SaleItem()
+        val breakdown = if (item.bags2 > 0) "${item.bags1}×${if (item.kg1 % 1.0 == 0.0) item.kg1.toInt() else item.kg1}kg + ${item.bags2}×${if (item.kg2 % 1.0 == 0.0) item.kg2.toInt() else item.kg2}kg" else "${item.bags1}×${if (item.kg1 % 1.0 == 0.0) item.kg1.toInt() else item.kg1}kg"
+        val text = "🧾 *શ્રી નંદિની સીડ્સ - વેચાણ બિલ*\n" +
+                "------------------------------------\n" +
+                "બિલ નં: ${sale.billNo}\n" +
+                "ખેડૂત: ${sale.farmerName} ${if (sale.farmerVillage.isNotEmpty()) "(${sale.farmerVillage})" else ""}\n" +
+                (if (sale.farmerMobile.isNotEmpty()) "મોબાઈલ: ${sale.farmerMobile}\n" else "") +
+                "------------------------------------\n" +
+                "બિયારણ: ${item.varietyName}\n" +
+                "બોરી: ${sale.items.sumOf { it.bags }} બોરી ($breakdown)\n" +
+                "કુલ વજન: ${sale.items.sumOf { it.totalWeightKg }} KG (${sale.items.sumOf { it.totalMan }} મણ)\n" +
+                "ભાવ: ₹${item.rate} / ${item.rateUnit}\n" +
+                "માલ રકમ: ₹${sale.subTotal.toInt()}\n" +
+                (if (sale.majuriAmount > 0) "મજૂરી: ₹${sale.majuriAmount.toInt()}\n" else "") +
+                (if (sale.extraCharges > 0) "અન્ય ચાર્જ: ₹${sale.extraCharges.toInt()}\n" else "") +
+                (if (sale.discount > 0) "ડિસ્કાઉન્ટ: -₹${sale.discount.toInt()}\n" else "") +
+                "------------------------------------\n" +
+                "*કુલ રકમ: ₹${sale.netAmount.toInt()}*\n" +
+                "ચુકવેલ: ₹${sale.paidAmount.toInt()}\n" +
+                (if (sale.dueAmount > 0) "*બાકી ઉધાર: ₹${sale.dueAmount.toInt()}*\n" else "") +
+                "ચુકવણી: ${if (sale.paymentMode == "credit") "ઉધાર (બાકી)" else "રોકડ (Cash)"}\n" +
+                "------------------------------------\n" +
+                "આભાર! ફરી પધારજો 🙏\n" +
+                "શ્રી નંદિની સીડ્સ | કૃષિ ટ્રેડ"
+
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            putExtra(Intent.EXTRA_TEXT, text)
+            type = "text/plain"
+        }
+        val shareIntent = Intent.createChooser(sendIntent, "🖨️ વેચાણ બિલ પ્રિન્ટ / શેર કરો")
+        context.startActivity(shareIntent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "શેર કરવામાં ભૂલ આવી", Toast.LENGTH_SHORT).show()
     }
 }
 
 fun shareBillOnWhatsApp(context: Context, sale: SaleInvoice) {
     try {
-        val msg = "🌱 *કૃષિ ટ્રેડ - બિલ*\n" +
+        val item = sale.items.firstOrNull() ?: SaleItem()
+        val breakdown = if (item.bags2 > 0) "${item.bags1}×${if (item.kg1 % 1.0 == 0.0) item.kg1.toInt() else item.kg1}kg + ${item.bags2}×${if (item.kg2 % 1.0 == 0.0) item.kg2.toInt() else item.kg2}kg" else "${item.bags1}×${if (item.kg1 % 1.0 == 0.0) item.kg1.toInt() else item.kg1}kg"
+        val msg = "🌱 *શ્રી નંદિની સીડ્સ - બિલ*\n" +
+                "બિલ નં: ${sale.billNo}\n" +
                 "ખેડૂત: ${sale.farmerName}\n" +
-                "બિયારણ: ${sale.items.firstOrNull()?.varietyName}\n" +
-                "વજન: ${sale.items.sumOf { it.bags }} બોરી (${sale.items.sumOf { it.totalWeightKg }} kg)\n" +
+                "બિયારણ: ${item.varietyName}\n" +
+                "વજન: ${sale.items.sumOf { it.bags }} બોરી ($breakdown = ${sale.items.sumOf { it.totalWeightKg }} kg)\n" +
                 "કુલ રકમ: ₹${sale.netAmount.toInt()}\n" +
-                "જમા: ₹${sale.paidAmount.toInt()}\n" +
-                "*બાકી ઉધાર: ₹${sale.dueAmount.toInt()}*\n" +
-                "આભાર! 🙏"
+                "જમા ચૂકવેલ: ₹${sale.paidAmount.toInt()}\n" +
+                (if (sale.dueAmount > 0) "*બાકી ઉધાર: ₹${sale.dueAmount.toInt()}*\n" else "") +
+                "આભાર! ફરી પધારજો 🙏"
 
         val sendIntent = Intent(Intent.ACTION_VIEW).apply {
             data = Uri.parse("https://api.whatsapp.com/send?phone=91${sale.farmerMobile}&text=${Uri.encode(msg)}")

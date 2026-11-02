@@ -118,19 +118,38 @@ export const SimpleBillModal = ({ sale, onClose }) => {
               </tr>
             </thead>
             <tbody>
-              {sale.items.map((it, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '0.6rem 0.5rem' }}>{idx + 1}</td>
-                  <td style={{ padding: '0.6rem 0.5rem', fontWeight: '600' }}>
-                    {it.varietyName}
-                    {it.looseKg > 0 && <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>(+ {it.looseKg} kg છૂટક)</span>}
-                  </td>
-                  <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>{it.bags}</td>
-                  <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: '700' }}>{it.totalWeightKg} kg</td>
-                  <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right' }}>₹{it.rate} /kg</td>
-                  <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: '600' }}>₹{it.itemTotal?.toLocaleString('en-IN')}</td>
-                </tr>
-              ))}
+              {sale.items.map((it, idx) => {
+                const b1 = (it.bags1 !== undefined && Number(it.bags1) > 0) ? it.bags1 : (it.bags || 1);
+                const k1 = it.kg1 !== undefined ? it.kg1 : (it.bagWeightKg || 35);
+                const b2 = it.bags2 !== undefined ? it.bags2 : 0;
+                const k2 = it.kg2 !== undefined ? it.kg2 : 0;
+                let breakdown = `${it.bags} બોરી`;
+                if (b2 > 0) {
+                  breakdown = `${b1} × ${k1} kg + ${b2} × ${k2} kg`;
+                } else if (k1) {
+                  breakdown = `${it.bags} × ${k1} kg`;
+                }
+
+                return (
+                  <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '0.6rem 0.5rem' }}>{idx + 1}</td>
+                    <td style={{ padding: '0.6rem 0.5rem', fontWeight: '600' }}>
+                      {it.varietyName}
+                      <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block' }}>
+                        ({breakdown})
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>{it.bags}</td>
+                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: '700' }}>{it.totalWeightKg} kg</td>
+                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right' }}>
+                      ₹{it.rate} {it.rateUnit === 'man' ? '/મણ' : '/kg'}
+                    </td>
+                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: '600' }}>
+                      ₹{it.itemTotal?.toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 

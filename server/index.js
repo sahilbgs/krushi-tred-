@@ -112,9 +112,9 @@ app.get('/api/initial-data', async (req, res) => {
       pool.query(`SELECT id, party_type AS "partyType", code, name, firm_name AS "firmName", mobile, village, taluka, opening_balance AS "openingBalance", COALESCE(opening_balance_type, balance_type, 'dr') AS "openingBalanceType", balance_type AS "balanceType", current_balance AS "currentBalance", credit_limit AS "creditLimit" FROM parties WHERE is_active = true ORDER BY name ASC`),
       pool.query(`SELECT id, seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", available_bags AS "availableBags", available_loose_kg AS "availableLooseKg", total_weight_kg AS "totalWeightKg", total_man AS "totalMan", last_purchase_rate AS "lastPurchaseRate" FROM stock_ledger ORDER BY variety_name ASC`),
       pool.query(`SELECT id, bill_no AS "billNo", TO_CHAR(purchase_date, 'YYYY-MM-DD') AS "purchaseDate", purchase_type AS "purchaseType", party_id AS "partyId", party_name AS "partyName", firm_name AS "firmName", village, mobile, truck_no AS "truckNo", truck_no AS "truckNumber", truck_owner AS "truckOwner", truck_owner AS "truckOwnerName", items_sub_total AS "itemsSubTotal", majuri_amount AS "majuriAmount", market_commission AS "marketCommission", firm_commission AS "firmCommission", total_expenses AS "totalExpenses", net_total AS "netTotal", paid_amount AS "paidAmount", due_amount AS "dueAmount", payment_mode AS "paymentMode", remarks, created_by AS "createdBy", created_at AS "createdAt" FROM purchases ORDER BY purchase_date DESC, created_at DESC LIMIT 100`),
-      pool.query(`SELECT id, purchase_id AS "purchaseId", seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", bags, last_bag_kg AS "lastBagKg", net_weight_kg AS "netWeightKg", total_man AS "totalMan", rate_per_man AS "ratePerMan", rate_per_kg AS "ratePerKg", item_total AS "itemTotal" FROM purchase_items`),
+      pool.query(`SELECT id, purchase_id AS "purchaseId", seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", bags, last_bag_kg AS "lastBagKg", COALESCE(bags1, bags, 0) AS "bags1", COALESCE(kg1, bag_weight_kg, 35) AS "kg1", COALESCE(bags2, 0) AS "bags2", COALESCE(kg2, 0) AS "kg2", net_weight_kg AS "netWeightKg", total_man AS "totalMan", rate_per_man AS "ratePerMan", rate_per_kg AS "ratePerKg", item_total AS "itemTotal" FROM purchase_items`),
       pool.query(`SELECT id, bill_no AS "billNo", TO_CHAR(bill_date, 'YYYY-MM-DD') AS "billDate", party_id AS "partyId", farmer_name AS "farmerName", farmer_mobile AS "farmerMobile", farmer_village AS "farmerVillage", sub_total AS "subTotal", majuri_amount AS "majuriAmount", discount, net_amount AS "netAmount", paid_amount AS "paidAmount", due_amount AS "dueAmount", payment_mode AS "paymentMode", remarks, created_by AS "createdBy", created_at AS "createdAt" FROM sales ORDER BY bill_date DESC, created_at DESC LIMIT 100`),
-      pool.query(`SELECT id, sale_id AS "saleId", seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", bags, loose_kg AS "looseKg", total_weight_kg AS "totalWeightKg", total_man AS "totalMan", rate_unit AS "rateUnit", rate, item_total AS "itemTotal" FROM sale_items`),
+      pool.query(`SELECT id, sale_id AS "saleId", seed_id AS "seedId", variety_name AS "varietyName", bag_weight_kg AS "bagWeightKg", bags, loose_kg AS "looseKg", COALESCE(bags1, bags, 0) AS "bags1", COALESCE(kg1, bag_weight_kg, 35) AS "kg1", COALESCE(bags2, 0) AS "bags2", COALESCE(kg2, 0) AS "kg2", total_weight_kg AS "totalWeightKg", total_man AS "totalMan", rate_unit AS "rateUnit", rate, item_total AS "itemTotal" FROM sale_items`),
       pool.query(`SELECT id, TO_CHAR(date, 'YYYY-MM-DD') AS date, time, party_id AS "partyId", party_name AS "partyName", party_type AS "partyType", voucher_no AS "voucherNo", voucher_type AS "voucherType", particulars, variety_name AS "varietyName", bags, weight_kg AS "weightKg", total_man AS "totalMan", rate_per_man AS "ratePerMan", debit, credit, running_balance AS "runningBalance", payment_mode AS "paymentMode", remarks, bill_id AS "billId" FROM party_transactions ORDER BY date DESC, created_at DESC LIMIT 200`),
       pool.query(`SELECT id, TO_CHAR(date, 'YYYY-MM-DD') AS date, time, voucher_no AS "voucherNo", voucher_type AS "voucherType", party_name AS "partyName", particulars, variety_name AS "varietyName", bags, weight_kg AS "weightKg", total_man AS "totalMan", account, debit, credit, payment_mode AS "paymentMode", remarks FROM rojmel ORDER BY date DESC, created_at DESC LIMIT 200`)
     ]);
@@ -457,12 +457,16 @@ app.post('/api/purchases', async (req, res) => {
       for (const item of purchaseData.items) {
         const itemId = item.id || ('pitm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
         const bagWeight = parseFloat(item.bagWeightKg || 35);
-        const bags = parseInt(item.bags || 0);
-        const netKg = parseFloat(item.netWeightKg || 0);
+        const b1 = parseInt(item.bags1 !== undefined ? item.bags1 : (item.bags || 0));
+        const k1 = parseFloat(item.kg1 !== undefined ? item.kg1 : (item.bagWeightKg || 35));
+        const b2 = parseInt(item.bags2 || 0);
+        const k2 = parseFloat(item.kg2 || 0);
+        const bags = parseInt(item.bags !== undefined ? item.bags : (b1 + b2));
+        const netKg = parseFloat(item.netWeightKg !== undefined ? item.netWeightKg : ((b1 * k1) + (b2 * k2)));
         const man = parseFloat(item.totalMan || (netKg / 20));
         const ratePerMan = parseFloat(item.ratePerMan || item.rate || 0);
         const total = parseFloat(item.itemTotal || 0);
-        const lastBagKg = Math.min(bagWeight, Math.max(0, parseFloat(item.lastBagKg !== undefined ? item.lastBagKg : bagWeight)));
+        const lastBagKg = parseFloat(item.lastBagKg !== undefined ? item.lastBagKg : k2);
 
         let validSeedId = item.seedId || null;
         if (validSeedId) {
@@ -492,8 +496,8 @@ app.post('/api/purchases', async (req, res) => {
 
         await client.query(
           `INSERT INTO purchase_items (
-            id, purchase_id, seed_id, variety_name, bag_weight_kg, bags, last_bag_kg, net_weight_kg, total_man, rate_per_man, rate_per_kg, item_total
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            id, purchase_id, seed_id, variety_name, bag_weight_kg, bags, last_bag_kg, bags1, kg1, bags2, kg2, net_weight_kg, total_man, rate_per_man, rate_per_kg, item_total
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
           [
             itemId,
             purchaseId,
@@ -502,6 +506,10 @@ app.post('/api/purchases', async (req, res) => {
             bagWeight,
             bags,
             lastBagKg,
+            b1,
+            k1,
+            b2,
+            k2,
             netKg,
             man,
             ratePerMan,
@@ -707,9 +715,13 @@ app.post('/api/sales', async (req, res) => {
       for (const item of saleData.items) {
         const itemId = item.id || ('sitm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
         const bagWeight = parseFloat(item.bagWeightKg || 35);
-        const bags = parseInt(item.bags || 0);
-        const looseKg = parseFloat(item.looseKg || 0);
-        const totalWeight = parseFloat(item.totalWeightKg || (bags * bagWeight + looseKg));
+        const b1 = parseInt(item.bags1 !== undefined ? item.bags1 : (item.bags || 0));
+        const k1 = parseFloat(item.kg1 !== undefined ? item.kg1 : (item.bagWeightKg || 35));
+        const b2 = parseInt(item.bags2 || 0);
+        const k2 = parseFloat(item.kg2 || 0);
+        const bags = parseInt(item.bags !== undefined ? item.bags : (b1 + b2));
+        const looseKg = parseFloat(item.looseKg !== undefined ? item.looseKg : (b2 * k2));
+        const totalWeight = parseFloat(item.totalWeightKg || ((b1 * k1) + (b2 * k2)));
         const totalMan = parseFloat(item.totalMan || (totalWeight / 20));
         const rate = parseFloat(item.rate || 0);
         const itemTotal = parseFloat(item.itemTotal || 0);
@@ -733,8 +745,8 @@ app.post('/api/sales', async (req, res) => {
 
         await client.query(
           `INSERT INTO sale_items (
-            id, sale_id, seed_id, variety_name, bag_weight_kg, bags, loose_kg, total_weight_kg, total_man, rate_unit, rate, item_total
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            id, sale_id, seed_id, variety_name, bag_weight_kg, bags, loose_kg, bags1, kg1, bags2, kg2, total_weight_kg, total_man, rate_unit, rate, item_total
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
           [
             itemId,
             saleId,
@@ -743,6 +755,10 @@ app.post('/api/sales', async (req, res) => {
             bagWeight,
             bags,
             looseKg,
+            b1,
+            k1,
+            b2,
+            k2,
             totalWeight,
             totalMan,
             rateUnit,
@@ -1265,12 +1281,16 @@ app.put('/api/purchases/:billNo', async (req, res) => {
       for (const item of purchaseData.items) {
         const itemId = item.id || ('pitm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
         const bagWeight = parseFloat(item.bagWeightKg || 35);
-        const bags = parseInt(item.bags || 0);
-        const netKg = parseFloat(item.netWeightKg || 0);
+        const b1 = parseInt(item.bags1 !== undefined ? item.bags1 : (item.bags || 0));
+        const k1 = parseFloat(item.kg1 !== undefined ? item.kg1 : (item.bagWeightKg || 35));
+        const b2 = parseInt(item.bags2 || 0);
+        const k2 = parseFloat(item.kg2 || 0);
+        const bags = parseInt(item.bags !== undefined ? item.bags : (b1 + b2));
+        const netKg = parseFloat(item.netWeightKg !== undefined ? item.netWeightKg : ((b1 * k1) + (b2 * k2)));
         const man = parseFloat(item.totalMan || (netKg / 20));
         const ratePerMan = parseFloat(item.ratePerMan || item.rate || 0);
         const total = parseFloat(item.itemTotal || 0);
-        const lastBagKg = Math.min(bagWeight, Math.max(0, parseFloat(item.lastBagKg !== undefined ? item.lastBagKg : bagWeight)));
+        const lastBagKg = parseFloat(item.lastBagKg !== undefined ? item.lastBagKg : k2);
 
         let validSeedId = item.seedId || null;
         if (validSeedId) {
@@ -1289,8 +1309,8 @@ app.put('/api/purchases/:billNo', async (req, res) => {
 
         await client.query(
           `INSERT INTO purchase_items (
-            id, purchase_id, seed_id, variety_name, bag_weight_kg, bags, last_bag_kg, net_weight_kg, total_man, rate_per_man, rate_per_kg, item_total
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            id, purchase_id, seed_id, variety_name, bag_weight_kg, bags, last_bag_kg, bags1, kg1, bags2, kg2, net_weight_kg, total_man, rate_per_man, rate_per_kg, item_total
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
           [
             itemId,
             oldPur.id,
@@ -1299,6 +1319,10 @@ app.put('/api/purchases/:billNo', async (req, res) => {
             bagWeight,
             bags,
             lastBagKg,
+            b1,
+            k1,
+            b2,
+            k2,
             netKg,
             man,
             ratePerMan,
@@ -1484,9 +1508,13 @@ app.put('/api/sales/:billNo', async (req, res) => {
       for (const item of saleData.items) {
         const itemId = item.id || ('sitm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
         const bagWeight = parseFloat(item.bagWeightKg || 35);
-        const bags = parseInt(item.bags || 0);
-        const looseKg = parseFloat(item.looseKg || 0);
-        const totalWeight = parseFloat(item.totalWeightKg || (bags * bagWeight + looseKg));
+        const b1 = parseInt(item.bags1 !== undefined ? item.bags1 : (item.bags || 0));
+        const k1 = parseFloat(item.kg1 !== undefined ? item.kg1 : (item.bagWeightKg || 35));
+        const b2 = parseInt(item.bags2 || 0);
+        const k2 = parseFloat(item.kg2 || 0);
+        const bags = parseInt(item.bags !== undefined ? item.bags : (b1 + b2));
+        const looseKg = parseFloat(item.looseKg !== undefined ? item.looseKg : (b2 * k2));
+        const totalWeight = parseFloat(item.totalWeightKg || ((b1 * k1) + (b2 * k2)));
         const totalMan = parseFloat(item.totalMan || (totalWeight / 20));
         const rate = parseFloat(item.rate || 0);
         const itemTotal = parseFloat(item.itemTotal || 0);
@@ -1508,8 +1536,8 @@ app.put('/api/sales/:billNo', async (req, res) => {
 
         await client.query(
           `INSERT INTO sale_items (
-            id, sale_id, seed_id, variety_name, bag_weight_kg, bags, loose_kg, total_weight_kg, total_man, rate_unit, rate, item_total
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            id, sale_id, seed_id, variety_name, bag_weight_kg, bags, loose_kg, bags1, kg1, bags2, kg2, total_weight_kg, total_man, rate_unit, rate, item_total
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
           [
             itemId,
             oldSale.id,
@@ -1518,6 +1546,10 @@ app.put('/api/sales/:billNo', async (req, res) => {
             bagWeight,
             bags,
             looseKg,
+            b1,
+            k1,
+            b2,
+            k2,
             totalWeight,
             totalMan,
             rateUnit,

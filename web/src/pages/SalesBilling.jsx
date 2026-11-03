@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useData, BAG_STD_KG, MAN_STD_KG } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { SimpleBillModal } from '../components/SimpleBillModal';
 
 export const SalesBilling = ({ onBillCreated }) => {
   const { parties, farmers, seeds, stock, sales, recordSale, addFarmer, getPartyTagInfo, deleteSale } = useData();
@@ -25,6 +26,8 @@ export const SalesBilling = ({ onBillCreated }) => {
   const [farmerName, setFarmerName] = useState('');
   const [farmerMobile, setFarmerMobile] = useState('');
   const [village, setVillage] = useState('');
+  const [taluka, setTaluka] = useState('દિયોદર');
+  const [district, setDistrict] = useState('વાવ - થરાદ');
   const [paymentMode, setPaymentMode] = useState('cash');
   const [paymentReference, setPaymentReference] = useState('');
   const [paid, setPaid] = useState('0');
@@ -83,6 +86,8 @@ export const SalesBilling = ({ onBillCreated }) => {
       setFarmerName(f.name || f.firmName || '');
       setFarmerMobile(f.mobile || '');
       setVillage(f.village || f.city || '');
+      if (f.taluka) setTaluka(f.taluka);
+      if (f.district) setDistrict(f.district);
     }
   };
 
@@ -149,6 +154,7 @@ export const SalesBilling = ({ onBillCreated }) => {
       return {
         seedId: seed?.id || row.seedId,
         varietyName: seed?.varietyName || 'બિયારણ',
+        cropType: seed?.cropType || 'મગફળી',
         bags1: b1,
         kg1: k1,
         bags2: b2,
@@ -173,6 +179,8 @@ export const SalesBilling = ({ onBillCreated }) => {
       farmerName,
       farmerMobile,
       farmerVillage: village,
+      farmerTaluka: taluka,
+      farmerDistrict: district,
       items: normalizedItems,
       goodsAmount: totals.goods,
       majuriAmount: chargesTotal,
@@ -190,19 +198,31 @@ export const SalesBilling = ({ onBillCreated }) => {
       const savedSale = await recordSale(salePayload);
       const invoiceData = {
         invoiceNo: savedSale.billNo || billNo,
+        billNo: savedSale.billNo || billNo,
         kind: 'sale',
+        farmerName,
         partyName: farmerName,
-        partyMobile,
+        farmerMobile,
+        partyMobile: farmerMobile,
+        farmerVillage: village,
         village,
+        farmerTaluka: taluka,
+        farmerDistrict: district,
+        billDate: date,
         date,
         items: normalizedItems,
         goodsTotal: totals.goods,
+        goodsAmount: totals.goods,
         chargesTotal,
+        majuriAmount: chargesTotal,
         discount: num(discount),
         netTotal,
+        netAmount: netTotal,
         totalAmount: netTotal,
         paid: num(paid),
+        paidAmount: num(paid),
         balance: dueAmount,
+        dueAmount: dueAmount,
         paymentMode,
         note
       };
@@ -256,78 +276,7 @@ export const SalesBilling = ({ onBillCreated }) => {
       )}
 
       {lastInvoice && (
-        <div className="modal-backdrop">
-          <section className="invoice-sheet">
-            <div className="no-print invoice-actions">
-              <button type="button" className="secondary" onClick={() => window.print()}>
-                🖨️ પ્રિન્ટ / PDF સેવ કરો
-              </button>
-              <button type="button" className="secondary" onClick={() => setLastInvoice(null)}>
-                ✕ બંધ કરો
-              </button>
-            </div>
-
-            <div className="invoice-head">
-              <div>
-                <h1>🌱 SHREE NANDINI SEEDS</h1>
-                <p>બિયારણ વેચાણ બિલ (Sales Bill)</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <b>{lastInvoice.invoiceNo}</b>
-                <p>તારીખ: {lastInvoice.date}</p>
-              </div>
-            </div>
-
-            <p style={{ margin: '8px 0', borderBottom: '1px solid #d1d5db', paddingBottom: '8px' }}>
-              <b>ગ્રાહક/ખેડૂત:</b> {lastInvoice.partyName || '—'} 
-              {lastInvoice.village ? ` | ગામ: ${lastInvoice.village}` : ''}
-              {lastInvoice.partyMobile ? ` | મોબાઇલ: ${lastInvoice.partyMobile}` : ''}
-            </p>
-
-            <table style={{ margin: '12px 0' }}>
-              <thead>
-                <tr>
-                  <th>બિયારણ જાત</th>
-                  <th>બોરી</th>
-                  <th>વજન KG</th>
-                  <th>મણ (20 KG)</th>
-                  <th>ભાવ પ્રતિ મણ (₹)</th>
-                  <th>રકમ (₹)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lastInvoice.items.map((x, i) => (
-                  <tr key={i}>
-                    <td><b>{x.varietyName}</b></td>
-                    <td>{x.bags}</td>
-                    <td>{x.totalWeightKg} KG</td>
-                    <td>{(x.totalMan || 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })}</td>
-                    <td>{money(x.ratePerMan)}</td>
-                    <td><b>{money(x.amount)}</b></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="invoice-summary">
-              <p>માલની કુલ રકમ: <b>{money(lastInvoice.goodsTotal)}</b></p>
-              {lastInvoice.chargesTotal > 0 && (
-                <p>મજૂરી / પેકિંગ ખર્ચ: <b>{money(lastInvoice.chargesTotal)}</b></p>
-              )}
-              {lastInvoice.discount > 0 && (
-                <p>ડિસ્કાઉન્ટ: <b>- {money(lastInvoice.discount)}</b></p>
-              )}
-              <p style={{ fontSize: '1.05rem', borderTop: '1px solid #94a3b8', paddingTop: '4px' }}>
-                નેટ ટોટલ: <b>{money(lastInvoice.netTotal)}</b>
-              </p>
-              <p>ચૂકવેલ રકમ: <b style={{ color: '#15803d' }}>{money(lastInvoice.paid)}</b></p>
-              <p>બાકી રકમ: <b style={{ color: lastInvoice.balance > 0 ? '#b91c1c' : '#15803d' }}>{money(lastInvoice.balance)}</b></p>
-            </div>
-
-            {lastInvoice.note && <p style={{ fontSize: '0.85rem', color: '#64748b' }}>નોંધ: {lastInvoice.note}</p>}
-            <p className="invoice-foot">આ કમ્પ્યુટર જનરેટેડ સેલ્સ બિલ છે. • Shree Nandini Seeds</p>
-          </section>
-        </div>
+        <SimpleBillModal sale={lastInvoice} onClose={() => setLastInvoice(null)} />
       )}
 
       {/* Main Form Panel */}

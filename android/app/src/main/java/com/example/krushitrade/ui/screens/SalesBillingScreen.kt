@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.krushitrade.model.*
 import com.example.krushitrade.ui.theme.*
+import com.example.krushitrade.util.InvoicePdfHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,7 +34,9 @@ import java.util.Locale
 fun SalesBillingScreen(
     farmers: List<Farmer>,
     stock: List<StockItem>,
-    onSaveSale: (SaleInvoice) -> Unit
+    sales: List<SaleInvoice> = emptyList(),
+    onSaveSale: (SaleInvoice) -> Unit,
+    onDeleteSale: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -57,7 +60,7 @@ fun SalesBillingScreen(
     var kg1Input by remember { mutableStateOf("35") }
     var bags2Input by remember { mutableStateOf("0") }
     var kg2Input by remember { mutableStateOf("0") }
-    var rateInput by remember { mutableStateOf("140") }
+    var rateInput by remember { mutableStateOf("2500") }
     var majuriInput by remember { mutableStateOf("0") }
     var extraChargesInput by remember { mutableStateOf("0") }
     var discountInput by remember { mutableStateOf("0") }
@@ -65,6 +68,7 @@ fun SalesBillingScreen(
     var paidInput by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var savedSaleForPrint by remember { mutableStateOf<SaleInvoice?>(null) }
+    var saleToDelete by remember { mutableStateOf<SaleInvoice?>(null) }
 
     LaunchedEffect(selectedStock) {
         if (selectedStock != null) {
@@ -82,7 +86,8 @@ fun SalesBillingScreen(
     val totalKg = (curB1 * curK1) + (curB2 * curK2)
     val totalMan = totalKg / 20.0
     val rate = rateInput.toDoubleOrNull() ?: 0.0
-    val lineTotal = totalKg * rate
+    // Rate is per 20 KG (મણ). Line total = totalMan * rate
+    val lineTotal = totalMan * rate
 
     val majuri = majuriInput.toDoubleOrNull() ?: 0.0
     val extra = extraChargesInput.toDoubleOrNull() ?: 0.0
@@ -105,7 +110,7 @@ fun SalesBillingScreen(
             color = GreenDark
         )
         Text(
-            text = "ખેડૂતનું બિલ બનાવો અને સ્ટોકમાંથી બોરી-કિલો ઘટાડો",
+            text = "ખેડૂતનું બિલ બનાવો અને સ્ટોકમાંથી બોરી-કિલો ઘટાડો (ભાવ ૨૦ KG મણ મુજબ)",
             fontSize = 12.sp,
             color = Color(0xFF64748B),
             modifier = Modifier.padding(bottom = 16.dp)
@@ -207,6 +212,8 @@ fun SalesBillingScreen(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(10.dp))
+
                 // Group 1: Bags 1 x KG 1
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -291,22 +298,34 @@ fun SalesBillingScreen(
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
-                        value = "$totalBags બોરી (${totalKg} kg)",
+                        value = "$totalBags બોરી (${totalKg} kg = ${String.format(Locale.US, "%.2f", totalMan)} મણ)",
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("કુલ વજન (Net KG)") },
+                        label = { Text("કુલ વજન & મણ (૨૦ KG)") },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     )
 
-                    OutlinedTextField(
-                        value = rateInput,
-                        onValueChange = { rateInput = it },
-                        label = { Text("ભાવ ₹/kg") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        OutlinedTextField(
+                            value = rateInput,
+                            onValueChange = { rateInput = it },
+                            label = { Text("ભાવ (₹/૨૦ KG - મણ)*") },
+                            placeholder = { Text("2500") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        if (rate > 0) {
+                            Text(
+                                "≈ ₹${String.format(Locale.US, "%.2f", rate / 20.0)} / KG | માલ: ₹${lineTotal.toInt()}",
+                                fontSize = 11.sp,
+                                color = GreenDark,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -448,7 +467,7 @@ fun SalesBillingScreen(
                             looseKg = if (curB2 > 0) curB2 * curK2 else 0.0,
                             totalWeightKg = totalKg,
                             totalMan = totalMan,
-                            rateUnit = "kg",
+                            rateUnit = "man",
                             rate = rate,
                             itemTotal = lineTotal
                         )
@@ -473,7 +492,165 @@ fun SalesBillingScreen(
         ) {
             Icon(Icons.Default.Print, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("સાદું બિલ બનાવો (Save Bill)", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text("સાદું બિલ બનાવો & સેવ કરો", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Recent Sales List with Print, Share & DELETE
+        Text(
+            text = "તાજેતરના વેચાણ બિલો (Recent Sales - ${sales.size})",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = GreenDark
+        )
+        Text(
+            text = "કોઈપણ બિલ અહીંથી પ્રિન્ટ કરી શકો છો અથવા રદ/ડીલીટ કરી શકો છો",
+            fontSize = 11.sp,
+            color = Color(0xFF64748B),
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        if (sales.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Box(modifier = Modifier.padding(24.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text("હજુ સુધી કોઈ વેચાણ એન્ટ્રી થયેલ નથી.", color = Color.Gray, fontSize = 13.sp)
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                sales.forEach { sale ->
+                    val it = sale.items.firstOrNull()
+                    val totalItemKg = sale.items.sumOf { it.totalWeightKg }
+                    val totalItemBags = sale.items.sumOf { it.bags }
+                    val totalItemMan = totalItemKg / 20.0
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = sale.billNo,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = GreenDark
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        color = if (sale.dueAmount > 0) Color(0xFFFEE2E2) else Color(0xFFDCFCE7),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = if (sale.dueAmount > 0) "ઉધાર" else "રોકડ",
+                                            color = if (sale.dueAmount > 0) Color(0xFFDC2626) else Color(0xFF166534),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = sale.billDate,
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF64748B)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = "ખેડૂત: ${sale.farmerName} ${if (sale.farmerVillage.isNotEmpty()) "(${sale.farmerVillage})" else ""}",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = Color(0xFF1E293B)
+                            )
+
+                            if (it != null) {
+                                Text(
+                                    text = "બિયારણ: ${it.varietyName} | $totalItemBags બોરી (${String.format(Locale.US, "%.1f", totalItemKg)} KG = ${String.format(Locale.US, "%.2f", totalItemMan)} મણ) @ ₹${String.format(Locale.US, "%.0f", it.rate)}/૨૦ KG",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF475569)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "કુલ: ₹${sale.netAmount.toInt()} | જમા: ₹${sale.paidAmount.toInt()}${if (sale.dueAmount > 0) " | બાકી: ₹${sale.dueAmount.toInt()}" else ""}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (sale.dueAmount > 0) Color(0xFFDC2626) else GreenDark
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Action Buttons: Print, PDF, Delete
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedButton(
+                                    onClick = { InvoicePdfHelper.printSaleInvoice(context, sale) },
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GreenDark)
+                                ) {
+                                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("🖨️ પ્રિન્ટ", fontSize = 11.sp)
+                                }
+
+                                Spacer(modifier = Modifier.width(6.dp))
+
+                                OutlinedButton(
+                                    onClick = { InvoicePdfHelper.shareSaleInvoicePdf(context, sale) },
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF25D366))
+                                ) {
+                                    Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("📄 PDF", fontSize = 11.sp)
+                                }
+
+                                Spacer(modifier = Modifier.width(6.dp))
+
+                                OutlinedButton(
+                                    onClick = { saleToDelete = sale },
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDC2626))
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("🗑️ ડીલીટ", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -492,36 +669,38 @@ fun SalesBillingScreen(
                     Text("બિલ નં: ${sale.billNo}", fontWeight = FontWeight.Bold)
                     Text("ખેડૂત: ${sale.farmerName} ${if (sale.farmerVillage.isNotEmpty()) "(${sale.farmerVillage})" else ""}")
                     Text("બિયારણ: ${it?.varietyName}")
-                    Text("વજન: ${sale.items.sumOf { it.bags }} બોરી ($breakdown = ${sale.items.sumOf { it.totalWeightKg }} kg)")
+                    val totalKg = sale.items.sumOf { it.totalWeightKg }
+                    Text("વજન: ${sale.items.sumOf { it.bags }} બોરી ($breakdown = ${String.format(Locale.US, "%.1f", totalKg)} kg = ${String.format(Locale.US, "%.2f", totalKg / 20.0)} મણ)")
+                    Text("ભાવ: ₹${String.format(Locale.US, "%.2f", it?.rate ?: 0.0)} / ૨૦ KG (મણ)")
                     Text("કુલ રકમ: ₹${sale.netAmount.toInt()}", fontWeight = FontWeight.Bold, color = GreenDark)
                     if (sale.dueAmount > 0) {
                         Text("બાકી ઉધાર: ₹${sale.dueAmount.toInt()}", fontWeight = FontWeight.Bold, color = RedDanger)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("આ બિલ પ્રિન્ટ કરવા અથવા WhatsApp પર મોકલવા માટે નીચેનું બટન પસંદ કરો:", fontSize = 12.sp, color = Color(0xFF64748B))
+                    Text("આ બિલ પ્રિન્ટ કરવા માટે અથવા પાકું ઇન્વોઇસ PDF વ્હોટ્સએપ કરવા માટે નીચેનું બટન પસંદ કરો:", fontSize = 12.sp, color = Color(0xFF64748B))
                 }
             },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
-                            shareSaleReceipt(context, sale)
+                            InvoicePdfHelper.printSaleInvoice(context, sale)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
                     ) {
                         Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("🖨️ પ્રિન્ટ / શેર")
+                        Text("🖨️ પ્રિન્ટ કરો")
                     }
-                    if (sale.farmerMobile.isNotBlank()) {
-                        Button(
-                            onClick = {
-                                shareBillOnWhatsApp(context, sale)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
-                        ) {
-                            Text("💬 WhatsApp")
-                        }
+                    Button(
+                        onClick = {
+                            InvoicePdfHelper.shareSaleInvoicePdf(context, sale)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("📄 ઇન્વોઇસ PDF")
                     }
                 }
             },
@@ -532,55 +711,71 @@ fun SalesBillingScreen(
             }
         )
     }
+
+    // Delete Confirmation Dialog for Sales
+    if (saleToDelete != null) {
+        val s = saleToDelete!!
+        AlertDialog(
+            onDismissRequest = { saleToDelete = null },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = RedDanger, modifier = Modifier.size(36.dp)) },
+            title = { Text("⚠️ વેચાણ બિલ રદ / ડીલીટ કરો", fontWeight = FontWeight.Bold, color = RedDanger) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("શું તમે ખરેખર વેચાણ બિલ નં. ${s.billNo} ડીલીટ કરવા માંગો છો?")
+                    Text("ગ્રાહક/ખેડૂત: ${s.farmerName} ${if (s.farmerVillage.isNotEmpty()) "(${s.farmerVillage})" else ""}", fontWeight = FontWeight.SemiBold)
+                    Text("કુલ રકમ: ₹${s.netAmount.toInt()}", color = RedDanger, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Surface(
+                        color = Color(0xFFFEE2E2),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "નોંધ: આ બિલ સાથે જોડાયેલ માલ (સ્ટોક) આપમેળે પાછો જમા થશે અને રોજમેળ / ખાતાવહીમાંથી આ એન્ટ્રી નીકળી જશે.",
+                            fontSize = 12.sp,
+                            color = Color(0xFFB91C1C),
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val bNo = s.billNo
+                        saleToDelete = null
+                        onDeleteSale(bNo)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                ) {
+                    Text("હા, ડીલીટ કરો", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { saleToDelete = null }) {
+                    Text("રદ કરો (Cancel)")
+                }
+            }
+        )
+    }
 }
 
 fun shareSaleReceipt(context: Context, sale: SaleInvoice) {
-    try {
-        val item = sale.items.firstOrNull() ?: SaleItem()
-        val breakdown = if (item.bags2 > 0) "${item.bags1}×${if (item.kg1 % 1.0 == 0.0) item.kg1.toInt() else item.kg1}kg + ${item.bags2}×${if (item.kg2 % 1.0 == 0.0) item.kg2.toInt() else item.kg2}kg" else "${item.bags1}×${if (item.kg1 % 1.0 == 0.0) item.kg1.toInt() else item.kg1}kg"
-        val text = "🧾 *શ્રી નંદિની સીડ્સ - વેચાણ બિલ*\n" +
-                "------------------------------------\n" +
-                "બિલ નં: ${sale.billNo}\n" +
-                "ખેડૂત: ${sale.farmerName} ${if (sale.farmerVillage.isNotEmpty()) "(${sale.farmerVillage})" else ""}\n" +
-                (if (sale.farmerMobile.isNotEmpty()) "મોબાઈલ: ${sale.farmerMobile}\n" else "") +
-                "------------------------------------\n" +
-                "બિયારણ: ${item.varietyName}\n" +
-                "બોરી: ${sale.items.sumOf { it.bags }} બોરી ($breakdown)\n" +
-                "કુલ વજન: ${sale.items.sumOf { it.totalWeightKg }} KG (${sale.items.sumOf { it.totalMan }} મણ)\n" +
-                "ભાવ: ₹${item.rate} / ${item.rateUnit}\n" +
-                "માલ રકમ: ₹${sale.subTotal.toInt()}\n" +
-                (if (sale.majuriAmount > 0) "મજૂરી: ₹${sale.majuriAmount.toInt()}\n" else "") +
-                (if (sale.extraCharges > 0) "અન્ય ચાર્જ: ₹${sale.extraCharges.toInt()}\n" else "") +
-                (if (sale.discount > 0) "ડિસ્કાઉન્ટ: -₹${sale.discount.toInt()}\n" else "") +
-                "------------------------------------\n" +
-                "*કુલ રકમ: ₹${sale.netAmount.toInt()}*\n" +
-                "ચુકવેલ: ₹${sale.paidAmount.toInt()}\n" +
-                (if (sale.dueAmount > 0) "*બાકી ઉધાર: ₹${sale.dueAmount.toInt()}*\n" else "") +
-                "ચુકવણી: ${if (sale.paymentMode == "credit") "ઉધાર (બાકી)" else "રોકડ (Cash)"}\n" +
-                "------------------------------------\n" +
-                "આભાર! ફરી પધારજો 🙏\n" +
-                "શ્રી નંદિની સીડ્સ | કૃષિ ટ્રેડ"
-
-        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-            putExtra(Intent.EXTRA_TEXT, text)
-            type = "text/plain"
-        }
-        val shareIntent = Intent.createChooser(sendIntent, "🖨️ વેચાણ બિલ પ્રિન્ટ / શેર કરો")
-        context.startActivity(shareIntent)
-    } catch (e: Exception) {
-        Toast.makeText(context, "શેર કરવામાં ભૂલ આવી", Toast.LENGTH_SHORT).show()
-    }
+    InvoicePdfHelper.shareSaleInvoicePdf(context, sale)
 }
 
 fun shareBillOnWhatsApp(context: Context, sale: SaleInvoice) {
     try {
         val item = sale.items.firstOrNull() ?: SaleItem()
         val breakdown = if (item.bags2 > 0) "${item.bags1}×${if (item.kg1 % 1.0 == 0.0) item.kg1.toInt() else item.kg1}kg + ${item.bags2}×${if (item.kg2 % 1.0 == 0.0) item.kg2.toInt() else item.kg2}kg" else "${item.bags1}×${if (item.kg1 % 1.0 == 0.0) item.kg1.toInt() else item.kg1}kg"
+        val totalKg = sale.items.sumOf { it.totalWeightKg }
+        val totalMan = totalKg / 20.0
         val msg = "🌱 *શ્રી નંદિની સીડ્સ - બિલ*\n" +
                 "બિલ નં: ${sale.billNo}\n" +
                 "ખેડૂત: ${sale.farmerName}\n" +
                 "બિયારણ: ${item.varietyName}\n" +
-                "વજન: ${sale.items.sumOf { it.bags }} બોરી ($breakdown = ${sale.items.sumOf { it.totalWeightKg }} kg)\n" +
+                "વજન: ${sale.items.sumOf { it.bags }} બોરી ($breakdown = ${String.format(Locale.US, "%.1f", totalKg)} kg = ${String.format(Locale.US, "%.2f", totalMan)} મણ)\n" +
+                "ભાવ: ₹${String.format(Locale.US, "%.2f", item.rate)} / ૨૦ KG (મણ)\n" +
                 "કુલ રકમ: ₹${sale.netAmount.toInt()}\n" +
                 "જમા ચૂકવેલ: ₹${sale.paidAmount.toInt()}\n" +
                 (if (sale.dueAmount > 0) "*બાકી ઉધાર: ₹${sale.dueAmount.toInt()}*\n" else "") +

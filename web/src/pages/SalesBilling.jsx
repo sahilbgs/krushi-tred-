@@ -3,7 +3,7 @@ import { useData, BAG_STD_KG, MAN_STD_KG } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
 export const SalesBilling = ({ onBillCreated }) => {
-  const { parties, farmers, seeds, stock, sales, recordSale, addFarmer, getPartyTagInfo } = useData();
+  const { parties, farmers, seeds, stock, sales, recordSale, addFarmer, getPartyTagInfo, deleteSale } = useData();
   const { userProfile } = useAuth();
 
   const getNextSaleBillNo = () => {
@@ -47,6 +47,8 @@ export const SalesBilling = ({ onBillCreated }) => {
   const [notice, setNotice] = useState('');
   const [lastInvoice, setLastInvoice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saleToDelete, setSaleToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const money = n => '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN');
   const num = v => Math.max(0, Number(v || 0));
@@ -522,7 +524,7 @@ export const SalesBilling = ({ onBillCreated }) => {
 
                 {/* Rate */}
                 <label>
-                  <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>ભાવ પ્રતિ મણ (₹/મણ)*</span>
+                  <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>ભાવ પ્રતિ ૨૦ KG (₹/મણ)*</span>
                   <input 
                     required 
                     type="number" 
@@ -724,6 +726,22 @@ export const SalesBilling = ({ onBillCreated }) => {
                     >
                       🖨️ પ્રિન્ટ
                     </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: '0.75rem',
+                        color: '#dc2626',
+                        borderColor: '#fca5a5',
+                        fontWeight: 'bold',
+                        marginLeft: '6px'
+                      }}
+                      onClick={() => setSaleToDelete(s)}
+                      title="વેચાણ બિલ ડીલીટ કરો"
+                    >
+                      🗑️ ડીલીટ
+                    </button>
                   </td>
                 </tr>
               );
@@ -731,6 +749,51 @@ export const SalesBilling = ({ onBillCreated }) => {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {saleToDelete && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '420px', padding: '1.25rem' }}>
+            <h3 style={{ color: '#dc2626', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              ⚠️ વેચાણ બિલ રદ / ડીલીટ કરો
+            </h3>
+            <p style={{ fontSize: '0.92rem', color: '#334155', marginBottom: '0.5rem' }}>
+              શું તમે ખરેખર વેચાણ બિલ નં. <b>{saleToDelete.billNo}</b> (ગ્રાહક: {saleToDelete.farmerName}) ડીલીટ કરવા માંગો છો?
+            </p>
+            <p style={{ fontSize: '0.8rem', color: '#b91c1c', backgroundColor: '#fee2e2', padding: '8px 10px', borderRadius: '6px', marginBottom: '1rem' }}>
+              નોંધ: આ બિલ સાથે જોડાયેલ માલ (સ્ટોક) આપમેળે પાછો જમા થશે અને રોજમેળ / ખાતાવહીમાંથી આ એન્ટ્રી નીકળી જશે.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isDeleting}
+                onClick={() => setSaleToDelete(null)}
+              >
+                રદ કરો (Cancel)
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={isDeleting}
+                onClick={async () => {
+                  setIsDeleting(true);
+                  try {
+                    await deleteSale(saleToDelete.billNo);
+                    setSaleToDelete(null);
+                  } catch (err) {
+                    alert('ડીલીટ કરવામાં ભૂલ: ' + (err.message || 'અજ્ઞાત ભૂલ'));
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+              >
+                {isDeleting ? 'ડીલીટ થઈ રહ્યું છે...' : 'હા, ડીલીટ કરો'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

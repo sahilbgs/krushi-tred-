@@ -14,9 +14,11 @@ export const SimpleBillModal = ({ sale, onClose }) => {
       return;
     }
 
-    let itemsText = sale.items.map((it, idx) => 
-      `${idx + 1}. ${it.varietyName} - ${it.bags} બોરી ${it.looseKg > 0 ? `+ ${it.looseKg} kg` : ''} (કુલ ${it.totalWeightKg} kg) @ ₹${it.rate} = ₹${it.itemTotal}`
-    ).join('%0A');
+    let itemsText = sale.items.map((it, idx) => {
+      const kg = it.totalWeightKg || (it.bags * 35);
+      const man = (kg / 20).toFixed(2);
+      return `${idx + 1}. ${it.varietyName} - ${it.bags} બોરી (કુલ ${kg} kg = ${man} મણ) @ ₹${it.rate}/૨૦ KG (મણ) = ₹${it.itemTotal?.toLocaleString('en-IN')}`;
+    }).join('%0A');
 
     let chargesText = '';
     if (sale.majuriAmount > 0) chargesText += `%0A+ મજૂરી ખર્ચ: ₹${sale.majuriAmount}`;
@@ -87,7 +89,7 @@ export const SimpleBillModal = ({ sale, onClose }) => {
               border: '1px solid #a7f3d0',
               marginTop: '0.4rem'
             }}>
-              સાદું વેચાણ બિલ (SIMPLE CASH / CREDIT MEMO)
+              સાદું વેચાણ બિલ (CASH / CREDIT MEMO) • ભાવ પ્રતિ ૨૦ KG (મણ)
             </div>
           </div>
 
@@ -113,7 +115,8 @@ export const SimpleBillModal = ({ sale, onClose }) => {
                 <th style={{ padding: '0.5rem' }}>બિયારણ વિગત</th>
                 <th style={{ padding: '0.5rem', textAlign: 'center' }}>બોરી</th>
                 <th style={{ padding: '0.5rem', textAlign: 'center' }}>કુલ KG</th>
-                <th style={{ padding: '0.5rem', textAlign: 'right' }}>ભાવ (₹ / kg)</th>
+                <th style={{ padding: '0.5rem', textAlign: 'center' }}>મણ (૨૦ KG)</th>
+                <th style={{ padding: '0.5rem', textAlign: 'right' }}>ભાવ (₹ / ૨૦ KG)</th>
                 <th style={{ padding: '0.5rem', textAlign: 'right' }}>રકમ (₹)</th>
               </tr>
             </thead>
@@ -129,6 +132,8 @@ export const SimpleBillModal = ({ sale, onClose }) => {
                 } else if (k1) {
                   breakdown = `${it.bags} × ${k1} kg`;
                 }
+                const kg = it.totalWeightKg || (it.bags * 35);
+                const man = (kg / 20).toFixed(2);
 
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
@@ -140,9 +145,10 @@ export const SimpleBillModal = ({ sale, onClose }) => {
                       </span>
                     </td>
                     <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>{it.bags}</td>
-                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: '700' }}>{it.totalWeightKg} kg</td>
+                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: '700' }}>{kg} kg</td>
+                    <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', color: '#047857', fontWeight: '600' }}>{man} મણ</td>
                     <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right' }}>
-                      ₹{it.rate} {it.rateUnit === 'man' ? '/મણ' : '/kg'}
+                      ₹{it.rate} /મણ
                     </td>
                     <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: '600' }}>
                       ₹{it.itemTotal?.toLocaleString('en-IN')}

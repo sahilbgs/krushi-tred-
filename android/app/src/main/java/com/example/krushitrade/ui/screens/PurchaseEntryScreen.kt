@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.krushitrade.model.*
 import com.example.krushitrade.ui.theme.*
+import com.example.krushitrade.util.InvoicePdfHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -1248,20 +1249,32 @@ fun PurchaseEntryScreen(
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        sharePurchaseVoucher(context, pur)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
-                ) {
-                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("🖨️ બિલ પ્રિન્ટ / શેર કરો", fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            InvoicePdfHelper.printPurchaseVoucher(context, pur)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+                    ) {
+                        Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("🖨️ પ્રિન્ટ")
+                    }
+                    Button(
+                        onClick = {
+                            InvoicePdfHelper.sharePurchaseVoucherPdf(context, pur)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("📄 વાઉચર PDF")
+                    }
                 }
             },
             dismissButton = {
                 OutlinedButton(onClick = { savedPurchaseForPrint = null }) {
-                    Text("બંધ કરો (Close)")
+                    Text("બંધ કરો")
                 }
             }
         )
@@ -1306,38 +1319,5 @@ fun PurchaseEntryScreen(
 }
 
 fun sharePurchaseVoucher(context: Context, pur: PurchaseRecord) {
-    try {
-        val itemsStr = pur.items.joinToString("\n") { it ->
-            val breakdown = if (it.bags2 > 0) "${it.bags1}×${if (it.kg1 % 1.0 == 0.0) it.kg1.toInt() else it.kg1}kg + ${it.bags2}×${if (it.kg2 % 1.0 == 0.0) it.kg2.toInt() else it.kg2}kg" else "${it.bags1}×${if (it.kg1 % 1.0 == 0.0) it.kg1.toInt() else it.kg1}kg"
-            "• ${it.varietyName}: ${it.bags} બોરી ($breakdown) = ${if (it.netWeightKg % 1.0 == 0.0) it.netWeightKg.toInt() else String.format(Locale.US, "%.2f", it.netWeightKg)} KG (${if (it.totalMan % 1.0 == 0.0) it.totalMan.toInt() else String.format(Locale.US, "%.2f", it.totalMan)} મણ) @ ₹${if (it.ratePerMan % 1.0 == 0.0) it.ratePerMan.toInt() else it.ratePerMan}/મણ = ₹${if (it.itemTotal % 1.0 == 0.0) it.itemTotal.toInt() else String.format(Locale.US, "%.2f", it.itemTotal)}"
-        }
-        val text = "🧾 *શ્રી નંદિની સીડ્સ - ખરીદી વાઉચર*\n" +
-                "------------------------------------\n" +
-                "બિલ નં: ${pur.billNo}\n" +
-                "તારીખ: ${pur.purchaseDate}\n" +
-                "પ્રકાર: ${if (pur.purchaseType == "market" || pur.purchaseType == "firm") "માર્કેટ પેઢી" else "ખેડૂત"}\n" +
-                "નામ: ${pur.partyName} ${if (pur.village.isNotEmpty()) "(${pur.village})" else ""}\n" +
-                (if (pur.truckNo.isNotEmpty()) "ગાડી નં: ${pur.truckNo} (${pur.truckOwner})\n" else "") +
-                "------------------------------------\n" +
-                "આઈટમ વિગત:\n$itemsStr\n" +
-                "------------------------------------\n" +
-                "કુલ બોરી: ${pur.items.sumOf { it.bags }}\n" +
-                "કુલ વજન: ${pur.items.sumOf { it.netWeightKg }} KG (${pur.items.sumOf { it.totalMan }} મણ)\n" +
-                "માલ રકમ: ₹${pur.itemsSubTotal}\n" +
-                (if (pur.totalExpenses > 0) "ખર્ચ/મજૂરી: ₹${pur.totalExpenses}\n" else "") +
-                "*ચુકવવાપાત્ર કુલ: ₹${pur.netTotal}*\n" +
-                "ચુકવેલ રકમ: ₹${pur.paidAmount}\n" +
-                (if (pur.dueAmount > 0) "*બાકી રકમ: ₹${pur.dueAmount}*\n" else "") +
-                "------------------------------------\n" +
-                "શ્રી નંદિની સીડ્સ | કૃષિ ટ્રેડ"
-
-        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-            putExtra(Intent.EXTRA_TEXT, text)
-            type = "text/plain"
-        }
-        val shareIntent = Intent.createChooser(sendIntent, "🖨️ ખરીદી બિલ પ્રિન્ટ / શેર કરો")
-        context.startActivity(shareIntent)
-    } catch (e: Exception) {
-        Toast.makeText(context, "શેર કરવામાં ભૂલ આવી", Toast.LENGTH_SHORT).show()
-    }
+    InvoicePdfHelper.printPurchaseVoucher(context, pur)
 }

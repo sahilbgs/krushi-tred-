@@ -194,7 +194,7 @@ class KrushiApiRepository(context: Context) {
                         looseKg = it.optDouble("looseKg", 0.0),
                         totalWeightKg = it.optDouble("totalWeightKg", 0.0),
                         totalMan = it.optDouble("totalMan", 0.0),
-                        rateUnit = it.optString("rateUnit", "kg"),
+                        rateUnit = it.optString("rateUnit", "man"),
                         rate = it.optDouble("rate", 0.0),
                         itemTotal = it.optDouble("itemTotal", 0.0)
                     )

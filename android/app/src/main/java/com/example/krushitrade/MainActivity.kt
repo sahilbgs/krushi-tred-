@@ -248,6 +248,7 @@ fun MainApp(repository: KrushiApiRepository) {
                 Screen.Sales -> SalesBillingScreen(
                     farmers = farmersList,
                     stock = stockList,
+                    sales = salesList,
                     onSaveSale = { newSale ->
                         coroutineScope.launch {
                             isSaving = true
@@ -266,6 +267,29 @@ fun MainApp(repository: KrushiApiRepository) {
                                 Toast.makeText(
                                     context,
                                     "❌ બિલ સેવ કરવામાં ભૂલ: ${err.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    },
+                    onDeleteSale = { billNo ->
+                        coroutineScope.launch {
+                            isSaving = true
+                            savingMessage = "વેચાણ બિલ રદ/ડીલીટ થઈ રહ્યું છે..."
+                            val result = repository.deleteSale(billNo)
+                            isSaving = false
+
+                            result.onSuccess {
+                                Toast.makeText(
+                                    context,
+                                    "🗑️ વેચાણ બિલ નં. $billNo રદ થઈ ગયું!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                loadData(showToast = false)
+                            }.onFailure { err ->
+                                Toast.makeText(
+                                    context,
+                                    "❌ ડીલીટ કરવામાં ભૂલ: ${err.message}",
                                     Toast.LENGTH_LONG
                                 ).show()
                             }

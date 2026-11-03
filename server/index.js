@@ -404,6 +404,16 @@ app.post('/api/purchases', async (req, res) => {
     }
 
     // 3. Insert Purchase
+    const subTotal = parseFloat(purchaseData.itemsSubTotal || 0);
+    const majuriAmt = parseFloat(purchaseData.majuriAmount || 0);
+    const totalExp = parseFloat(purchaseData.totalExpenses || 0);
+    const paidAmt = parseFloat(purchaseData.paidAmount || 0);
+    let finalNetTotal = parseFloat(purchaseData.netTotal || 0);
+    if (isFarmer) {
+      finalNetTotal = Math.max(0, parseFloat((subTotal - majuriAmt).toFixed(2)));
+    }
+    const finalDueAmount = Math.max(0, parseFloat((finalNetTotal - paidAmt).toFixed(2)));
+
     await client.query(
       `INSERT INTO purchases (
         id, purchase_type, bill_no, purchase_date, party_id, party_name,
@@ -436,16 +446,16 @@ app.post('/api/purchases', async (req, res) => {
         purchaseData.mobile || null,
         cleanTruckNo || null,
         cleanTruckOwner || null,
-        parseFloat(purchaseData.itemsSubTotal || 0),
+        subTotal,
         parseFloat(purchaseData.majuriRatePerBag || 0),
-        parseFloat(purchaseData.majuriAmount || 0),
+        majuriAmt,
         parseFloat(purchaseData.marketCommission || 0),
         parseFloat(purchaseData.firmCommission || 0),
         parseFloat(purchaseData.bardanExpense || 0),
-        parseFloat(purchaseData.totalExpenses || 0),
-        parseFloat(purchaseData.netTotal || 0),
-        parseFloat(purchaseData.paidAmount || 0),
-        parseFloat(purchaseData.dueAmount || 0),
+        totalExp,
+        finalNetTotal,
+        paidAmt,
+        finalDueAmount,
         normalizedMode,
         purchaseData.remarks || null,
         purchaseData.createdBy || 'સ્ટાફ'
@@ -569,9 +579,9 @@ app.post('/api/purchases', async (req, res) => {
           totalKg,
           totalMan,
           ratePerMan,
-          parseFloat(purchaseData.paidAmount || 0),
-          parseFloat(purchaseData.netTotal || 0),
-          dueAmount,
+          paidAmt,
+          finalNetTotal,
+          finalDueAmount,
           purchaseData.paymentMode || 'credit',
           purchaseId
         ]
@@ -585,8 +595,6 @@ app.post('/api/purchases', async (req, res) => {
     const purBags = purchaseData.items?.reduce((s, it) => s + parseInt(it.bags || 0), 0) || 0;
     const purKg = purchaseData.items?.reduce((s, it) => s + parseFloat(it.netWeightKg || 0), 0) || 0;
     const purMan = purchaseData.items?.reduce((s, it) => s + parseFloat(it.totalMan || (purKg / 20)), 0) || 0;
-    const purNetTotal = parseFloat(purchaseData.netTotal || 0);
-    const purPaid = parseFloat(purchaseData.paidAmount || 0);
 
     await client.query(
       `INSERT INTO rojmel (
@@ -605,8 +613,8 @@ app.post('/api/purchases', async (req, res) => {
         purKg,
         purMan,
         'purchase',
-        purPaid > 0 ? purPaid : 0,
-        purPaid > 0 ? 0 : purNetTotal,
+        paidAmt > 0 ? paidAmt : 0,
+        paidAmt > 0 ? 0 : finalNetTotal,
         normalizedMode
       ]
     );
@@ -1219,6 +1227,16 @@ app.put('/api/purchases/:billNo', async (req, res) => {
     }
 
     // 5. Update purchase record
+    const subTotal = parseFloat(purchaseData.itemsSubTotal || 0);
+    const majuriAmt = parseFloat(purchaseData.majuriAmount || 0);
+    const totalExp = parseFloat(purchaseData.totalExpenses || 0);
+    const paidAmt = parseFloat(purchaseData.paidAmount || 0);
+    let finalNetTotal = parseFloat(purchaseData.netTotal || 0);
+    if (isFarmer) {
+      finalNetTotal = Math.max(0, parseFloat((subTotal - majuriAmt).toFixed(2)));
+    }
+    const finalDueAmount = Math.max(0, parseFloat((finalNetTotal - paidAmt).toFixed(2)));
+
     await client.query(
       `UPDATE purchases SET
         purchase_type = $1,
@@ -1260,16 +1278,16 @@ app.put('/api/purchases/:billNo', async (req, res) => {
         purchaseData.mobile || null,
         cleanTruckNo || null,
         cleanTruckOwner || null,
-        parseFloat(purchaseData.itemsSubTotal || 0),
+        subTotal,
         parseFloat(purchaseData.majuriRatePerBag || 0),
-        parseFloat(purchaseData.majuriAmount || 0),
+        majuriAmt,
         parseFloat(purchaseData.marketCommission || 0),
         parseFloat(purchaseData.firmCommission || 0),
         parseFloat(purchaseData.bardanExpense || 0),
-        parseFloat(purchaseData.totalExpenses || 0),
-        parseFloat(purchaseData.netTotal || 0),
-        parseFloat(purchaseData.paidAmount || 0),
-        parseFloat(purchaseData.dueAmount || 0),
+        totalExp,
+        finalNetTotal,
+        paidAmt,
+        finalDueAmount,
         normalizedMode,
         purchaseData.remarks || null,
         oldPur.id
@@ -1379,9 +1397,9 @@ app.put('/api/purchases/:billNo', async (req, res) => {
           totalKg,
           totalMan,
           ratePerMan,
-          parseFloat(purchaseData.paidAmount || 0),
-          parseFloat(purchaseData.netTotal || 0),
-          parseFloat(purchaseData.dueAmount || 0),
+          paidAmt,
+          finalNetTotal,
+          finalDueAmount,
           purchaseData.paymentMode || 'credit',
           oldPur.id
         ]
@@ -1416,8 +1434,8 @@ app.put('/api/purchases/:billNo', async (req, res) => {
         purKg,
         purMan,
         purchaseData.paymentMode === 'cash' ? 'cash' : 'bank',
-        parseFloat(purchaseData.paidAmount || 0),
-        parseFloat(purchaseData.paidAmount || 0) > 0 ? 0 : parseFloat(purchaseData.netTotal || 0),
+        paidAmt > 0 ? paidAmt : 0,
+        paidAmt > 0 ? 0 : finalNetTotal,
         purchaseData.paymentMode || 'credit'
       ]
     );

@@ -229,7 +229,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
         'કુલ મણ (20 KG)': Number(totalMan.toFixed(2)),
         'ભાવ પ્રતિ મણ (₹/મણ)': rates,
         'માલની રકમ (₹)': parseFloat(p.itemsSubTotal || p.goodsTotal || 0),
-        'મજૂરી ખર્ચ (₹)': parseFloat(p.majuriAmount || 0),
+        'મજૂરી ખર્ચ (₹)': ((p.purchaseType === 'farmer' || tag === 'farmer') && parseFloat(p.majuriAmount || 0) > 0 ? '-' : '') + parseFloat(p.majuriAmount || 0),
         'કુલ ખર્ચ/કમિશન (₹)': parseFloat(p.totalExpenses || 0),
         'નેટ કુલ રકમ (₹)': parseFloat(p.netTotal || p.totalAmount || 0),
         'ચૂકવેલ રકમ (₹)': parseFloat(p.paidAmount || p.paid || 0),
@@ -338,9 +338,13 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
   }, { kg: 0, man: 0, goods: 0, bags: 0 });
 
   // Charges calculation: labour per bag + optional commissions/bardana
+  const isFarmer = partyType === 'farmer';
   const labourTotal = Number((num(labour) * totals.bags).toFixed(2));
   const chargesTotal = Number((labourTotal + num(marketCommission) + num(pethiCommission) + num(bardana)).toFixed(2));
-  const netTotal = Number((totals.goods + chargesTotal).toFixed(2));
+  // In farmer purchase, labour (મજૂરી) is subtracted from goods total payable to farmer
+  const netTotal = isFarmer
+    ? Math.max(0, Number((totals.goods - labourTotal).toFixed(2)))
+    : Number((totals.goods + chargesTotal).toFixed(2));
   const balance = Math.max(0, Number((netTotal - num(paid)).toFixed(2)));
 
   const updateItem = (i, key, value) => {
@@ -1253,7 +1257,7 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
 
         {/* Charges & Expenses */}
         <div className="item-row">
-          <h3>મજૂરી ખર્ચ</h3>
+          <h3>{isFarmer ? 'મજૂરી ખર્ચ (ખેડૂતના બિલમાંથી બાદ થશે)' : 'મજૂરી ખર્ચ'}</h3>
           <div className="formgrid">
             <label>
               મજૂરી પ્રતિ બેગ (₹/બેગ)
@@ -1266,8 +1270,8 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
               />
             </label>
             <div style={{ display: 'flex', alignItems: 'center', paddingTop: '20px' }}>
-              <span style={{ fontSize: '0.9rem', color: '#4b5563' }}>
-                કુલ મજૂરી ({totals.bags} બેગ × ₹{num(labour)}): <b>{money(labourTotal)}</b>
+              <span style={{ fontSize: '0.9rem', color: isFarmer ? '#b91c1c' : '#4b5563', fontWeight: isFarmer ? '600' : 'normal' }}>
+                કુલ મજૂરી ({totals.bags} બેગ × ₹{num(labour)}): <b>{isFarmer ? (labourTotal > 0 ? `- ${money(labourTotal)} (બાદ)` : money(0)) : money(labourTotal)}</b>
               </span>
             </div>
           </div>
@@ -1319,11 +1323,13 @@ export const PurchaseEntry = ({ onPurchaseCompleted }) => {
             <b>{money(totals.goods)}</b>
           </div>
           <div>
-            <span>મજૂરી / કમિશન / ખર્ચ</span>
-            <b>{money(chargesTotal)}</b>
+            <span>{isFarmer ? 'બાદ: મજૂરી' : 'મજૂરી / કમિશન / ખર્ચ'}</span>
+            <b style={{ color: isFarmer && labourTotal > 0 ? '#b91c1c' : undefined }}>
+              {isFarmer ? (labourTotal > 0 ? `- ${money(labourTotal)}` : money(0)) : money(chargesTotal)}
+            </b>
           </div>
           <div>
-            <span>નેટ ટોટલ</span>
+            <span>નેટ કુલ રકમ</span>
             <b style={{ color: '#064e3b' }}>{money(netTotal)}</b>
           </div>
           <div>

@@ -348,7 +348,13 @@ export const Reports = ({ onOpenBill, initialTab }) => {
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
                         <td style={{ padding: '0.7rem', color: '#475569' }}>{p.purchaseDate}</td>
-                        <td style={{ padding: '0.7rem', fontWeight: '700', color: '#064e3b' }}>{p.billNo}</td>
+                        <td 
+                          style={{ padding: '0.7rem', fontWeight: '700', color: '#064e3b', cursor: onOpenBill ? 'pointer' : 'default' }}
+                          onClick={() => onOpenBill && onOpenBill(p)}
+                          title="બિલ પ્રિન્ટ કરો"
+                        >
+                          {p.billNo} 🖨️
+                        </td>
                         <td style={{ padding: '0.7rem' }}>
                           <span className={`badge ${p.purchaseType === 'farmer' ? 'badge-primary' : 'badge-warning'}`} style={{ fontSize: '0.7rem' }}>
                             {p.purchaseType === 'farmer' ? 'ખેડૂત' : 'માર્કેટ'}
@@ -561,7 +567,13 @@ export const Reports = ({ onOpenBill, initialTab }) => {
                 {filteredSales.map((s, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
                     <td style={{ padding: '0.7rem' }}>{s.billDate}</td>
-                    <td style={{ padding: '0.7rem', fontWeight: '700', color: '#064e3b' }}>{s.billNo}</td>
+                    <td 
+                      style={{ padding: '0.7rem', fontWeight: '700', color: '#064e3b', cursor: onOpenBill ? 'pointer' : 'default' }}
+                      onClick={() => onOpenBill && onOpenBill(s)}
+                      title="બિલ પ્રિન્ટ કરો"
+                    >
+                      {s.billNo} 🖨️
+                    </td>
                     <td style={{ padding: '0.7rem', fontWeight: '600' }}>{s.farmerName}</td>
                     <td style={{ padding: '0.7rem', color: '#64748b' }}>{s.farmerVillage || '—'}</td>
                     <td style={{ padding: '0.7rem', textAlign: 'right', fontWeight: '700' }}>

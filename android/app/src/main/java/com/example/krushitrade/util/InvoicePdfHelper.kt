@@ -407,7 +407,7 @@ object InvoicePdfHelper {
     }
 
     /**
-     * Generates a standard A4 PDF voucher document for a purchase.
+     * Generates a standard A4 PDF voucher document for a purchase matching Shree Nandini Seeds layout.
      */
     fun generatePurchaseVoucherPdf(context: Context, pur: PurchaseRecord): File {
         val invoicesDir = File(context.cacheDir, "invoices")
@@ -426,225 +426,192 @@ object InvoicePdfHelper {
             style = Paint.Style.STROKE
         }
 
+        // Background White
         canvas.drawColor(Color.WHITE)
 
-        // Outer Border
-        strokePaint.color = Color.rgb(203, 213, 225)
+        // Outer Page Border
+        strokePaint.color = Color.BLACK
         strokePaint.strokeWidth = 1.5f
-        canvas.drawRect(24f, 24f, (pageWidth - 24).toFloat(), (pageHeight - 24).toFloat(), strokePaint)
+        canvas.drawRect(26f, 26f, (pageWidth - 26).toFloat(), (pageHeight - 26).toFloat(), strokePaint)
 
-        // Header Banner
-        paint.color = Color.rgb(20, 83, 45) // Emerald-900
-        paint.style = Paint.Style.FILL
-        canvas.drawRect(24f, 24f, (pageWidth - 24).toFloat(), 110f, paint)
-
-        paint.color = Color.WHITE
-        paint.textSize = 20f
+        // Header - Brand Left & Gujarati Right
+        paint.color = Color.rgb(13, 92, 44) // #0D5C2C
+        paint.textSize = 13.5f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         paint.textAlign = Paint.Align.CENTER
-        canvas.drawText("🌱 કૃષિ ટ્રેડ (KRUSHI TRADE)", (pageWidth / 2).toFloat(), 55f, paint)
+        canvas.drawText("Shree Nandini", 88f, 56f, paint)
 
-        paint.textSize = 10.5f
-        paint.typeface = Typeface.DEFAULT
-        canvas.drawText("શ્રી નંદિની સીડ્સ • ખરીદી વાઉચર (PURCHASE VOUCHER)", (pageWidth / 2).toFloat(), 74f, paint)
+        paint.textSize = 12f
+        canvas.drawText("Seeds 🌱", 88f, 72f, paint)
 
-        paint.textSize = 9.5f
-        paint.color = Color.rgb(209, 250, 229)
-        canvas.drawText("સ્ટેશન રોડ, માર્કેટ યાર્ડ પાસે, જૂનાગઢ (ગુજરાત) | મો. ૯૮૨૫૦ ૦૦૦૦૦", (pageWidth / 2).toFloat(), 92f, paint)
+        // Vertical divider
+        strokePaint.color = Color.rgb(13, 92, 44)
+        strokePaint.strokeWidth = 1.5f
+        canvas.drawLine(145f, 42f, 145f, 82f, strokePaint)
 
-        // Metadata box
-        val infoTop = 130f
-        val infoBottom = 200f
-        paint.color = Color.rgb(248, 250, 252)
-        canvas.drawRect(36f, infoTop, (pageWidth - 36).toFloat(), infoBottom, paint)
-        strokePaint.color = Color.rgb(226, 232, 240)
-        canvas.drawRect(36f, infoTop, (pageWidth - 36).toFloat(), infoBottom, strokePaint)
-
+        // Right Gujarati Title
+        paint.textSize = 24f
         paint.textAlign = Paint.Align.LEFT
-        paint.color = Color.rgb(71, 85, 105)
-        paint.textSize = 10f
-        canvas.drawText("વાઉચર નં:", 46f, 155f, paint)
+        canvas.drawText("શ્રી નંદિની સીડ્સ", 168f, 68f, paint)
+
+        // Bottom green line
+        strokePaint.strokeWidth = 2.5f
+        canvas.drawLine(26f, 92f, (pageWidth - 26).toFloat(), 92f, strokePaint)
+
+        // Bill No & Date Box (Top Left)
+        val noBoxTop = 104f
+        val noBoxWidth = 160f
+        val noBoxHeight = 44f
+        strokePaint.color = Color.BLACK
+        strokePaint.strokeWidth = 1.2f
+        canvas.drawRect(38f, noBoxTop, 38f + noBoxWidth, noBoxTop + noBoxHeight, strokePaint)
+        canvas.drawLine(38f, noBoxTop + 22f, 38f + noBoxWidth, noBoxTop + 22f, strokePaint)
+
+        paint.color = Color.BLACK
+        paint.textSize = 9.5f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.color = Color.rgb(15, 23, 42)
-        canvas.drawText(pur.billNo, 105f, 155f, paint)
+        paint.textAlign = Paint.Align.LEFT
+        val cleanBillNo = pur.billNo.replace(Regex("^SN-PUR-\\d{4}-"), "")
+        canvas.drawText("ખરીદી નં. : $cleanBillNo", 46f, noBoxTop + 15f, paint)
+        canvas.drawText("તારીખ : ${formatBillDate(pur.purchaseDate)}", 46f, noBoxTop + 37f, paint)
 
-        paint.typeface = Typeface.DEFAULT
-        paint.color = Color.rgb(71, 85, 105)
-        canvas.drawText("તારીખ:", 46f, 175f, paint)
-        paint.color = Color.rgb(15, 23, 42)
-        canvas.drawText(pur.purchaseDate, 105f, 175f, paint)
+        // Customer / Party Details Box
+        val custTop = 158f
+        val hasTruck = pur.truckNo.isNotEmpty()
+        val custHeight = if (hasTruck) 88f else 66f
+        canvas.drawRect(38f, custTop, (pageWidth - 38).toFloat(), custTop + custHeight, strokePaint)
+        canvas.drawLine(38f, custTop + 22f, (pageWidth - 38).toFloat(), custTop + 22f, strokePaint)
+        canvas.drawLine(38f, custTop + 44f, (pageWidth - 38).toFloat(), custTop + 44f, strokePaint)
+        canvas.drawLine((pageWidth / 2).toFloat(), custTop + 44f, (pageWidth / 2).toFloat(), custTop + (if (hasTruck) 66f else custHeight), strokePaint)
 
-        if (pur.truckNo.isNotEmpty()) {
-            paint.typeface = Typeface.DEFAULT
-            paint.color = Color.rgb(71, 85, 105)
-            canvas.drawText("ગાડી નં:", 46f, 192f, paint)
-            paint.color = Color.rgb(15, 23, 42)
-            canvas.drawText("${pur.truckNo} ${if (pur.truckOwner.isNotEmpty()) "(${pur.truckOwner})" else ""}", 105f, 192f, paint)
+        val partyDisp = if (pur.firmName.isNotEmpty()) "${pur.partyName} (${pur.firmName})" else pur.partyName
+        canvas.drawText("નામ : $partyDisp", 46f, custTop + 15f, paint)
+        canvas.drawText("ગામ : ${pur.village.ifEmpty { "—" }}", 46f, custTop + 37f, paint)
+        canvas.drawText("તાલુકો : દિયોદર", 46f, custTop + 59f, paint)
+        canvas.drawText("જિલ્લો : વાવ - થરાદ", (pageWidth / 2) + 10f, custTop + 59f, paint)
+
+        if (hasTruck) {
+            canvas.drawLine(38f, custTop + 66f, (pageWidth - 38).toFloat(), custTop + 66f, strokePaint)
+            val truckDisp = if (pur.truckOwner.isNotEmpty()) "${pur.truckNo} (${pur.truckOwner})" else pur.truckNo
+            canvas.drawText("ગાડી નં. : $truckDisp", 46f, custTop + 81f, paint)
         }
 
-        // Right column
-        val rightX = 310f
-        paint.typeface = Typeface.DEFAULT
-        paint.color = Color.rgb(71, 85, 105)
-        canvas.drawText("પાર્ટી/માલિક:", rightX, 155f, paint)
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.color = Color.rgb(15, 23, 42)
-        canvas.drawText(pur.partyName, rightX + 70f, 155f, paint)
-
-        paint.typeface = Typeface.DEFAULT
-        paint.color = Color.rgb(71, 85, 105)
-        canvas.drawText("ગામ:", rightX, 175f, paint)
-        paint.color = Color.rgb(15, 23, 42)
-        canvas.drawText(if (pur.village.isNotEmpty()) pur.village else "—", rightX + 70f, 175f, paint)
-
-        // Table Header
-        val tblTop = 215f
+        // Items Table
+        val tblTop = custTop + custHeight + 12f
         val tblHeight = 24f
-        paint.color = Color.rgb(20, 83, 45)
-        canvas.drawRect(36f, tblTop, (pageWidth - 36).toFloat(), tblTop + tblHeight, paint)
+        val cols = floatArrayOf(38f, 115f, 215f, 280f, 370f, 455f, (pageWidth - 38).toFloat())
 
-        paint.color = Color.WHITE
+        // Header fill
+        paint.color = Color.rgb(220, 242, 217) // #dcf2d9
+        canvas.drawRect(38f, tblTop, (pageWidth - 38).toFloat(), tblTop + tblHeight, paint)
+        canvas.drawRect(38f, tblTop, (pageWidth - 38).toFloat(), tblTop + tblHeight, strokePaint)
+
+        cols.forEach { x ->
+            canvas.drawLine(x, tblTop, x, tblTop + tblHeight, strokePaint)
+        }
+
+        paint.color = Color.BLACK
         paint.textSize = 9.5f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textAlign = Paint.Align.LEFT
-        canvas.drawText("ક્રમ", 46f, tblTop + 16f, paint)
-        canvas.drawText("બિયારણ જાત (Variety)", 80f, tblTop + 16f, paint)
         paint.textAlign = Paint.Align.CENTER
-        canvas.drawText("બોરી", 260f, tblTop + 16f, paint)
-        canvas.drawText("કુલ KG", 320f, tblTop + 16f, paint)
-        canvas.drawText("મણ (૨૦ KG)", 385f, tblTop + 16f, paint)
-        paint.textAlign = Paint.Align.RIGHT
-        canvas.drawText("ભાવ (₹/મણ)", 480f, tblTop + 16f, paint)
-        canvas.drawText("રકમ (₹)", (pageWidth - 46).toFloat(), tblTop + 16f, paint)
 
-        // Table Rows
+        canvas.drawText("પાક", (cols[0] + cols[1]) / 2, tblTop + 16f, paint)
+        canvas.drawText("જાત", (cols[1] + cols[2]) / 2, tblTop + 16f, paint)
+        canvas.drawText("બેગ (નંગ)", (cols[2] + cols[3]) / 2, tblTop + 16f, paint)
+        canvas.drawText("જથ્થો (કિ.ગ્રા.)", (cols[3] + cols[4]) / 2, tblTop + 16f, paint)
+        canvas.drawText("દર (રૂ./મણ)", (cols[4] + cols[5]) / 2, tblTop + 16f, paint)
+        canvas.drawText("રકમ (રૂ.)", (cols[5] + cols[6]) / 2, tblTop + 16f, paint)
+
         var currentY = tblTop + tblHeight
-        pur.items.forEachIndexed { idx, it ->
-            val rowHeight = 32f
-            paint.color = if (idx % 2 == 0) Color.rgb(255, 255, 255) else Color.rgb(248, 250, 252)
-            canvas.drawRect(36f, currentY, (pageWidth - 36).toFloat(), currentY + rowHeight, paint)
+        val rowHeight = 25f
 
-            strokePaint.color = Color.rgb(226, 232, 240)
-            strokePaint.strokeWidth = 0.8f
-            canvas.drawLine(36f, currentY + rowHeight, (pageWidth - 36).toFloat(), currentY + rowHeight, strokePaint)
+        pur.items.forEach { it ->
+            canvas.drawRect(38f, currentY, (pageWidth - 38).toFloat(), currentY + rowHeight, strokePaint)
+            cols.forEach { x ->
+                canvas.drawLine(x, currentY, x, currentY + rowHeight, strokePaint)
+            }
 
-            paint.color = Color.rgb(15, 23, 42)
-            paint.typeface = Typeface.DEFAULT
-            paint.textAlign = Paint.Align.LEFT
-            paint.textSize = 10f
-            canvas.drawText("${idx + 1}", 48f, currentY + 18f, paint)
-
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            canvas.drawText(it.varietyName, 80f, currentY + 14f, paint)
-
-            paint.typeface = Typeface.DEFAULT
-            paint.textSize = 8f
-            paint.color = Color.rgb(100, 116, 139)
-            val breakdown = if (it.bags2 > 0) "${it.bags1}×${it.kg1.toInt()}kg + ${it.bags2}×${it.kg2.toInt()}kg" else "${it.bags1}×${it.kg1.toInt()}kg"
-            canvas.drawText("($breakdown)", 80f, currentY + 26f, paint)
-
-            paint.textSize = 10f
-            paint.color = Color.rgb(15, 23, 42)
+            paint.color = Color.BLACK
             paint.textAlign = Paint.Align.CENTER
-            canvas.drawText("${it.bags}", 260f, currentY + 18f, paint)
-            canvas.drawText("${String.format(Locale.US, "%.1f", it.netWeightKg)} kg", 320f, currentY + 18f, paint)
+            paint.textSize = 9.5f
 
-            paint.color = Color.rgb(5, 150, 105)
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            canvas.drawText("${String.format(Locale.US, "%.2f", it.totalMan)} મણ", 385f, currentY + 18f, paint)
+            val totalKg = if (it.netWeightKg > 0) it.netWeightKg else (it.bags * 35.0)
 
-            paint.textAlign = Paint.Align.RIGHT
-            paint.color = Color.rgb(15, 23, 42)
-            paint.typeface = Typeface.DEFAULT
-            canvas.drawText("₹${String.format(Locale.US, "%.2f", it.ratePerMan)}", 480f, currentY + 18f, paint)
-
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            canvas.drawText("₹${String.format(Locale.US, "%.0f", it.itemTotal)}", (pageWidth - 46).toFloat(), currentY + 18f, paint)
+            canvas.drawText("મગફળી", (cols[0] + cols[1]) / 2, currentY + 17f, paint)
+            canvas.drawText(it.varietyName, (cols[1] + cols[2]) / 2, currentY + 17f, paint)
+            canvas.drawText("${it.bags}", (cols[2] + cols[3]) / 2, currentY + 17f, paint)
+            canvas.drawText("${totalKg.toInt()}", (cols[3] + cols[4]) / 2, currentY + 17f, paint)
+            canvas.drawText(String.format(Locale.US, "%,.0f", it.ratePerMan), (cols[4] + cols[5]) / 2, currentY + 17f, paint)
+            canvas.drawText(String.format(Locale.US, "%,.0f", it.itemTotal), (cols[5] + cols[6]) / 2, currentY + 17f, paint)
 
             currentY += rowHeight
         }
 
-        // Summary Box
-        val sumBoxTop = currentY + 16f
-        val sumBoxLeft = 320f
-        val sumBoxRight = (pageWidth - 36).toFloat()
-
-        paint.color = Color.rgb(248, 250, 252)
-        canvas.drawRect(sumBoxLeft, sumBoxTop, sumBoxRight, sumBoxTop + 110f, paint)
-        strokePaint.color = Color.rgb(226, 232, 240)
-        canvas.drawRect(sumBoxLeft, sumBoxTop, sumBoxRight, sumBoxTop + 110f, strokePaint)
-
-        var sumY = sumBoxTop + 18f
-        paint.textSize = 9.5f
-        paint.typeface = Typeface.DEFAULT
-
-        paint.color = Color.rgb(71, 85, 105)
-        paint.textAlign = Paint.Align.LEFT
-        canvas.drawText("માલ રકમ (Sub Total):", sumBoxLeft + 12f, sumY, paint)
-        paint.textAlign = Paint.Align.RIGHT
-        paint.color = Color.rgb(15, 23, 42)
-        canvas.drawText("₹${String.format(Locale.US, "%.0f", pur.itemsSubTotal)}", sumBoxRight - 12f, sumY, paint)
-        sumY += 16f
-
-        if (pur.totalExpenses > 0) {
-            paint.textAlign = Paint.Align.LEFT
-            paint.color = Color.rgb(30, 64, 175)
-            canvas.drawText("+ ખર્ચ / મજૂરી:", sumBoxLeft + 12f, sumY, paint)
-            paint.textAlign = Paint.Align.RIGHT
-            canvas.drawText("+ ₹${String.format(Locale.US, "%.0f", pur.totalExpenses)}", sumBoxRight - 12f, sumY, paint)
-            sumY += 16f
+        // Expenses Rows (મજૂરી, માર્કેટ કમિશન, પેઢી કમિશન, બારદાન ખર્ચ)
+        val isFarmer = pur.purchaseType == "farmer"
+        fun drawExpenseRow(label: String, amount: Double, isDeduction: Boolean = false) {
+            if (amount <= 0) return
+            canvas.drawRect(38f, currentY, (pageWidth - 38).toFloat(), currentY + rowHeight, strokePaint)
+            cols.forEach { x ->
+                canvas.drawLine(x, currentY, x, currentY + rowHeight, strokePaint)
+            }
+            paint.color = Color.BLACK
+            paint.textAlign = Paint.Align.CENTER
+            canvas.drawText(label, (cols[4] + cols[5]) / 2, currentY + 17f, paint)
+            val valText = if (isDeduction) "- " + String.format(Locale.US, "%,.0f", amount) else String.format(Locale.US, "%,.0f", amount)
+            canvas.drawText(valText, (cols[5] + cols[6]) / 2, currentY + 17f, paint)
+            currentY += rowHeight
         }
 
-        // Net Amount
-        strokePaint.color = Color.rgb(203, 213, 225)
-        canvas.drawLine(sumBoxLeft + 12f, sumY - 2f, sumBoxRight - 12f, sumY - 2f, strokePaint)
+        drawExpenseRow(if (isFarmer) "બાદ: મજૂરી" else "મજૂરી", pur.majuriAmount, isDeduction = isFarmer)
+        drawExpenseRow("માર્કેટ કમિશન", pur.marketCommission)
+        drawExpenseRow("પેઢી કમિશન", pur.firmCommission)
+        drawExpenseRow("બારદાન ખર્ચ", pur.bardanExpense)
 
-        paint.textAlign = Paint.Align.LEFT
-        paint.color = Color.rgb(20, 83, 45)
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textSize = 11f
-        canvas.drawText("ચુકવવાપાત્ર કુલ:", sumBoxLeft + 12f, sumY + 12f, paint)
-        paint.textAlign = Paint.Align.RIGHT
-        canvas.drawText("₹${String.format(Locale.US, "%.0f", pur.netTotal)}", sumBoxRight - 12f, sumY + 12f, paint)
-        sumY += 26f
-
-        // Paid & Due
-        paint.textSize = 9.5f
-        paint.typeface = Typeface.DEFAULT
-        paint.textAlign = Paint.Align.LEFT
-        paint.color = Color.rgb(22, 101, 52)
-        canvas.drawText("ચુકવેલ રકમ:", sumBoxLeft + 12f, sumY, paint)
-        paint.textAlign = Paint.Align.RIGHT
-        canvas.drawText("₹${String.format(Locale.US, "%.0f", pur.paidAmount)}", sumBoxRight - 12f, sumY, paint)
-        sumY += 16f
-
-        paint.textAlign = Paint.Align.LEFT
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.color = if (pur.dueAmount > 0) Color.rgb(220, 38, 38) else Color.rgb(22, 101, 52)
-        canvas.drawText("બાકી રકમ:", sumBoxLeft + 12f, sumY, paint)
-        paint.textAlign = Paint.Align.RIGHT
-        canvas.drawText("₹${String.format(Locale.US, "%.0f", pur.dueAmount)}", sumBoxRight - 12f, sumY, paint)
-
-        // Footer
-        val footerY = (pageHeight - 80).toFloat()
-        strokePaint.color = Color.rgb(203, 213, 225)
-        strokePaint.strokeWidth = 1f
-        canvas.drawLine(36f, footerY, (pageWidth - 36).toFloat(), footerY, strokePaint)
-
-        paint.textAlign = Paint.Align.LEFT
-        paint.textSize = 8.5f
-        paint.color = Color.rgb(100, 116, 139)
-        paint.typeface = Typeface.DEFAULT
-        canvas.drawText("શ્રી નંદિની સીડ્સ | કૃષિ ટ્રેડ મેનેજમેન્ટ સિસ્ટમ", 36f, footerY + 20f, paint)
-
-        val sigLineRight = (pageWidth - 46).toFloat()
-        val sigLineLeft = sigLineRight - 120f
-        canvas.drawLine(sigLineLeft, footerY + 35f, sigLineRight, footerY + 35f, strokePaint)
+        // Total Row (કુલ રકમ)
+        paint.color = Color.rgb(220, 242, 217) // #dcf2d9
+        canvas.drawRect(cols[4], currentY, (pageWidth - 38).toFloat(), currentY + rowHeight, paint)
+        canvas.drawRect(38f, currentY, (pageWidth - 38).toFloat(), currentY + rowHeight, strokePaint)
+        cols.forEach { x ->
+            canvas.drawLine(x, currentY, x, currentY + rowHeight, strokePaint)
+        }
+        paint.color = Color.BLACK
         paint.textAlign = Paint.Align.CENTER
-        paint.color = Color.rgb(51, 65, 85)
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textSize = 9f
-        canvas.drawText("કૃષિ ટ્રેડ સહી/સિક્કો", (sigLineLeft + sigLineRight) / 2, footerY + 48f, paint)
+        canvas.drawText("કુલ રકમ", (cols[4] + cols[5]) / 2, currentY + 17f, paint)
+        canvas.drawText(String.format(Locale.US, "%,.0f", pur.netTotal), (cols[5] + cols[6]) / 2, currentY + 17f, paint)
+        currentY += rowHeight
+
+        // Amount in Words Box
+        val wordsTop = currentY + 16f
+        val wordsHeight = 48f
+        paint.color = Color.rgb(220, 242, 217)
+        canvas.drawRect(38f, wordsTop, (pageWidth - 38).toFloat(), wordsTop + 22f, paint)
+        canvas.drawRect(38f, wordsTop, (pageWidth - 38).toFloat(), wordsTop + wordsHeight, strokePaint)
+        canvas.drawLine(38f, wordsTop + 22f, (pageWidth - 38).toFloat(), wordsTop + 22f, strokePaint)
+
+        paint.color = Color.BLACK
+        paint.textAlign = Paint.Align.LEFT
+        paint.textSize = 9.5f
+        canvas.drawText("રકમ અક્ષરે (રૂપિયામાં) :", 46f, wordsTop + 15f, paint)
+        canvas.drawText(numberToGujaratiWords(pur.netTotal), 46f, wordsTop + 38f, paint)
+
+        // Signatory Box (Bottom Right)
+        val sigTop = wordsTop + wordsHeight + 20f
+        val sigRight = (pageWidth - 38).toFloat()
+        val sigLeft = sigRight - 180f
+        val sigHeight = 85f
+        canvas.drawRect(sigLeft, sigTop, sigRight, sigTop + sigHeight, strokePaint)
+
+        paint.color = Color.rgb(13, 92, 44)
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = 11f
+        canvas.drawText("શ્રી નંદિની સીડ્સ તરફથી,", (sigLeft + sigRight) / 2, sigTop + 24f, paint)
+
+        canvas.drawLine(sigLeft + 25f, sigTop + sigHeight - 25f, sigRight - 25f, sigTop + sigHeight - 25f, strokePaint)
+
+        paint.color = Color.BLACK
+        paint.textSize = 9.5f
+        canvas.drawText("અધિકૃત સહીકર્તા", (sigLeft + sigRight) / 2, sigTop + sigHeight - 10f, paint)
 
         document.finishPage(page)
 

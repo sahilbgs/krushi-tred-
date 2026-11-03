@@ -175,7 +175,11 @@ fun PurchaseEntryScreen(
         (marketMajuriInput.toDoubleOrNull() ?: 0.0)
     }
 
-    val netTotal = itemsSubTotal + calculatedExpenses
+    val netTotal = if (purchaseType == "farmer") {
+        (itemsSubTotal - calculatedExpenses).coerceAtLeast(0.0)
+    } else {
+        itemsSubTotal + calculatedExpenses
+    }
     val paidAmount = if (paidInput.isEmpty()) netTotal else (paidInput.toDoubleOrNull() ?: 0.0)
     val dueAmount = (netTotal - paidAmount).coerceAtLeast(0.0)
 
@@ -947,8 +951,15 @@ fun PurchaseEntryScreen(
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
+                if (purchaseType == "farmer" && calculatedExpenses > 0) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("બાદ: મજૂરી:", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
+                        Text("- ₹${fmt(calculatedExpenses)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Net Total:", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = GreenDark)
+                    Text("Net Total (ચુકવવાપાત્ર):", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = GreenDark)
                     Text("₹${fmt(netTotal)}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = GreenDark)
                 }
 

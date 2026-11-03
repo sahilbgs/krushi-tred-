@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext';
 import { useData } from './context/DataContext';
 import { Sidebar } from './components/Sidebar';
 import { SimpleBillModal } from './components/SimpleBillModal';
+import { PurchaseBillModal } from './components/PurchaseBillModal';
 import { SiteLock, checkSiteUnlocked, lockSite } from './components/SiteLock';
 
 import { Dashboard } from './pages/Dashboard';
@@ -250,10 +251,17 @@ export function App() {
       </main>
 
       {currentBillModal && (
-        <SimpleBillModal 
-          sale={currentBillModal} 
-          onClose={() => setCurrentBillModal(null)} 
-        />
+        (currentBillModal.purchaseType || currentBillModal.purchaseDate || (currentBillModal.billNo && currentBillModal.billNo.includes('PUR'))) ? (
+          <PurchaseBillModal
+            purchase={currentBillModal}
+            onClose={() => setCurrentBillModal(null)}
+          />
+        ) : (
+          <SimpleBillModal 
+            sale={currentBillModal} 
+            onClose={() => setCurrentBillModal(null)} 
+          />
+        )
       )}
     </div>
   );

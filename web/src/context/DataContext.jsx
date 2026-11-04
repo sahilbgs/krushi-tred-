@@ -529,12 +529,11 @@ export const DataProvider = ({ children }) => {
         const cur = updatedStock[existingIdx];
         const newBags = cur.availableBags + addedBags;
         const newTotalKg = cur.totalWeightKg + addedKg;
-        const newLoose = newTotalKg - (newBags * BAG_STD_KG);
 
         updatedStock[existingIdx] = {
           ...cur,
           availableBags: newBags,
-          availableLooseKg: Math.max(0, newLoose),
+          availableLooseKg: 0,
           totalWeightKg: newTotalKg,
           totalMan: newTotalKg / MAN_STD_KG,
           lastPurchaseRate: parseFloat(item.ratePerMan || cur.lastPurchaseRate)
@@ -544,9 +543,9 @@ export const DataProvider = ({ children }) => {
           id: "stock_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
           seedId: item.seedId,
           varietyName: item.varietyName,
-          bagWeightKg: BAG_STD_KG,
+          bagWeightKg: item.bagWeightKg || BAG_STD_KG,
           availableBags: addedBags,
-          availableLooseKg: Math.max(0, addedKg - (addedBags * BAG_STD_KG)),
+          availableLooseKg: 0,
           totalWeightKg: addedKg,
           totalMan: addedMan,
           lastPurchaseRate: parseFloat(item.ratePerMan || 0)
@@ -720,17 +719,15 @@ export const DataProvider = ({ children }) => {
       if (idx >= 0) {
         const cur = updatedStock[idx];
         const soldBags = parseInt(item.bags || 0);
-        const soldLoose = parseFloat(item.looseKg || 0);
-        const totalSoldKg = parseFloat(item.totalWeightKg || (soldBags * BAG_STD_KG + soldLoose));
+        const totalSoldKg = parseFloat(item.totalWeightKg || (soldBags * (cur.bagWeightKg || BAG_STD_KG)));
 
         const remTotalKg = Math.max(0, cur.totalWeightKg - totalSoldKg);
-        const remBags = Math.floor(remTotalKg / BAG_STD_KG);
-        const remLoose = remTotalKg % BAG_STD_KG;
+        const remBags = Math.max(0, cur.availableBags - soldBags);
 
         updatedStock[idx] = {
           ...cur,
           availableBags: remBags,
-          availableLooseKg: remLoose,
+          availableLooseKg: 0,
           totalWeightKg: remTotalKg,
           totalMan: remTotalKg / MAN_STD_KG
         };

@@ -40,7 +40,7 @@ export const StockLedger = () => {
       {/* 3 Stock Summary Cards */}
       <div className="cards">
         <div className="metric">
-          <span>કુલ હાજર બોરી (35 KG સ્ટાન્ડર્ડ)</span>
+          <span>કુલ હાજર બોરી (Total Bags)</span>
           <b>{totalBags.toLocaleString('en-IN')} બોરી</b>
         </div>
         <div className="metric">

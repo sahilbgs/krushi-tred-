@@ -116,9 +116,9 @@ CREATE TABLE IF NOT EXISTS stock_ledger (
     batch_no VARCHAR(50) NOT NULL DEFAULT 'MAIN',
     bag_weight_kg NUMERIC(8,2) NOT NULL DEFAULT 35.00,
     available_bags INTEGER NOT NULL DEFAULT 0 CHECK (available_bags >= 0),
-    available_loose_kg NUMERIC(8,2) NOT NULL DEFAULT 0.00 CHECK (available_loose_kg >= 0 AND available_loose_kg < bag_weight_kg),
-    total_weight_kg NUMERIC(12,2) GENERATED ALWAYS AS ((available_bags * bag_weight_kg) + available_loose_kg) STORED,
-    total_man NUMERIC(12,2) GENERATED ALWAYS AS (ROUND(((available_bags * bag_weight_kg) + available_loose_kg) / 20.00, 2)) STORED,
+    available_loose_kg NUMERIC(8,2) NOT NULL DEFAULT 0.00 CHECK (available_loose_kg >= 0),
+    total_weight_kg NUMERIC(12,2) NOT NULL DEFAULT 0.00 CHECK (total_weight_kg >= 0),
+    total_man NUMERIC(12,2) GENERATED ALWAYS AS (ROUND(total_weight_kg / 20.00, 2)) STORED,
     last_purchase_rate NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_stock_seed_batch UNIQUE(seed_id, batch_no)

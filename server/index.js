@@ -84,6 +84,84 @@ export async function recalculateAllParties() {
   console.log(`✅ Recalculated balances for ${partiesRes.rows.length} parties.`);
 }
 
+// Centralized stock ledger calculation based on purchases and sales items
+export async function recalculateStockLedger(clientOrPool, seedId) {
+  if (!seedId) return null;
+
+  const seedRes = await clientOrPool.query('SELECT id, variety_name, bag_weight_kg FROM seed_varieties WHERE id = $1', [seedId]);
+  if (seedRes.rows.length === 0) return null;
+  const seed = seedRes.rows[0];
+
+  // 1. Total purchases for this variety
+  const purRes = await clientOrPool.query(
+    `SELECT 
+       COALESCE(SUM(bags), 0) AS pur_bags,
+       COALESCE(SUM(net_weight_kg), 0) AS pur_kg
+     FROM purchase_items 
+     WHERE seed_id = $1`,
+    [seedId]
+  );
+
+  // 2. Total sales for this variety
+  const saleRes = await clientOrPool.query(
+    `SELECT 
+       COALESCE(SUM(bags), 0) AS sale_bags,
+       COALESCE(SUM(total_weight_kg), 0) AS sale_kg
+     FROM sale_items 
+     WHERE seed_id = $1`,
+    [seedId]
+  );
+
+  // 3. Latest purchase rate
+  const latestPurRes = await clientOrPool.query(
+    `SELECT rate_per_man 
+     FROM purchase_items 
+     WHERE seed_id = $1 
+     ORDER BY id DESC LIMIT 1`,
+    [seedId]
+  );
+
+  const purBags = parseInt(purRes.rows[0]?.pur_bags || 0);
+  const purKg = parseFloat(purRes.rows[0]?.pur_kg || 0);
+  const saleBags = parseInt(saleRes.rows[0]?.sale_bags || 0);
+  const saleKg = parseFloat(saleRes.rows[0]?.sale_kg || 0);
+
+  const netBags = Math.max(0, purBags - saleBags);
+  const netKg = Math.max(0, parseFloat((purKg - saleKg).toFixed(2)));
+  const lastRate = parseFloat(latestPurRes.rows[0]?.rate_per_man || 0);
+
+  // Ensure row exists in stock_ledger
+  await clientOrPool.query(
+    `INSERT INTO stock_ledger (id, seed_id, variety_name, batch_no, bag_weight_kg, available_bags, available_loose_kg, total_weight_kg, last_purchase_rate)
+     VALUES ($1, $2, $3, 'MAIN', $4, $5, 0, $6, $7)
+     ON CONFLICT (seed_id, batch_no) DO UPDATE SET
+       available_bags = EXCLUDED.available_bags,
+       total_weight_kg = EXCLUDED.total_weight_kg,
+       available_loose_kg = 0,
+       last_purchase_rate = CASE WHEN EXCLUDED.last_purchase_rate > 0 THEN EXCLUDED.last_purchase_rate ELSE stock_ledger.last_purchase_rate END,
+       updated_at = CURRENT_TIMESTAMP`,
+    [
+      'stock_' + Date.now(),
+      seedId,
+      seed.variety_name,
+      seed.bag_weight_kg || 35,
+      netBags,
+      netKg,
+      lastRate
+    ]
+  );
+
+  return { seedId, netBags, netKg, lastRate };
+}
+
+export async function recalculateAllStock() {
+  const seedsRes = await pool.query('SELECT id FROM seed_varieties');
+  for (const row of seedsRes.rows) {
+    await recalculateStockLedger(pool, row.id);
+  }
+  console.log(`✅ Recalculated stock for ${seedsRes.rows.length} seed varieties.`);
+}
+
 // 1. Health Check
 app.get('/api/health', async (req, res) => {
   try {
@@ -530,23 +608,7 @@ app.post('/api/purchases', async (req, res) => {
 
         // Update Stock Ledger
         if (validSeedId) {
-          await client.query(
-            `INSERT INTO stock_ledger (id, seed_id, variety_name, batch_no, bag_weight_kg, available_bags, available_loose_kg, last_purchase_rate)
-             VALUES ($1, $2, $3, 'MAIN', $4, $5, $6, $7)
-             ON CONFLICT (seed_id, batch_no) DO UPDATE SET
-               available_bags = stock_ledger.available_bags + EXCLUDED.available_bags,
-               available_loose_kg = stock_ledger.available_loose_kg + EXCLUDED.available_loose_kg,
-               last_purchase_rate = EXCLUDED.last_purchase_rate`,
-            [
-              'stock_' + Date.now(),
-              validSeedId,
-              item.varietyName,
-              bagWeight,
-              bags,
-              Math.max(0, netKg - (bags * bagWeight)),
-              ratePerMan
-            ]
-          );
+          await recalculateStockLedger(client, validSeedId);
         }
       }
     }
@@ -775,15 +837,9 @@ app.post('/api/sales', async (req, res) => {
           ]
         );
 
-        // Deduct Stock
+        // Deduct Stock via centralized recalculation
         if (validSaleSeedId) {
-          await client.query(
-            `UPDATE stock_ledger
-             SET available_bags = GREATEST(0, available_bags - $1),
-                 available_loose_kg = GREATEST(0, available_loose_kg - $2)
-             WHERE seed_id = $3`,
-            [bags, looseKg, validSaleSeedId]
-          );
+          await recalculateStockLedger(client, validSaleSeedId);
         }
       }
     }
@@ -1040,22 +1096,17 @@ app.delete('/api/purchases/:billNo', async (req, res) => {
       [pur.id]
     );
 
-    for (const it of itemsRes.rows) {
-      if (it.seed_id) {
-        await client.query(
-          `UPDATE stock_ledger
-           SET available_bags = GREATEST(0, available_bags - $1)
-           WHERE seed_id = $2`,
-          [it.bags || 0, it.seed_id]
-        );
-      }
-    }
+    const affectedSeedIds = new Set(itemsRes.rows.map(it => it.seed_id).filter(Boolean));
 
     // 3. Delete items, purchase, transactions, rojmel
     await client.query(`DELETE FROM purchase_items WHERE purchase_id = $1`, [pur.id]);
     await client.query(`DELETE FROM purchases WHERE id = $1`, [pur.id]);
     await client.query(`DELETE FROM party_transactions WHERE voucher_no = $1 OR bill_id = $2`, [billNo, pur.id]);
     await client.query(`DELETE FROM rojmel WHERE voucher_no = $1`, [billNo]);
+
+    for (const sid of affectedSeedIds) {
+      await recalculateStockLedger(client, sid);
+    }
 
     // 4. Recalculate true balance from remaining ledger transactions
     if (pur.party_id) {
@@ -1099,23 +1150,17 @@ app.delete('/api/sales/:billNo', async (req, res) => {
       [sale.id]
     );
 
-    for (const it of itemsRes.rows) {
-      if (it.seed_id) {
-        await client.query(
-          `UPDATE stock_ledger
-           SET available_bags = available_bags + $1,
-               available_loose_kg = available_loose_kg + $2
-           WHERE seed_id = $3`,
-          [it.bags || 0, it.loose_kg || 0, it.seed_id]
-        );
-      }
-    }
+    const affectedSeedIds = new Set(itemsRes.rows.map(it => it.seed_id).filter(Boolean));
 
     // Delete items, sale, transactions, rojmel
     await client.query(`DELETE FROM sale_items WHERE sale_id = $1`, [sale.id]);
     await client.query(`DELETE FROM sales WHERE id = $1`, [sale.id]);
     await client.query(`DELETE FROM party_transactions WHERE voucher_no = $1 OR bill_id = $2`, [billNo, sale.id]);
     await client.query(`DELETE FROM rojmel WHERE voucher_no = $1`, [billNo]);
+
+    for (const sid of affectedSeedIds) {
+      await recalculateStockLedger(client, sid);
+    }
 
     // Recalculate true balance from remaining ledger transactions
     if (sale.party_id) {
@@ -1150,18 +1195,9 @@ app.put('/api/purchases/:billNo', async (req, res) => {
     }
     const oldPur = purRes.rows[0];
 
-    // 2. Revert Old Stock Ledger
-    const oldItemsRes = await client.query('SELECT seed_id, bags, net_weight_kg FROM purchase_items WHERE purchase_id = $1', [oldPur.id]);
-    for (const it of oldItemsRes.rows) {
-      if (it.seed_id) {
-        await client.query(
-          `UPDATE stock_ledger
-           SET available_bags = GREATEST(0, available_bags - $1)
-           WHERE seed_id = $2`,
-          [it.bags || 0, it.seed_id]
-        );
-      }
-    }
+    // 2. Track old seed IDs for accurate stock recalculation
+    const oldItemsRes = await client.query('SELECT seed_id FROM purchase_items WHERE purchase_id = $1', [oldPur.id]);
+    const affectedSeedIds = new Set(oldItemsRes.rows.map(it => it.seed_id).filter(Boolean));
 
     // 3. Delete old purchase items
     await client.query('DELETE FROM purchase_items WHERE purchase_id = $1', [oldPur.id]);
@@ -1350,23 +1386,11 @@ app.put('/api/purchases/:billNo', async (req, res) => {
         );
 
         if (validSeedId) {
-          await client.query(
-            `INSERT INTO stock_ledger (id, seed_id, variety_name, batch_no, bag_weight_kg, available_bags, available_loose_kg, last_purchase_rate)
-             VALUES ($1, $2, $3, 'MAIN', $4, $5, $6, $7)
-             ON CONFLICT (seed_id, batch_no) DO UPDATE SET
-               available_bags = stock_ledger.available_bags + EXCLUDED.available_bags,
-               last_purchase_rate = EXCLUDED.last_purchase_rate`,
-            [
-              'stock_' + Date.now(),
-              validSeedId,
-              item.varietyName,
-              bagWeight,
-              bags,
-              Math.max(0, netKg - (bags * bagWeight)),
-              ratePerMan
-            ]
-          );
+          affectedSeedIds.add(validSeedId);
         }
+      }
+      for (const sid of affectedSeedIds) {
+        await recalculateStockLedger(client, sid);
       }
     }
 
@@ -1467,20 +1491,9 @@ app.put('/api/sales/:billNo', async (req, res) => {
     }
     const oldSale = saleRes.rows[0];
 
-    // Revert old sale items from stock
-    const oldItemsRes = await client.query('SELECT seed_id, bags, loose_kg FROM sale_items WHERE sale_id = $1', [oldSale.id]);
-    for (const it of oldItemsRes.rows) {
-      if (it.seed_id) {
-        await client.query(
-          `UPDATE stock_ledger
-           SET available_bags = available_bags + $1,
-               available_loose_kg = available_loose_kg + $2
-           WHERE seed_id = $3`,
-          [it.bags || 0, it.loose_kg || 0, it.seed_id]
-        );
-      }
-    }
-
+    // Track old sale seed IDs for accurate stock recalculation
+    const oldItemsRes = await client.query('SELECT seed_id FROM sale_items WHERE sale_id = $1', [oldSale.id]);
+    const affectedSaleSeedIds = new Set(oldItemsRes.rows.map(it => it.seed_id).filter(Boolean));
     await client.query('DELETE FROM sale_items WHERE sale_id = $1', [oldSale.id]);
 
     let finalSalePartyId = saleData.farmerId || saleData.partyId || oldSale.party_id;
@@ -1577,14 +1590,11 @@ app.put('/api/sales/:billNo', async (req, res) => {
         );
 
         if (validSaleSeedId) {
-          await client.query(
-            `UPDATE stock_ledger
-             SET available_bags = GREATEST(0, available_bags - $1),
-                 available_loose_kg = GREATEST(0, available_loose_kg - $2)
-             WHERE seed_id = $3`,
-            [bags, looseKg, validSaleSeedId]
-          );
+          affectedSaleSeedIds.add(validSaleSeedId);
         }
+      }
+      for (const sid of affectedSaleSeedIds) {
+        await recalculateStockLedger(client, sid);
       }
     }
 
@@ -1665,7 +1675,8 @@ app.post('/api/stock/adjust', async (req, res) => {
     const result = await pool.query(
       `UPDATE stock_ledger
        SET available_bags = GREATEST(0, available_bags + $1),
-           available_loose_kg = GREATEST(0, available_loose_kg + $2)
+           total_weight_kg = GREATEST(0, total_weight_kg + $2),
+           updated_at = CURRENT_TIMESTAMP
        WHERE id = $3
        RETURNING *`,
       [parseInt(bagDiff || 0), parseFloat(kgDiff || 0), stockId]
@@ -1673,6 +1684,16 @@ app.post('/api/stock/adjust', async (req, res) => {
     res.json({ success: true, stock: result.rows[0] });
   } catch (err) {
     console.error('Error adjusting stock in PostgreSQL:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9b. Force Recalculate All Stock
+app.post('/api/stock/recalculate', async (req, res) => {
+  try {
+    await recalculateAllStock();
+    res.json({ success: true, message: 'બધા બિયારણનો સ્ટોક સફળતાપૂર્વક મેળવાઈ ગયો.' });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -1691,7 +1712,8 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Krushi Trade PostgreSQL API running dynamically on port ${PORT}`);
   try {
     await recalculateAllParties();
+    await recalculateAllStock();
   } catch (err) {
-    console.error('Error recalculating party balances on startup:', err);
+    console.error('Error recalculating party balances or stock on startup:', err);
   }
 });

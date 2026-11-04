@@ -436,7 +436,7 @@ export const Reports = ({ onOpenBill, initialTab }) => {
                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', fontSize: '0.88rem' }}>
                       <td style={{ padding: '0.75rem' }}>{idx + 1}</td>
                       <td style={{ padding: '0.75rem', fontWeight: '700', color: '#0f172a' }}>{stk.varietyName}</td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center', color: '#64748b' }}>35 KG</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center', color: '#64748b' }}>{stk.bagWeightKg || 35} KG</td>
                       <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                         <span className="badge badge-primary" style={{ fontSize: '0.85rem' }}>
                           {stk.availableBags} બેગ
@@ -461,6 +461,27 @@ export const Reports = ({ onOpenBill, initialTab }) => {
                   );
                 })}
               </tbody>
+              <tfoot>
+                <tr style={{ backgroundColor: '#ecfdf5', fontWeight: '800', fontSize: '0.9rem', color: '#064e3b' }}>
+                  <td colSpan={3} style={{ padding: '0.8rem' }}>કુલ સ્ટોક સરવાળો (Total Stock)</td>
+                  <td style={{ padding: '0.8rem', textAlign: 'center' }}>
+                    {stock.reduce((s, it) => s + (parseInt(it.availableBags) || 0), 0)} બેગ
+                  </td>
+                  <td style={{ padding: '0.8rem', textAlign: 'center' }}>
+                    {stock.reduce((s, it) => s + (parseFloat(it.availableLooseKg) || 0), 0).toFixed(2)} kg
+                  </td>
+                  <td style={{ padding: '0.8rem', textAlign: 'right' }}>
+                    {stock.reduce((s, it) => s + (parseFloat(it.totalWeightKg) || 0), 0).toLocaleString('en-IN')} KG
+                  </td>
+                  <td style={{ padding: '0.8rem', textAlign: 'right' }}>
+                    {stock.reduce((s, it) => s + (parseFloat(it.totalMan || (it.totalWeightKg / 20)) || 0), 0).toFixed(2)} મણ
+                  </td>
+                  <td style={{ padding: '0.8rem', textAlign: 'right' }}>—</td>
+                  <td style={{ padding: '0.8rem', textAlign: 'right' }}>
+                    ₹{Math.round(stock.reduce((s, it) => s + ((it.totalMan || (it.totalWeightKg / 20)) * (it.lastPurchaseRate || 0)), 0)).toLocaleString('en-IN')}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
